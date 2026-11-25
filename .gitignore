@@ -1,0 +1,44 @@
+# --- Data: never versioned (only data/README.md is kept) ---
+data/*
+!data/README.md
+
+# --- Model weights and exports ---
+*.pt
+*.pth
+*.onnx
+*.ckpt
+*.safetensors
+*.engine
+*.tflite
+*_openvino_model/
+openvino/
+weights/
+runs/
+results/
+lightning_logs/
+
+# --- Runtime files (event database, logs) ---
+var/
+*.db
+*.sqlite
+*.log
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# --- Environment / IDE ---
+.env
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/settings.local.json
