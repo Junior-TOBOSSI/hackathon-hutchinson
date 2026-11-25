@@ -1,0 +1,16 @@
+# Use case: safety (missing PPE, phone use)
+
+# Class loaded by the registry ("module:Class"). Change this line to plug a real model.
+analyzer_class: usecases.safety.analyzer:FakeSafetyAnalyzer
+
+# Decision layer: score < low -> conforme ; low <= score < high -> a_verifier ; score >= high -> anomalie
+thresholds:
+  low: 0.4
+  high: 0.7
+
+params:
+  seed: 123
+  anomaly_rate: 0.08
+  min_latency_ms: 20
+  max_latency_ms: 50
+  max_persons: 3

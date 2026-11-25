@@ -1,0 +1,17 @@
+# Use case: quality (anomaly detection on parts)
+
+# Class loaded by the registry ("module:Class"). Change this line to plug a real model.
+analyzer_class: usecases.quality.analyzer:FakeQualityAnalyzer
+
+# Decision layer: score < low -> conforme ; low <= score < high -> a_verifier ; score >= high -> anomalie
+# Initial values; they can be changed at runtime through PUT /thresholds/quality.
+thresholds:
+  low: 0.4
+  high: 0.7
+
+# Free parameters passed to analyzer.load() (plus "device" from the global settings).
+params:
+  seed: 42
+  anomaly_rate: 0.08      # share of clearly anomalous frames
+  min_latency_ms: 20      # simulated inference time
+  max_latency_ms: 60

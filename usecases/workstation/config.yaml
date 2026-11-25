@@ -1,0 +1,17 @@
+# Use case: workstation (station layout vs. reference)
+
+# Class loaded by the registry ("module:Class"). Change this line to plug a real model.
+analyzer_class: usecases.workstation.analyzer:FakeWorkstationAnalyzer
+
+# Decision layer: score < low -> conforme ; low <= score < high -> a_verifier ; score >= high -> anomalie
+thresholds:
+  low: 0.4
+  high: 0.7
+
+params:
+  seed: 7
+  anomaly_rate: 0.08
+  min_latency_ms: 15
+  max_latency_ms: 40
+  # Reference layout: objects that must be on the station.
+  expected_objects: [screwdriver, gauge, parts_tray, torque_wrench]
