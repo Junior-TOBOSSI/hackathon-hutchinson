@@ -6,8 +6,9 @@
 # Source folders are mounted: after editing code, run  docker compose restart api
 
 x-app: &app
+  # No shared "image:" name: three services building the same tag in parallel conflict.
+  # The layers are shared through the build cache, so this costs no extra time or disk.
   build: .
-  image: visionhub:dev
   env_file:
     - path: .env
       required: false
