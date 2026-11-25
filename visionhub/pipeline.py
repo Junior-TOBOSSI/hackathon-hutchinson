@@ -32,6 +32,7 @@ class Pipeline:
         self.frames_processed = 0
         self.last_error: str | None = None
         self._stop = threading.Event()
+        self._analyze_lock = threading.Lock()
         self._thread: threading.Thread | None = None
 
     # ------------------------------------------------------------- one frame
@@ -52,7 +53,10 @@ class Pipeline:
                 continue
             start = time.perf_counter()
             try:
-                result = analyzer.analyze(image, meta)
+                # The background loop and POST /analyze may call the same model at the same
+                # time; many real models are not thread-safe, so calls are serialized.
+                with self._analyze_lock:
+                    result = analyzer.analyze(image, meta)
             except Exception:
                 # One failing analyzer must not stop the others.
                 log.exception("Analyzer %s failed on frame %s", use_case, meta.frame_id)
