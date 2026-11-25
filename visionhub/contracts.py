@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
 Score = Annotated[float, Field(ge=0.0, le=1.0)]
 
@@ -151,7 +151,8 @@ class AnalysisResult(Contract):
     def _details_match_use_case(self) -> AnalysisResult:
         if self.details.kind != self.use_case.value:
             raise ValueError(
-                f"details.kind={self.details.kind!r} does not match use_case={self.use_case.value!r}"
+                f"details.kind={self.details.kind!r} does not match "
+                f"use_case={self.use_case.value!r}"
             )
         return self
 
@@ -188,6 +189,44 @@ class Event(AnalysisResult):
     decision: Decision
     thresholds_used: Thresholds
     operator_feedback: OperatorFeedback | None = None
+
+
+class UseCaseStats(Contract):
+    counts: dict[str, int]  # decision -> number of events
+    pending_review: int  # a_verifier events without operator feedback
+
+    @computed_field
+    @property
+    def total(self) -> int:
+        return sum(self.counts.values())
+
+    @computed_field
+    @property
+    def review_rate(self) -> float:
+        """Share of a_verifier among all events."""
+        return self.counts.get(Decision.A_VERIFIER.value, 0) / self.total if self.total else 0.0
+
+
+class Stats(Contract):
+    """Served by GET /stats."""
+
+    by_use_case: dict[str, UseCaseStats]
+
+    @computed_field
+    @property
+    def total(self) -> int:
+        return sum(s.total for s in self.by_use_case.values())
+
+    @computed_field
+    @property
+    def review_rate(self) -> float:
+        review = sum(s.counts.get(Decision.A_VERIFIER.value, 0) for s in self.by_use_case.values())
+        return review / self.total if self.total else 0.0
+
+    @computed_field
+    @property
+    def pending_review(self) -> int:
+        return sum(s.pending_review for s in self.by_use_case.values())
 
 
 class UseCaseInfo(Contract):

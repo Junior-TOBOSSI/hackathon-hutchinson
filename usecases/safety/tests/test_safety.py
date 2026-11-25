@@ -41,7 +41,13 @@ def test_high_score_means_missing_ppe_or_phone():
 def test_no_identity_fields_in_contract():
     """Privacy by design: a person is only described by position and PPE states."""
     assert set(PersonPPE.model_fields) == {
-        "person_index", "bbox", "helmet", "vest", "glasses", "gloves", "phone"
+        "person_index",
+        "bbox",
+        "helmet",
+        "vest",
+        "glasses",
+        "gloves",
+        "phone",
     }
 
 

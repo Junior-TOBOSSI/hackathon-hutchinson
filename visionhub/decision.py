@@ -1,8 +1,8 @@
 """Common decision layer: the same rule for every use case.
 
-    score <  low          -> conforme
-    low <= score < high   -> a_verifier   (a human checks it)
-    score >= high         -> anomalie
+score <  low          -> conforme
+low <= score < high   -> a_verifier   (a human checks it)
+score >= high         -> anomalie
 """
 
 from __future__ import annotations
