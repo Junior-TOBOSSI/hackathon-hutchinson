@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     api_port: int = 8000
     dashboard_port: int = 8501
     api_url: str = "http://localhost:8000"
+    dashboard_refresh_seconds: float = 2.0
 
     @field_validator("enabled_use_cases", mode="before")
     @classmethod

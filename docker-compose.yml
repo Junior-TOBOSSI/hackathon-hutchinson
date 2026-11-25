@@ -1,0 +1,58 @@
+# Demo:   docker compose up --build        -> dashboard http://localhost:8501, API http://localhost:8000/docs
+# Tests:  docker compose run --rm tests
+#
+# Ports are bound to 127.0.0.1 only: nothing is exposed on the network by default.
+# Host ports come from API_PORT / DASHBOARD_PORT (in .env) if the defaults are taken.
+# Source folders are mounted: after editing code, run  docker compose restart api
+
+x-app: &app
+  build: .
+  image: visionhub:dev
+  env_file:
+    - path: .env
+      required: false
+  volumes:
+    - ./visionhub:/app/visionhub
+    - ./usecases:/app/usecases
+    - ./dashboard:/app/dashboard
+    - ./tests:/app/tests
+    - ./conftest.py:/app/conftest.py
+    - ./data:/app/data            # for SOURCE=folder / SOURCE=video (SOURCE_PATH=data/...)
+
+services:
+  api:
+    <<: *app
+    command: uvicorn visionhub.api:app --host 0.0.0.0 --port 8000
+    environment:
+      DB_PATH: /app/var/events.db
+    volumes:
+      - ./visionhub:/app/visionhub
+      - ./usecases:/app/usecases
+      - ./data:/app/data
+      - events:/app/var           # SQLite event database (Docker volume)
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  dashboard:
+    <<: *app
+    command: streamlit run dashboard/app.py --server.address 0.0.0.0 --server.port 8501
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-8501}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  tests:
+    <<: *app
+    profiles: [tools]
+    command: sh -c "ruff check . && pytest"
+
+volumes:
+  events:

@@ -1,0 +1,6 @@
+# No data leaves the machine: disable Streamlit usage statistics.
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = true
