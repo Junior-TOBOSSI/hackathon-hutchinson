@@ -43,6 +43,10 @@ line-length = 100
 target-version = "py311"
 extend-exclude = ["usecases/*/notebooks"]
 
+[tool.ruff.format]
+# Do not reformat code snippets inside documentation.
+exclude = ["*.md"]
+
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
 

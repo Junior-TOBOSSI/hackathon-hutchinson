@@ -14,15 +14,16 @@ data/
 │   ├── quality/
 │   ├── workstation/
 │   └── safety/
-└── test/         # JEU DE TEST MIS DE CÔTÉ dès le départ
-    ├── quality/
-    ├── workstation/
-    └── safety/
+├── test/         # JEU DE TEST MIS DE CÔTÉ dès le départ
+│   ├── quality/
+│   ├── workstation/
+│   └── safety/
+└── models/       # poids des modèles (*.pt, *.ckpt, *.onnx…), un dossier par cas d'usage
 ```
 
 ## Règles
 
 1. **`test/` n'est jamais utilisé pour l'entraînement ni pour régler les seuils.** On le constitue au début, on n'y touche plus, et on ne s'en sert que pour mesurer les résultats finaux (présentés au jury).
 2. On ne modifie jamais `raw/` : toute transformation produit des fichiers dans `processed/`.
-3. Les poids de modèles (`*.pt`, `*.onnx`, `*.ckpt`, dossiers OpenVINO…) ne sont pas versionnés non plus. Partagez-les entre vous par clé USB ou dossier partagé interne.
+3. Les poids de modèles (`*.pt`, `*.onnx`, `*.ckpt`, dossiers OpenVINO…) ne sont pas versionnés non plus. Rangez-les dans `data/models/<cas>/` et partagez-les entre vous par clé USB ou dossier partagé interne.
 4. Images de personnes (cas `safety`) : ne conservez que le strict nécessaire, ne publiez rien, et supprimez tout à la fin du hackathon.

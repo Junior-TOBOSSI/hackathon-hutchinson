@@ -5,6 +5,9 @@ analyzer exactly as the platform does (through the registry and its config.yaml)
 checks the shape of its outputs. Run it with:
 
     pytest tests/test_contract.py
+
+Rule for real models: import heavy libraries (ultralytics, anomalib, torch) INSIDE load(),
+not at the top of the module, so that the class can be imported everywhere.
 """
 
 import os
@@ -44,6 +47,21 @@ def sample_images() -> list[np.ndarray]:
     ]
 
 
+# In CI (GitHub sets CI=true), real models cannot load: weights are not versioned and heavy
+# libraries are not installed. Only these failures are skipped there; locally they FAIL.
+MISSING_IN_CI = ("ModuleNotFoundError", "ImportError", "FileNotFoundError")
+
+
+def skip_if_unavailable_in_ci(registry: Registry, use_case: UseCase) -> None:
+    info = {i.use_case: i for i in registry.info()}[use_case]
+    if (
+        os.environ.get("CI") == "true"
+        and info.status == "error"
+        and (info.error or "").startswith(MISSING_IN_CI)
+    ):
+        pytest.skip(f"{use_case}: model or dependency not available in CI ({info.error})")
+
+
 @pytest.fixture(scope="module")
 def registry() -> Registry:
     return Registry(Settings(_env_file=None, enabled_use_cases=list(UseCase))).load()
@@ -62,12 +80,14 @@ def test_analyzer_class_is_declared_correctly(use_case):
 
 @pytest.mark.parametrize("use_case", list(UseCase), ids=lambda u: u.value)
 def test_analyzer_loads_through_registry(registry, use_case):
+    skip_if_unavailable_in_ci(registry, use_case)
     info = {i.use_case: i for i in registry.info()}[use_case]
     assert info.status == "ok", f"Analyzer failed to load: {info.error}"
 
 
 @pytest.mark.parametrize("use_case", list(UseCase), ids=lambda u: u.value)
 def test_analyzer_output_respects_contract(registry, use_case):
+    skip_if_unavailable_in_ci(registry, use_case)
     analyzer = registry.get(use_case)
     assert analyzer is not None
     for i, image in enumerate(sample_images()):
