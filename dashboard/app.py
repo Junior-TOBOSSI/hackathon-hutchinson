@@ -34,12 +34,38 @@ def api_get(path: str, **params):
     return response.json()
 
 
-def api_send(method: str, path: str, payload: dict):
+def api_send(method: str, path: str, payload: dict) -> bool:
+    """Send a change to the API. The message is shown on the next redraw (see flash())."""
     response = requests.request(method, f"{API_URL}{path}", json=payload, timeout=5)
     if not response.ok:
-        st.error(f"Erreur API {response.status_code} : {response.text}")
-        return None
-    return response.json()
+        st.session_state["flash"] = (
+            "error",
+            f"Erreur API {response.status_code} : {response.text}",
+        )
+    return response.ok
+
+
+def flash() -> None:
+    """Show the message left by the last button callback, if any."""
+    kind, message = st.session_state.pop("flash", (None, None))
+    if kind == "error":
+        st.error(message)
+    elif kind == "ok":
+        st.toast(message)
+
+
+# Button callbacks: they run BEFORE the page is redrawn, so the new state shows at once.
+# They must not display anything themselves: they leave a message for flash().
+
+
+def send_feedback(event_id: str, verdict: str) -> None:
+    if api_send("POST", f"/events/{event_id}/feedback", {"verdict": verdict}):
+        st.session_state["flash"] = ("ok", f"Verdict « {verdict} » enregistré")
+
+
+def send_thresholds(use_case: str, low: float, high: float) -> None:
+    if api_send("PUT", f"/thresholds/{use_case}", {"low": low, "high": high}):
+        st.session_state["flash"] = ("ok", f"Seuils {use_case} : {low:.2f} / {high:.2f}")
 
 
 def summarize(event: dict) -> str:
@@ -108,10 +134,12 @@ with st.sidebar:
             key=f"thr-{uc['use_case']}",
         )
         if (low, high) != (t["low"], t["high"]):
-            if st.button(f"Appliquer à {uc['use_case']}", key=f"apply-{uc['use_case']}"):
-                if api_send("PUT", f"/thresholds/{uc['use_case']}", {"low": low, "high": high}):
-                    st.toast(f"Seuils {uc['use_case']} mis à jour : {low:.2f} / {high:.2f}")
-                    st.rerun()
+            st.button(
+                f"Appliquer à {uc['use_case']}",
+                key=f"apply-{uc['use_case']}",
+                on_click=send_thresholds,
+                args=(uc["use_case"], low, high),
+            )
 
 
 # ------------------------------------------------------------------ live part
@@ -119,6 +147,7 @@ with st.sidebar:
 
 @st.fragment(run_every=REFRESH_SECONDS if auto else None)
 def live() -> None:
+    flash()
     filters = {} if selected == "tous" else {"use_case": selected}
 
     # Counters
@@ -182,11 +211,12 @@ def live() -> None:
                     (ok_col, "conforme", "✅ Conforme"),
                     (ko_col, "defaut", "❌ Défaut"),
                 ):
-                    if col.button(label, key=f"{verdict}-{e['event_id']}"):
-                        path = f"/events/{e['event_id']}/feedback"
-                        if api_send("POST", path, {"verdict": verdict}):
-                            st.toast(f"Verdict « {verdict} » enregistré")
-                            st.rerun(scope="fragment")
+                    col.button(
+                        label,
+                        key=f"{verdict}-{e['event_id']}",
+                        on_click=send_feedback,
+                        args=(e["event_id"], verdict),
+                    )
 
 
 live()
