@@ -1,0 +1,28 @@
+[
+  {
+    "kind": "operator.report",
+    "report_id": "e94a1a72-3ad0-5c78-a4b7-244c19eed855",
+    "category": "quality",
+    "severity": "warning",
+    "message": "Beaucoup de rejets sur la pièce de référence depuis 7 h",
+    "actor_role": "operator",
+    "related_part_id": "3a157ee8-9d9c-57bc-aa6a-a082bcedced7",
+    "related_event_id": null,
+    "station_id": "WS-01",
+    "created_at": "2026-11-26T08:45:00Z",
+    "status": "open"
+  },
+  {
+    "kind": "operator.report",
+    "report_id": "39fe4c49-bdf3-53d0-bd45-318027c2d6b9",
+    "category": "equipment",
+    "severity": "critical",
+    "message": "Éclairage du poste instable",
+    "actor_role": "operator",
+    "related_part_id": null,
+    "related_event_id": null,
+    "station_id": "WS-04",
+    "created_at": "2026-11-26T08:00:00Z",
+    "status": "acknowledged"
+  }
+]

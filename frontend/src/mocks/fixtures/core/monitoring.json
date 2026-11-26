@@ -1,0 +1,39 @@
+[
+  {
+    "station_id": null,
+    "use_case": "quality",
+    "model": {
+      "registered_model": "argos-quality",
+      "version": "3",
+      "alias": "champion",
+      "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+    },
+    "window_start": "2026-11-26T06:00:00Z",
+    "window_end": "2026-11-26T09:00:00Z",
+    "n_inferences": 1650,
+    "decision_rates": {
+      "conforme": 0.9,
+      "a_verifier": 0.04,
+      "anomalie": 0.06
+    },
+    "mean_score": 0.21,
+    "latency_ms_p95": 6.4,
+    "human_agreement_rate": 0.93,
+    "drift": [
+      {
+        "feature": "score",
+        "method": "psi",
+        "value": 0.08,
+        "threshold": 0.2,
+        "alert": false
+      },
+      {
+        "feature": "brightness",
+        "method": "ks",
+        "value": 0.31,
+        "threshold": 0.25,
+        "alert": true
+      }
+    ]
+  }
+]

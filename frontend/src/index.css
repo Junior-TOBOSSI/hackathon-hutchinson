@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* ARGOS identity: industrial dark theme, night blue with cyan accents.
+   Tokens only: the Frontend group owns the final design. */
+@theme {
+  --color-argos-night: #0b1526;
+  --color-argos-panel: #12213a;
+  --color-argos-line: #1f3556;
+  --color-argos-cyan: #22d3ee;
+  --color-verdict-ok: #22c55e;
+  --color-verdict-nok: #ef4444;
+  --color-verdict-hold: #f59e0b;
+  --color-verdict-error: #a855f7;
+}

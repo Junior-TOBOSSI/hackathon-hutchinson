@@ -1,0 +1,9 @@
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "device": "cpu",
+  "source": "synthetic",
+  "pipeline_running": true,
+  "frames_processed": 1234,
+  "pipeline_error": null
+}

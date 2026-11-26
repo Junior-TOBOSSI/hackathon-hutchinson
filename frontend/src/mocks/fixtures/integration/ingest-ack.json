@@ -1,0 +1,42 @@
+{
+  "station_id": "WS-01",
+  "received_at": "2026-11-26T09:00:01Z",
+  "results": [
+    {
+      "event_id": "f6849afd-1078-56d1-91df-fee450ba50bc",
+      "status": "duplicate",
+      "error": null
+    },
+    {
+      "event_id": "2f8f969b-5e97-561e-ad41-9e54b2551414",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "event_id": "b60fab1b-9c77-5bec-99ab-8d81e0ece703",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "event_id": "4f5507ee-e31a-561b-a0a8-510d699f7b8a",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "event_id": "937f43c1-3bc8-5adc-bf66-662bc76424d1",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "event_id": "f48f360e-8e4a-53c1-b8d8-514b2467afb1",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "event_id": "eb76378b-b651-5114-a25e-3667137d11bb",
+      "status": "accepted",
+      "error": null
+    }
+  ],
+  "highest_contiguous_sequence": 107
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "use_case": "quality",
+    "status": "ok",
+    "analyzer_class": "usecases.quality.analyzer:FakeQualityAnalyzer",
+    "name": "fake-quality",
+    "version": "0.1.0",
+    "thresholds": {
+      "low": 0.4,
+      "high": 0.7
+    },
+    "error": null
+  },
+  {
+    "use_case": "workstation",
+    "status": "ok",
+    "analyzer_class": "usecases.workstation.analyzer:FakeWorkstationAnalyzer",
+    "name": "fake-workstation",
+    "version": "0.1.0",
+    "thresholds": {
+      "low": 0.4,
+      "high": 0.7
+    },
+    "error": null
+  },
+  {
+    "use_case": "safety",
+    "status": "ok",
+    "analyzer_class": "usecases.safety.analyzer:FakeSafetyAnalyzer",
+    "name": "fake-safety",
+    "version": "0.1.0",
+    "thresholds": {
+      "low": 0.4,
+      "high": 0.7
+    },
+    "error": null
+  }
+]

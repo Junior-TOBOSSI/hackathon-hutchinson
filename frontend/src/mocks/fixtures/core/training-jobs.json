@@ -1,0 +1,94 @@
+[
+  {
+    "job_id": "a5f56265-280e-5856-9ecf-d0a9f582b2d8",
+    "status": "succeeded",
+    "trigger": "manual",
+    "config": {
+      "use_case": "quality",
+      "task": "classification",
+      "architecture": "yolo26n-cls",
+      "base_weights": "yolo26n-cls.pt",
+      "image_size": [
+        224,
+        224
+      ],
+      "epochs": 50,
+      "batch_size": 64,
+      "seed": 42,
+      "hyperparameters": {
+        "lr0": 0.001
+      },
+      "dataset": {
+        "name": "ref-part-a",
+        "version": "v1.0",
+        "uri": "dvc://argos/datasets/ref-part-a",
+        "manifest_sha256": "3ccdaa3b5434a13dc7da324db5485ed6dee0afb8c49e8275ac676e7358713234",
+        "num_samples": 1000,
+        "splits": {
+          "train": 700,
+          "val": 150,
+          "test": 150
+        },
+        "split_strategy": "by_sequence",
+        "confidential": true,
+        "classes": [
+          "OK",
+          "NOK"
+        ]
+      }
+    },
+    "mlflow_experiment_id": "12",
+    "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073",
+    "compute": "a100-cluster",
+    "created_at": "2026-11-24T06:00:00Z",
+    "started_at": "2026-11-24T06:00:00Z",
+    "ended_at": "2026-11-24T07:00:00Z",
+    "error": null
+  },
+  {
+    "job_id": "454a4ee9-1897-555d-bb84-e79087d23b33",
+    "status": "running",
+    "trigger": "policy",
+    "config": {
+      "use_case": "quality",
+      "task": "classification",
+      "architecture": "yolo26n-cls",
+      "base_weights": "yolo26n-cls.pt",
+      "image_size": [
+        224,
+        224
+      ],
+      "epochs": 50,
+      "batch_size": 64,
+      "seed": 42,
+      "hyperparameters": {
+        "lr0": 0.001
+      },
+      "dataset": {
+        "name": "ref-part-a",
+        "version": "v1.0",
+        "uri": "dvc://argos/datasets/ref-part-a",
+        "manifest_sha256": "3ccdaa3b5434a13dc7da324db5485ed6dee0afb8c49e8275ac676e7358713234",
+        "num_samples": 1000,
+        "splits": {
+          "train": 700,
+          "val": 150,
+          "test": 150
+        },
+        "split_strategy": "by_sequence",
+        "confidential": true,
+        "classes": [
+          "OK",
+          "NOK"
+        ]
+      }
+    },
+    "mlflow_experiment_id": "12",
+    "mlflow_run_id": null,
+    "compute": "a100-cluster",
+    "created_at": "2026-11-26T07:30:00Z",
+    "started_at": "2026-11-26T07:32:00Z",
+    "ended_at": null,
+    "error": null
+  }
+]

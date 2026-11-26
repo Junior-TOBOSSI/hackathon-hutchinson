@@ -1,0 +1,113 @@
+[
+  {
+    "part_id": "567fd9b0-36c3-5bc6-ac62-6ce68f921439",
+    "station_id": "WS-01",
+    "cycle_id": "C-20261126-000413",
+    "shift_id": "cfd15730-1e70-5493-8ed9-3569642baa6d",
+    "created_at": "2026-11-26T08:53:00Z",
+    "trigger_source": "plc",
+    "camera_id": "CAM-Q",
+    "image_sha256": null,
+    "predicted_verdict": "ERROR",
+    "prediction": null,
+    "error": {
+      "code": "CAPTURE_FAILED",
+      "message": "no image received for an industrial cycle"
+    },
+    "effective_verdict": "ERROR",
+    "correction_count": 0,
+    "disposition": "UNKNOWN",
+    "disposition_note": null,
+    "disposition_updated_at": null
+  },
+  {
+    "part_id": "3a157ee8-9d9c-57bc-aa6a-a082bcedced7",
+    "station_id": "WS-01",
+    "cycle_id": "C-20261126-000412",
+    "shift_id": "cfd15730-1e70-5493-8ed9-3569642baa6d",
+    "created_at": "2026-11-26T08:52:00Z",
+    "trigger_source": "plc",
+    "camera_id": "CAM-Q",
+    "image_sha256": "15e336bfd131a5d9ad7beb9b1619bb4fd73d992cc9be9445d2706d1f49cc4c05",
+    "predicted_verdict": "NOK",
+    "prediction": {
+      "verdict": "NOK",
+      "ai_decision": "anomalie",
+      "score": 0.82,
+      "model_name": "argos-quality",
+      "model_version": "3",
+      "thresholds_used": {
+        "low": 0.4,
+        "high": 0.7
+      },
+      "event_id": "460ca35f-37d2-5284-929b-cf90a55ed504",
+      "latency_ms": 4.2
+    },
+    "error": null,
+    "effective_verdict": "OK",
+    "correction_count": 1,
+    "disposition": "UNKNOWN",
+    "disposition_note": null,
+    "disposition_updated_at": null
+  },
+  {
+    "part_id": "4e58368d-76c1-50f9-a1d3-4374781ade27",
+    "station_id": "WS-01",
+    "cycle_id": "C-20261126-000411",
+    "shift_id": "cfd15730-1e70-5493-8ed9-3569642baa6d",
+    "created_at": "2026-11-26T08:51:00Z",
+    "trigger_source": "plc",
+    "camera_id": "CAM-Q",
+    "image_sha256": "9323c0d88a1d88c069b51ffc898b3239dafffecc4a92ee6edc18798cf084d34a",
+    "predicted_verdict": "HOLD",
+    "prediction": {
+      "verdict": "HOLD",
+      "ai_decision": "a_verifier",
+      "score": 0.52,
+      "model_name": "argos-quality",
+      "model_version": "3",
+      "thresholds_used": {
+        "low": 0.4,
+        "high": 0.7
+      },
+      "event_id": "c8b89afa-e7cc-5954-b2b2-785334254fe9",
+      "latency_ms": 4.2
+    },
+    "error": null,
+    "effective_verdict": "HOLD",
+    "correction_count": 0,
+    "disposition": "UNKNOWN",
+    "disposition_note": null,
+    "disposition_updated_at": null
+  },
+  {
+    "part_id": "a1e709ee-9df7-59f7-ab7a-1ba073922bfe",
+    "station_id": "WS-01",
+    "cycle_id": "C-20261126-000410",
+    "shift_id": "cfd15730-1e70-5493-8ed9-3569642baa6d",
+    "created_at": "2026-11-26T08:50:00Z",
+    "trigger_source": "plc",
+    "camera_id": "CAM-Q",
+    "image_sha256": "e72344934bb5aecc3982db194123c9f9bfe952210ddd6454d621d6faa9e02843",
+    "predicted_verdict": "OK",
+    "prediction": {
+      "verdict": "OK",
+      "ai_decision": "conforme",
+      "score": 0.08,
+      "model_name": "argos-quality",
+      "model_version": "3",
+      "thresholds_used": {
+        "low": 0.4,
+        "high": 0.7
+      },
+      "event_id": "49832a02-e162-515c-9b26-d5a23e59f0f9",
+      "latency_ms": 4.2
+    },
+    "error": null,
+    "effective_verdict": "OK",
+    "correction_count": 0,
+    "disposition": "SHIPPED",
+    "disposition_note": null,
+    "disposition_updated_at": "2026-11-26T08:55:00Z"
+  }
+]

@@ -1,0 +1,110 @@
+[
+  {
+    "alert_id": "3c2f2530-bee6-5e84-8349-a73a4d31f4ee",
+    "station_id": "WS-01",
+    "camera_id": "WS-01-CAM-01",
+    "use_case": "safety",
+    "alert_type": "ppe.helmet_missing",
+    "severity": "critical",
+    "status": "open",
+    "title": "Casque absent",
+    "first_seen_at": "2026-11-26T08:30:00Z",
+    "last_seen_at": "2026-11-26T08:40:00Z",
+    "occurrences": 3,
+    "max_score": 0.7,
+    "source_event_ids": [
+      "8d434439-1639-58a3-a20e-c9f659a4cb71"
+    ],
+    "simulated": false
+  },
+  {
+    "alert_id": "66f05aec-f8c1-5732-825d-5aed11c5acbe",
+    "station_id": "WS-03",
+    "camera_id": "WS-03-CAM-01",
+    "use_case": "safety",
+    "alert_type": "behavior.phone_use",
+    "severity": "warning",
+    "status": "acknowledged",
+    "title": "Utilisation du téléphone",
+    "first_seen_at": "2026-11-26T08:31:00Z",
+    "last_seen_at": "2026-11-26T08:42:00Z",
+    "occurrences": 4,
+    "max_score": 0.72,
+    "source_event_ids": [
+      "ac959251-084b-5f86-93ce-24e04cce91f6"
+    ],
+    "simulated": true
+  },
+  {
+    "alert_id": "80e1c9ba-bc9d-568d-b466-634fdd138c6d",
+    "station_id": "WS-05",
+    "camera_id": "WS-05-CAM-01",
+    "use_case": "safety",
+    "alert_type": "behavior.hand_in_danger_zone",
+    "severity": "critical",
+    "status": "open",
+    "title": "Main dans la zone presse",
+    "first_seen_at": "2026-11-26T08:32:00Z",
+    "last_seen_at": "2026-11-26T08:44:00Z",
+    "occurrences": 5,
+    "max_score": 0.74,
+    "source_event_ids": [
+      "96ea8967-3254-5f57-beb5-d567f3f4bef9"
+    ],
+    "simulated": true
+  },
+  {
+    "alert_id": "aa790570-e373-5121-ab90-417318726778",
+    "station_id": "WS-07",
+    "camera_id": "WS-07-CAM-01",
+    "use_case": null,
+    "alert_type": "equipment.camera_degraded",
+    "severity": "warning",
+    "status": "open",
+    "title": "Caméra qualité dégradée",
+    "first_seen_at": "2026-11-26T08:33:00Z",
+    "last_seen_at": "2026-11-26T08:46:00Z",
+    "occurrences": 6,
+    "max_score": 0.76,
+    "source_event_ids": [
+      "6a7795d2-2ed4-5681-8cd6-11a5fa40425c"
+    ],
+    "simulated": true
+  },
+  {
+    "alert_id": "068bf05a-fd40-5fbb-a903-45467620972a",
+    "station_id": "WS-02",
+    "camera_id": "WS-02-CAM-01",
+    "use_case": "workstation",
+    "alert_type": "workstation.missing_object",
+    "severity": "info",
+    "status": "validated",
+    "title": "Jauge manquante",
+    "first_seen_at": "2026-11-26T08:34:00Z",
+    "last_seen_at": "2026-11-26T08:48:00Z",
+    "occurrences": 7,
+    "max_score": 0.7799999999999999,
+    "source_event_ids": [
+      "09f71cf5-b483-5cc5-a7e9-6aad2d845440"
+    ],
+    "simulated": true
+  },
+  {
+    "alert_id": "4c502e60-3725-5d89-b11c-05ed46f1b832",
+    "station_id": "WS-11",
+    "camera_id": "WS-11-CAM-01",
+    "use_case": "quality",
+    "alert_type": "quality.nok_burst",
+    "severity": "warning",
+    "status": "rejected",
+    "title": "Série de NOK (5 en 10 min)",
+    "first_seen_at": "2026-11-26T08:35:00Z",
+    "last_seen_at": "2026-11-26T08:50:00Z",
+    "occurrences": 8,
+    "max_score": 0.7999999999999999,
+    "source_event_ids": [
+      "285791f1-345c-5cee-adc3-81c1d8c7756e"
+    ],
+    "simulated": true
+  }
+]

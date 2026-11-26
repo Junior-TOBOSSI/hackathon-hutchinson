@@ -1,0 +1,2482 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "visionhub",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/use-cases": {
+      "get": {
+        "summary": "Use Cases",
+        "operationId": "use_cases_use_cases_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UseCaseInfo"
+                  },
+                  "type": "array",
+                  "title": "Response Use Cases Use Cases Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "summary": "Events",
+        "operationId": "events_events_get",
+        "parameters": [
+          {
+            "name": "use_case",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UseCase"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Use Case"
+            }
+          },
+          {
+            "name": "decision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Decision"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Decision"
+            }
+          },
+          {
+            "name": "pending_feedback",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true = only events without operator feedback",
+              "title": "Pending Feedback"
+            },
+            "description": "true = only events without operator feedback"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Event"
+                  },
+                  "title": "Response Events Events Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "summary": "Stats",
+        "operationId": "stats_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stats"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analyze": {
+      "post": {
+        "summary": "Analyze",
+        "operationId": "analyze_analyze_post",
+        "parameters": [
+          {
+            "name": "use_case",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UseCase"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Empty = all loaded analyzers",
+              "title": "Use Case"
+            },
+            "description": "Empty = all loaded analyzers"
+          },
+          {
+            "name": "store",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Also store the resulting events",
+              "default": false,
+              "title": "Store"
+            },
+            "description": "Also store the resulting events"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_analyze_analyze_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Event"
+                  },
+                  "title": "Response Analyze Analyze Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/thresholds/{use_case}": {
+      "put": {
+        "summary": "Set Thresholds",
+        "operationId": "set_thresholds_thresholds__use_case__put",
+        "parameters": [
+          {
+            "name": "use_case",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UseCase"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Thresholds"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UseCaseInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{event_id}/feedback": {
+      "post": {
+        "summary": "Feedback",
+        "operationId": "feedback_events__event_id__feedback_post",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/stations/{station_id}/cycles": {
+      "post": {
+        "tags": [
+          "production"
+        ],
+        "summary": "Trigger Cycle",
+        "description": "PLC trigger: inspect one part with the quality analyzer and record it.\n\nAn industrial cycle (simulated=false) without image is recorded as ERROR\n(CAPTURE_FAILED): no synthetic image is ever used for it.",
+        "operationId": "trigger_cycle_production_stations__station_id__cycles_post",
+        "parameters": [
+          {
+            "name": "station_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "title": "Station Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_trigger_cycle_production_stations__station_id__cycles_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Idempotent replay: the cycle already existed"
+          },
+          "409": {
+            "description": "Same cycle already recorded with another image/camera/source"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/stations/{station_id}/cycles/{cycle_id}": {
+      "get": {
+        "tags": [
+          "production"
+        ],
+        "summary": "Get Cycle",
+        "operationId": "get_cycle_production_stations__station_id__cycles__cycle_id__get",
+        "parameters": [
+          {
+            "name": "station_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "title": "Station Id"
+            }
+          },
+          {
+            "name": "cycle_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cycle Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/parts": {
+      "get": {
+        "tags": [
+          "production"
+        ],
+        "summary": "List Parts",
+        "operationId": "list_parts_production_parts_get",
+        "parameters": [
+          {
+            "name": "station_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Station Id"
+            }
+          },
+          {
+            "name": "shift_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Shift Id"
+            }
+          },
+          {
+            "name": "verdict",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PartVerdict"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Effective verdict",
+              "title": "Verdict"
+            },
+            "description": "Effective verdict"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Part"
+                  },
+                  "title": "Response List Parts Production Parts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/parts/{part_id}": {
+      "get": {
+        "tags": [
+          "production"
+        ],
+        "summary": "Get Part",
+        "operationId": "get_part_production_parts__part_id__get",
+        "parameters": [
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Part Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/parts/{part_id}/corrections": {
+      "post": {
+        "tags": [
+          "production"
+        ],
+        "summary": "Correct Part",
+        "description": "Human verdict. Never overwrites the AI prediction; never releases the part.",
+        "operationId": "correct_part_production_parts__part_id__corrections_post",
+        "parameters": [
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Part Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "production"
+        ],
+        "summary": "List Corrections",
+        "operationId": "list_corrections_production_parts__part_id__corrections_get",
+        "parameters": [
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Part Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Correction"
+                  },
+                  "title": "Response List Corrections Production Parts  Part Id  Corrections Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/parts/{part_id}/disposition": {
+      "put": {
+        "tags": [
+          "production"
+        ],
+        "summary": "Set Disposition",
+        "description": "Physical disposition reported by the industrial process (not a verdict).",
+        "operationId": "set_disposition_production_parts__part_id__disposition_put",
+        "parameters": [
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Part Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispositionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/stations/{station_id}/shifts": {
+      "post": {
+        "tags": [
+          "production"
+        ],
+        "summary": "Start Shift",
+        "operationId": "start_shift_production_stations__station_id__shifts_post",
+        "parameters": [
+          {
+            "name": "station_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "title": "Station Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftStart"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Shift"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/stations/{station_id}/shifts/current": {
+      "get": {
+        "tags": [
+          "production"
+        ],
+        "summary": "Current Shift",
+        "operationId": "current_shift_production_stations__station_id__shifts_current_get",
+        "parameters": [
+          {
+            "name": "station_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "title": "Station Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/shifts/{shift_id}/close": {
+      "post": {
+        "tags": [
+          "production"
+        ],
+        "summary": "Close Shift",
+        "operationId": "close_shift_production_shifts__shift_id__close_post",
+        "parameters": [
+          {
+            "name": "shift_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Shift Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/shifts/{shift_id}": {
+      "get": {
+        "tags": [
+          "production"
+        ],
+        "summary": "Get Shift",
+        "operationId": "get_shift_production_shifts__shift_id__get",
+        "parameters": [
+          {
+            "name": "shift_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Shift Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/shifts": {
+      "get": {
+        "tags": [
+          "production"
+        ],
+        "summary": "List Shifts",
+        "operationId": "list_shifts_production_shifts_get",
+        "parameters": [
+          {
+            "name": "station_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Station Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Shift"
+                  },
+                  "title": "Response List Shifts Production Shifts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/production/stations/{station_id}/kpi": {
+      "get": {
+        "tags": [
+          "production"
+        ],
+        "summary": "Station Kpi",
+        "description": "KPIs of a station over [from, to). Defaults: the last 8 hours. Naive times = UTC.",
+        "operationId": "station_kpi_production_stations__station_id__kpi_get",
+        "parameters": [
+          {
+            "name": "station_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "title": "Station Id"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionKPI"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AIPrediction": {
+        "properties": {
+          "verdict": {
+            "$ref": "#/components/schemas/PartVerdict"
+          },
+          "ai_decision": {
+            "$ref": "#/components/schemas/Decision"
+          },
+          "score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "thresholds_used": {
+            "$ref": "#/components/schemas/Thresholds"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "latency_ms": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Latency Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "verdict",
+          "ai_decision",
+          "score",
+          "model_name",
+          "model_version",
+          "thresholds_used",
+          "event_id",
+          "latency_ms"
+        ],
+        "title": "AIPrediction",
+        "description": "Snapshot of the quality inference that produced a part verdict. Immutable."
+      },
+      "AnomalyZone": {
+        "properties": {
+          "bbox": {
+            "$ref": "#/components/schemas/BBox"
+          },
+          "score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bbox",
+          "score"
+        ],
+        "title": "AnomalyZone"
+      },
+      "BBox": {
+        "properties": {
+          "x1": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "X1"
+          },
+          "y1": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y1"
+          },
+          "x2": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "X2"
+          },
+          "y2": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y2"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "x1",
+          "y1",
+          "x2",
+          "y2"
+        ],
+        "title": "BBox",
+        "description": "Normalized bounding box, coordinates in [0, 1]."
+      },
+      "Body_analyze_analyze_post": {
+        "properties": {
+          "image": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Image",
+            "description": "JPEG/PNG image"
+          }
+        },
+        "type": "object",
+        "required": [
+          "image"
+        ],
+        "title": "Body_analyze_analyze_post"
+      },
+      "Body_trigger_cycle_production_stations__station_id__cycles_post": {
+        "properties": {
+          "cycle_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+            "title": "Cycle Id"
+          },
+          "camera_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Camera Id",
+            "default": "CAM-Q"
+          },
+          "simulated": {
+            "type": "boolean",
+            "title": "Simulated",
+            "description": "true = simulated PLC cycle (synthetic image if none sent)",
+            "default": false
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image",
+            "description": "JPEG/PNG image of the part"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cycle_id"
+        ],
+        "title": "Body_trigger_cycle_production_stations__station_id__cycles_post"
+      },
+      "Correction": {
+        "properties": {
+          "correction_id": {
+            "type": "string",
+            "title": "Correction Id"
+          },
+          "part_id": {
+            "type": "string",
+            "title": "Part Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Sequence"
+          },
+          "previous_verdict": {
+            "$ref": "#/components/schemas/PartVerdict"
+          },
+          "new_verdict": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "NOK"
+            ],
+            "title": "New Verdict"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "actor_role": {
+            "type": "string",
+            "enum": [
+              "operator",
+              "supervisor",
+              "quality"
+            ],
+            "title": "Actor Role"
+          },
+          "physical_inspection": {
+            "type": "boolean",
+            "title": "Physical Inspection"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "correction_id",
+          "part_id",
+          "sequence",
+          "previous_verdict",
+          "new_verdict",
+          "reason",
+          "actor_role",
+          "physical_inspection",
+          "at"
+        ],
+        "title": "Correction"
+      },
+      "CorrectionIn": {
+        "properties": {
+          "new_verdict": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "NOK"
+            ],
+            "title": "New Verdict"
+          },
+          "expected_current_verdict": {
+            "$ref": "#/components/schemas/PartVerdict"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason"
+          },
+          "actor_role": {
+            "type": "string",
+            "enum": [
+              "operator",
+              "supervisor",
+              "quality"
+            ],
+            "title": "Actor Role"
+          },
+          "physical_inspection": {
+            "type": "boolean",
+            "title": "Physical Inspection",
+            "description": "Must be true to correct a HOLD or ERROR part: the part was inspected.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "new_verdict",
+          "expected_current_verdict",
+          "reason",
+          "actor_role"
+        ],
+        "title": "CorrectionIn",
+        "description": "Human verdict on a part, after looking at the physical part.\n\n``expected_current_verdict`` is an optimistic lock: the correction is refused if the\npart changed in the meantime (two screens, double click)."
+      },
+      "Decision": {
+        "type": "string",
+        "enum": [
+          "conforme",
+          "a_verifier",
+          "anomalie"
+        ],
+        "title": "Decision"
+      },
+      "DetectedObject": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence"
+          },
+          "bbox": {
+            "$ref": "#/components/schemas/BBox"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "confidence",
+          "bbox"
+        ],
+        "title": "DetectedObject"
+      },
+      "Disposition": {
+        "type": "string",
+        "enum": [
+          "UNKNOWN",
+          "SHIPPED",
+          "QUARANTINED",
+          "REWORKED",
+          "SCRAPPED"
+        ],
+        "title": "Disposition"
+      },
+      "DispositionIn": {
+        "properties": {
+          "disposition": {
+            "$ref": "#/components/schemas/Disposition"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "disposition"
+        ],
+        "title": "DispositionIn"
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "ANALYZER_UNAVAILABLE",
+          "ANALYZER_FAILED",
+          "IMAGE_DECODE_FAILED",
+          "CAPTURE_FAILED"
+        ],
+        "title": "ErrorCode"
+      },
+      "Event": {
+        "properties": {
+          "use_case": {
+            "$ref": "#/components/schemas/UseCase"
+          },
+          "score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "latency_ms": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Latency Ms",
+            "description": "Filled in by the pipeline",
+            "default": 0.0
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "details": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QualityDetails"
+              },
+              {
+                "$ref": "#/components/schemas/WorkstationDetails"
+              },
+              {
+                "$ref": "#/components/schemas/SafetyDetails"
+              }
+            ],
+            "title": "Details",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "quality": "#/components/schemas/QualityDetails",
+                "safety": "#/components/schemas/SafetyDetails",
+                "workstation": "#/components/schemas/WorkstationDetails"
+              }
+            }
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "frame": {
+            "$ref": "#/components/schemas/FrameMeta"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/Decision"
+          },
+          "thresholds_used": {
+            "$ref": "#/components/schemas/Thresholds"
+          },
+          "operator_feedback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperatorFeedback"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "use_case",
+          "score",
+          "model_name",
+          "model_version",
+          "details",
+          "event_id",
+          "frame",
+          "decision",
+          "thresholds_used"
+        ],
+        "title": "Event",
+        "description": "An analysis result after the decision layer: this is what is stored and served."
+      },
+      "FeedbackIn": {
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "conforme",
+              "defaut"
+            ],
+            "title": "Verdict"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "verdict"
+        ],
+        "title": "FeedbackIn",
+        "description": "Operator verdict, as sent to the API."
+      },
+      "FrameMeta": {
+        "properties": {
+          "frame_id": {
+            "type": "string",
+            "title": "Frame Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "workstation_id": {
+            "type": "string",
+            "title": "Workstation Id"
+          },
+          "camera_id": {
+            "type": "string",
+            "title": "Camera Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "frame_id",
+          "workstation_id",
+          "camera_id"
+        ],
+        "title": "FrameMeta",
+        "description": "Metadata of one image coming from a source."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InferenceError": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "InferenceError"
+      },
+      "OperatorFeedback": {
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "conforme",
+              "defaut"
+            ],
+            "title": "Verdict"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "verdict"
+        ],
+        "title": "OperatorFeedback"
+      },
+      "PPEState": {
+        "type": "string",
+        "enum": [
+          "present",
+          "absent",
+          "uncertain"
+        ],
+        "title": "PPEState"
+      },
+      "Part": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "title": "Part Id"
+          },
+          "station_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Station Id"
+          },
+          "cycle_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+            "title": "Cycle Id"
+          },
+          "shift_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shift Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "trigger_source": {
+            "type": "string",
+            "enum": [
+              "plc",
+              "plc_simulated"
+            ],
+            "title": "Trigger Source"
+          },
+          "camera_id": {
+            "type": "string",
+            "title": "Camera Id"
+          },
+          "image_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Sha256"
+          },
+          "predicted_verdict": {
+            "$ref": "#/components/schemas/PartVerdict"
+          },
+          "prediction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AIPrediction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InferenceError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_verdict": {
+            "$ref": "#/components/schemas/PartVerdict"
+          },
+          "correction_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Correction Count"
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/Disposition",
+            "default": "UNKNOWN"
+          },
+          "disposition_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disposition Note"
+          },
+          "disposition_updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disposition Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "part_id",
+          "station_id",
+          "cycle_id",
+          "shift_id",
+          "created_at",
+          "trigger_source",
+          "camera_id",
+          "image_sha256",
+          "predicted_verdict",
+          "prediction",
+          "error",
+          "effective_verdict",
+          "correction_count"
+        ],
+        "title": "Part",
+        "description": "One physical part presented by a PLC cycle."
+      },
+      "PartVerdict": {
+        "type": "string",
+        "enum": [
+          "OK",
+          "NOK",
+          "HOLD",
+          "ERROR"
+        ],
+        "title": "PartVerdict"
+      },
+      "PersonPPE": {
+        "properties": {
+          "person_index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Person Index",
+            "description": "Index in this frame only, not a tracking id"
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BBox"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "helmet": {
+            "$ref": "#/components/schemas/PPEState"
+          },
+          "vest": {
+            "$ref": "#/components/schemas/PPEState"
+          },
+          "glasses": {
+            "$ref": "#/components/schemas/PPEState"
+          },
+          "gloves": {
+            "$ref": "#/components/schemas/PPEState"
+          },
+          "phone": {
+            "type": "boolean",
+            "title": "Phone"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "person_index",
+          "helmet",
+          "vest",
+          "glasses",
+          "gloves",
+          "phone"
+        ],
+        "title": "PersonPPE",
+        "description": "One detected person. Position in the image only: NO identity, NO face data."
+      },
+      "ProductionKPI": {
+        "properties": {
+          "window_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Start"
+          },
+          "window_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window End"
+          },
+          "elapsed_s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Elapsed S"
+          },
+          "total_parts": {
+            "type": "integer",
+            "title": "Total Parts"
+          },
+          "ok_parts": {
+            "type": "integer",
+            "title": "Ok Parts"
+          },
+          "nok_parts": {
+            "type": "integer",
+            "title": "Nok Parts"
+          },
+          "hold_parts": {
+            "type": "integer",
+            "title": "Hold Parts"
+          },
+          "error_parts": {
+            "type": "integer",
+            "title": "Error Parts"
+          },
+          "predicted_ok_parts": {
+            "type": "integer",
+            "title": "Predicted Ok Parts"
+          },
+          "predicted_nok_parts": {
+            "type": "integer",
+            "title": "Predicted Nok Parts"
+          },
+          "predicted_hold_parts": {
+            "type": "integer",
+            "title": "Predicted Hold Parts"
+          },
+          "predicted_error_parts": {
+            "type": "integer",
+            "title": "Predicted Error Parts"
+          },
+          "corrected_parts": {
+            "type": "integer",
+            "title": "Corrected Parts"
+          },
+          "yield_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Rate"
+          },
+          "nok_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nok Rate"
+          },
+          "pending_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Rate"
+          },
+          "correction_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Rate"
+          },
+          "target_parts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Parts"
+          },
+          "target_progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Progress"
+          },
+          "actual_total_rate_per_hour": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Total Rate Per Hour"
+          },
+          "actual_ok_rate_per_hour": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Ok Rate Per Hour"
+          },
+          "expected_ok_rate_per_hour": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Ok Rate Per Hour"
+          },
+          "expected_ok_parts_by_now": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Ok Parts By Now"
+          },
+          "efficiency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Efficiency"
+          },
+          "mean_latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Latency Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "window_start",
+          "window_end",
+          "elapsed_s",
+          "total_parts",
+          "ok_parts",
+          "nok_parts",
+          "hold_parts",
+          "error_parts",
+          "predicted_ok_parts",
+          "predicted_nok_parts",
+          "predicted_hold_parts",
+          "predicted_error_parts",
+          "corrected_parts",
+          "yield_rate",
+          "nok_rate",
+          "pending_rate",
+          "correction_rate",
+          "target_parts",
+          "target_progress",
+          "actual_total_rate_per_hour",
+          "actual_ok_rate_per_hour",
+          "expected_ok_rate_per_hour",
+          "expected_ok_parts_by_now",
+          "efficiency",
+          "mean_latency_ms"
+        ],
+        "title": "ProductionKPI",
+        "description": "Production indicators over a window. Rates are None when their denominator is 0.\n\nCounts use the EFFECTIVE verdict; ``predicted_*`` counts keep the AI view.\nHOLD and ERROR parts are never counted as OK nor as NOK."
+      },
+      "QualityDetails": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "quality",
+            "title": "Kind",
+            "default": "quality"
+          },
+          "zones": {
+            "items": {
+              "$ref": "#/components/schemas/AnomalyZone"
+            },
+            "type": "array",
+            "title": "Zones"
+          },
+          "heatmap_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heatmap Ref",
+            "description": "Optional reference (path/URL) to a heatmap. Never inline."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "QualityDetails"
+      },
+      "SafetyDetails": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "safety",
+            "title": "Kind",
+            "default": "safety"
+          },
+          "person_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Person Count"
+          },
+          "persons": {
+            "items": {
+              "$ref": "#/components/schemas/PersonPPE"
+            },
+            "type": "array",
+            "title": "Persons"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "person_count"
+        ],
+        "title": "SafetyDetails"
+      },
+      "Shift": {
+        "properties": {
+          "shift_id": {
+            "type": "string",
+            "title": "Shift Id"
+          },
+          "station_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Station Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "CLOSED"
+            ],
+            "title": "Status"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "planned_duration_min": {
+            "type": "integer",
+            "title": "Planned Duration Min"
+          },
+          "target_parts": {
+            "type": "integer",
+            "title": "Target Parts"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "planned_end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned End At",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "shift_id",
+          "station_id",
+          "name",
+          "status",
+          "started_at",
+          "planned_duration_min",
+          "target_parts",
+          "planned_end_at"
+        ],
+        "title": "Shift"
+      },
+      "ShiftReport": {
+        "properties": {
+          "shift": {
+            "$ref": "#/components/schemas/Shift"
+          },
+          "kpi": {
+            "$ref": "#/components/schemas/ProductionKPI"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "shift",
+          "kpi"
+        ],
+        "title": "ShiftReport"
+      },
+      "ShiftStart": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "planned_duration_min": {
+            "type": "integer",
+            "maximum": 720.0,
+            "minimum": 1.0,
+            "title": "Planned Duration Min",
+            "default": 480
+          },
+          "target_parts": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Target Parts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "target_parts"
+        ],
+        "title": "ShiftStart"
+      },
+      "Stats": {
+        "properties": {
+          "by_use_case": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/UseCaseStats"
+            },
+            "type": "object",
+            "title": "By Use Case"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "readOnly": true
+          },
+          "review_rate": {
+            "type": "number",
+            "title": "Review Rate",
+            "readOnly": true
+          },
+          "pending_review": {
+            "type": "integer",
+            "title": "Pending Review",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "by_use_case",
+          "total",
+          "review_rate",
+          "pending_review"
+        ],
+        "title": "Stats",
+        "description": "Served by GET /stats."
+      },
+      "Thresholds": {
+        "properties": {
+          "low": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Low"
+          },
+          "high": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "High"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "low",
+          "high"
+        ],
+        "title": "Thresholds",
+        "description": "Two thresholds per use case: score < low -> conforme, score >= high -> anomalie."
+      },
+      "UseCase": {
+        "type": "string",
+        "enum": [
+          "quality",
+          "workstation",
+          "safety"
+        ],
+        "title": "UseCase"
+      },
+      "UseCaseInfo": {
+        "properties": {
+          "use_case": {
+            "$ref": "#/components/schemas/UseCase"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "analyzer_class": {
+            "type": "string",
+            "title": "Analyzer Class"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "thresholds": {
+            "$ref": "#/components/schemas/Thresholds"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "use_case",
+          "status",
+          "analyzer_class",
+          "thresholds"
+        ],
+        "title": "UseCaseInfo",
+        "description": "Description of a loaded use case, served by GET /use-cases."
+      },
+      "UseCaseStats": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "pending_review": {
+            "type": "integer",
+            "title": "Pending Review"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "readOnly": true
+          },
+          "review_rate": {
+            "type": "number",
+            "title": "Review Rate",
+            "description": "Share of a_verifier among all events.",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "counts",
+          "pending_review",
+          "total",
+          "review_rate"
+        ],
+        "title": "UseCaseStats"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WorkstationDetails": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "workstation",
+            "title": "Kind",
+            "default": "workstation"
+          },
+          "expected": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Expected"
+          },
+          "detected": {
+            "items": {
+              "$ref": "#/components/schemas/DetectedObject"
+            },
+            "type": "array",
+            "title": "Detected"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing"
+          },
+          "misplaced": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Misplaced"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "WorkstationDetails"
+      }
+    }
+  }
+}

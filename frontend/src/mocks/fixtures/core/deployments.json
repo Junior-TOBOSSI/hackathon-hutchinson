@@ -1,0 +1,46 @@
+[
+  {
+    "deployment_id": "e54ef97a-78a2-558d-add0-f8294831da98",
+    "station_id": "WS-01",
+    "use_case": "quality",
+    "model": {
+      "registered_model": "argos-quality",
+      "version": "3",
+      "alias": "champion",
+      "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+    },
+    "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+    "status": "active",
+    "requested_at": "2026-11-25T10:00:00Z",
+    "approved_at": "2026-11-25T11:00:00Z",
+    "approved_by_role": "ai_leader",
+    "previous_model": {
+      "registered_model": "argos-quality",
+      "version": "2",
+      "alias": "champion",
+      "mlflow_run_id": "b24c5eba-402b-5dcd-9d19-3a25cf13"
+    }
+  },
+  {
+    "deployment_id": "65d5e321-9b4b-521d-bd38-1b888a895f4c",
+    "station_id": "WS-02",
+    "use_case": "quality",
+    "model": {
+      "registered_model": "argos-quality",
+      "version": "4",
+      "alias": "champion",
+      "mlflow_run_id": "7723122b-d21b-52a2-b3e0-b6b309b6"
+    },
+    "package_sha256": "d702cd5371b44b8f26ebad55a056dce72ce7a68021f4c6a1d74e4bdbb3eb4f93",
+    "status": "pending_approval",
+    "requested_at": "2026-11-26T07:40:00Z",
+    "approved_at": null,
+    "approved_by_role": null,
+    "previous_model": {
+      "registered_model": "argos-quality",
+      "version": "3",
+      "alias": "champion",
+      "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+    }
+  }
+]

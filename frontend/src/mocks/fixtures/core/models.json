@@ -1,0 +1,223 @@
+[
+  {
+    "package_schema": "argos.model-package/1",
+    "use_case": "quality",
+    "model": {
+      "registered_model": "argos-quality",
+      "version": "3",
+      "alias": "champion",
+      "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+    },
+    "analyzer_class": "usecases.quality.analyzer:OnnxAnalyzer",
+    "runtime": "onnxruntime",
+    "device": "cpu",
+    "artifact": {
+      "uri": "model.onnx",
+      "sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+      "size_bytes": 6291456,
+      "format": "onnx"
+    },
+    "preprocessing": {
+      "input_size": [
+        224,
+        224
+      ],
+      "color": "RGB",
+      "resize": "letterbox",
+      "normalize_mean": null,
+      "normalize_std": null,
+      "roi": null
+    },
+    "classes": [
+      "OK",
+      "NOK"
+    ],
+    "thresholds": {
+      "low": 0.3,
+      "high": 0.6
+    },
+    "params": {
+      "top_k": 1
+    },
+    "dataset": {
+      "name": "ref-part-a",
+      "version": "v1.0",
+      "uri": "dvc://argos/datasets/ref-part-a",
+      "manifest_sha256": "3ccdaa3b5434a13dc7da324db5485ed6dee0afb8c49e8275ac676e7358713234",
+      "num_samples": 1000,
+      "splits": {
+        "train": 700,
+        "val": 150,
+        "test": 150
+      },
+      "split_strategy": "by_sequence",
+      "confidential": true,
+      "classes": [
+        "OK",
+        "NOK"
+      ]
+    },
+    "evaluation": {
+      "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073",
+      "dataset": {
+        "name": "ref-part-a",
+        "version": "v1.0",
+        "uri": "dvc://argos/datasets/ref-part-a",
+        "manifest_sha256": "3ccdaa3b5434a13dc7da324db5485ed6dee0afb8c49e8275ac676e7358713234",
+        "num_samples": 1000,
+        "splits": {
+          "train": 700,
+          "val": 150,
+          "test": 150
+        },
+        "split_strategy": "by_sequence",
+        "confidential": true,
+        "classes": [
+          "OK",
+          "NOK"
+        ]
+      },
+      "split": "test",
+      "metrics": {
+        "recall_nok": 0.991,
+        "false_reject_rate": 0.043,
+        "accuracy": 0.968
+      },
+      "per_class": {},
+      "confusion_matrix": [
+        [
+          118,
+          5
+        ],
+        [
+          1,
+          102
+        ]
+      ],
+      "class_order": [
+        "OK",
+        "NOK"
+      ],
+      "recommended_thresholds": {
+        "low": 0.3,
+        "high": 0.6
+      },
+      "latency_ms_p50_cpu": 3.8,
+      "latency_ms_p95_cpu": 6.1
+    },
+    "created_at": "2026-11-25T06:00:00Z"
+  },
+  {
+    "package_schema": "argos.model-package/1",
+    "use_case": "workstation",
+    "model": {
+      "registered_model": "argos-workstation",
+      "version": "3",
+      "alias": "champion",
+      "mlflow_run_id": "41d1ef88-143a-518f-bec8-28822c71"
+    },
+    "analyzer_class": "usecases.workstation.analyzer:OnnxAnalyzer",
+    "runtime": "onnxruntime",
+    "device": "cpu",
+    "artifact": {
+      "uri": "model.onnx",
+      "sha256": "055069c5a4965245499d8a2bcfbc9bdaf44d29ef74d4a94e313b74cef0b1abe7",
+      "size_bytes": 6291456,
+      "format": "onnx"
+    },
+    "preprocessing": {
+      "input_size": [
+        640,
+        640
+      ],
+      "color": "RGB",
+      "resize": "letterbox",
+      "normalize_mean": null,
+      "normalize_std": null,
+      "roi": null
+    },
+    "classes": [
+      "screwdriver",
+      "gauge",
+      "torque_wrench"
+    ],
+    "thresholds": {
+      "low": 0.3,
+      "high": 0.6
+    },
+    "params": {
+      "top_k": 1
+    },
+    "dataset": {
+      "name": "workstation-synthetic",
+      "version": "v0.1",
+      "uri": "dvc://argos/datasets/workstation",
+      "manifest_sha256": "d195d36bd79da7df853b78f0b539b75f002819330c13b6438bbbe89a8f4f267a",
+      "num_samples": 0,
+      "splits": {},
+      "split_strategy": "by_time",
+      "confidential": false,
+      "classes": []
+    },
+    "evaluation": null,
+    "created_at": "2026-11-25T06:00:00Z"
+  },
+  {
+    "package_schema": "argos.model-package/1",
+    "use_case": "safety",
+    "model": {
+      "registered_model": "argos-safety",
+      "version": "3",
+      "alias": "champion",
+      "mlflow_run_id": "f5ee0593-43c8-5c31-9a5e-ab966d38"
+    },
+    "analyzer_class": "usecases.safety.analyzer:OnnxAnalyzer",
+    "runtime": "onnxruntime",
+    "device": "cpu",
+    "artifact": {
+      "uri": "model.onnx",
+      "sha256": "ef2a4cbdffa7e95f4a130fb91ea90f46e581177808e987e17a0f689017ac9806",
+      "size_bytes": 6291456,
+      "format": "onnx"
+    },
+    "preprocessing": {
+      "input_size": [
+        640,
+        640
+      ],
+      "color": "RGB",
+      "resize": "letterbox",
+      "normalize_mean": null,
+      "normalize_std": null,
+      "roi": null
+    },
+    "classes": [
+      "person",
+      "helmet",
+      "vest",
+      "glasses",
+      "gloves",
+      "phone"
+    ],
+    "thresholds": {
+      "low": 0.3,
+      "high": 0.6
+    },
+    "params": {
+      "top_k": 1
+    },
+    "dataset": {
+      "name": "safety-synthetic",
+      "version": "v0.1",
+      "uri": "dvc://argos/datasets/safety",
+      "manifest_sha256": "856e8bd358ece398c72f1003391aef5d1cd4fb9146e9f280b86290ce670b5afc",
+      "num_samples": 0,
+      "splits": {},
+      "split_strategy": "by_time",
+      "confidential": false,
+      "classes": []
+    },
+    "evaluation": null,
+    "created_at": "2026-11-25T06:00:00Z"
+  }
+]

@@ -1,0 +1,37 @@
+{
+  "by_use_case": {
+    "quality": {
+      "counts": {
+        "conforme": 120,
+        "a_verifier": 6,
+        "anomalie": 9
+      },
+      "pending_review": 2,
+      "total": 135,
+      "review_rate": 0.044444444444444446
+    },
+    "workstation": {
+      "counts": {
+        "conforme": 300,
+        "a_verifier": 12,
+        "anomalie": 4
+      },
+      "pending_review": 5,
+      "total": 316,
+      "review_rate": 0.0379746835443038
+    },
+    "safety": {
+      "counts": {
+        "conforme": 280,
+        "a_verifier": 20,
+        "anomalie": 7
+      },
+      "pending_review": 8,
+      "total": 307,
+      "review_rate": 0.06514657980456026
+    }
+  },
+  "total": 758,
+  "review_rate": 0.05013192612137203,
+  "pending_review": 15
+}
