@@ -24,17 +24,18 @@ export function ProgressRing({ value, target, expected, size = 220 }: { value: n
 }
 
 /** Jauges heure par heure (opérateur). */
-export function HourlyGauges({ hours, perHour, currentHour, height = 56 }: { hours: { hour: number; good: number | null }[]; perHour: number; currentHour: number; height?: number }) {
+export function HourlyGauges({ hours, perHour, currentHour, height = 56 }: { hours: { hour: number; good: number | null }[]; perHour: number | null; currentHour: number; height?: number }) {
+  const scale = perHour && perHour > 0 ? perHour : Math.max(1, ...hours.map((item) => item.good ?? 0));
   return (
     <div className="col" style={{ gap: 8, borderTop: '1px solid var(--line-soft)', paddingTop: 12 }}>
       <div className="between">
         <span className="label-caps">Heure par heure</span>
-        <span className="muted" style={{ fontSize: 14 }}>objectif {perHour} pièces / h · heure en cours en vert clair</span>
+        <span className="muted" style={{ fontSize: 14 }}>{perHour == null ? 'Objectif horaire indisponible' : `objectif ${perHour} pièces / h · heure en cours en vert clair`}</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${hours.length}, minmax(0, 1fr))`, gap: 8 }}>
         {hours.map((h) => {
           const cur = h.hour === currentHour;
-          const ok = h.good !== null && h.good >= perHour;
+          const ok = perHour != null && h.good !== null && h.good >= perHour;
           const color = cur ? 'var(--green-light)' : ok ? 'var(--green)' : 'var(--amber)';
           return (
             <div key={h.hour} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
@@ -42,7 +43,7 @@ export function HourlyGauges({ hours, perHour, currentHour, height = 56 }: { hou
               <div style={{ position: 'relative', width: '100%', height, borderRadius: 8, background: 'var(--track)', overflow: 'hidden' }}>
                 {h.good === null
                   ? <div style={{ position: 'absolute', inset: 0, border: '2px dashed var(--line-strong)', borderRadius: 8 }} />
-                  : <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.min(100, (h.good / perHour) * 100)}%`, background: color }} />}
+                  : <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.min(100, (h.good / scale) * 100)}%`, background: color }} />}
               </div>
               <span style={{ fontSize: 12, fontWeight: cur ? 700 : 400 }} className={cur ? '' : 'muted'}>{h.hour} h</span>
             </div>
@@ -54,16 +55,17 @@ export function HourlyGauges({ hours, perHour, currentHour, height = 56 }: { hou
 }
 
 /** Barres par heure avec ligne d'objectif (superviseur). */
-export function HourlyBars({ hours, perHour, currentHour, barMax = 120 }: { hours: { hour: number; good: number | null; ko: number }[]; perHour: number; currentHour: number; barMax?: number }) {
+export function HourlyBars({ hours, perHour, currentHour, barMax = 120 }: { hours: { hour: number; good: number | null; ko: number }[]; perHour: number | null; currentHour: number; barMax?: number }) {
+  const scale = perHour && perHour > 0 ? perHour : Math.max(1, ...hours.map((item) => item.good ?? 0));
   return (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 14, paddingTop: 20 }}>
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 40 + barMax, height: 2, background: 'var(--navy)' }} />
+      {perHour != null && <div style={{ position: 'absolute', left: 0, right: 0, bottom: 40 + barMax, height: 2, background: 'var(--navy)' }} />}
       {hours.map((h) => (
         <div key={h.hour} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
           <span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>{h.good ?? ''}</span>
           {h.good === null
             ? <div style={{ width: '100%', height: barMax, border: '2px dashed var(--line-strong)', borderRadius: '8px 8px 3px 3px' }} />
-            : <div style={{ width: '100%', height: Math.round((h.good / perHour) * barMax), borderRadius: '8px 8px 3px 3px', background: h.hour === currentHour ? 'var(--green-light)' : 'var(--green)' }} />}
+            : <div style={{ width: '100%', height: Math.round((h.good / scale) * barMax), borderRadius: '8px 8px 3px 3px', background: h.hour === currentHour ? 'var(--green-light)' : 'var(--green)' }} />}
           <span style={{ fontSize: 13, fontWeight: 700, height: 16, color: h.ko ? 'var(--red-text)' : 'transparent' }}>{h.ko ? `${h.ko} KO` : ''}</span>
           <span className="muted" style={{ fontSize: 13, height: 16 }}>{h.hour} h</span>
         </div>
@@ -117,7 +119,8 @@ export function Legend({ categories }: { categories: Category[] }) {
 
 /** Anneau de répartition. */
 export function Donut({ items, size = 190, centerLabel }: { items: { name: string; value: number; color: string }[]; size?: number; centerLabel: string }) {
-  const total = items.reduce((s, i) => s + i.value, 0) || 1;
+  const actualTotal = items.reduce((s, i) => s + i.value, 0);
+  const total = actualTotal || 1;
   const r = 78, c = 2 * Math.PI * r;
   let cum = 0;
   return (
@@ -133,7 +136,7 @@ export function Donut({ items, size = 190, centerLabel }: { items: { name: strin
           })}
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <span className="num" style={{ fontSize: 44 }}>{total}</span>
+          <span className="num" style={{ fontSize: 44 }}>{actualTotal}</span>
           <span className="muted" style={{ fontSize: 14 }}>{centerLabel}</span>
         </div>
       </div>

@@ -13,7 +13,8 @@ export interface Kpi {
 }
 export interface Shift {
   shift_id: string; name: string; status: 'OPEN' | 'CLOSED';
-  started_at: string; ended_at: string | null; target_parts: number;
+  started_at: string; ended_at: string | null; planned_end_at: string;
+  planned_duration_min: number; target_parts: number;
 }
 export interface Station {
   station_id: string; cell: string; simulated: boolean; online: boolean;
@@ -75,6 +76,7 @@ export const industrial = {
   },
   parts: (stationId: string, limit = 100) =>
     request<Part[]>(`${core}/parts?station_id=${id(stationId)}&limit=${limit}`),
+  allParts: (limit = 500) => request<Part[]>(`${core}/parts?limit=${limit}`),
   alerts: (stationId?: string) =>
     request<Alert[]>(`${core}/alerts${stationId ? `?station_id=${id(stationId)}` : ''}`),
   events: (stationId: string, limit = 100) =>

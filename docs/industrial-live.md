@@ -7,6 +7,8 @@ PosteDetail aux API existantes. Le login, Admin et les autres espaces conservent
 mode actuel. Ce drapeau est indépendant de `VITE_USE_MOCK` et de
 `VITE_LIVE_AI_LEADER`. Le frontend ne lit aucune base SQLite et n'appelle ni modèle
 ni Databricks. Il utilise `/api/v1/*` pour le Core et `/production/*` pour l'Edge.
+Depuis INT-01-FIX, les modes mock et live utilisent les **mêmes quatre pages et
+les mêmes composants graphiques**. Le drapeau choisit la source de données.
 
 L'écran Operator lit la dernière pièce dans l'Edge, les KPI, le shift, les alertes
 et les équipements dans le Core. Une correction part vers
@@ -25,6 +27,13 @@ montre au maximum 100 pièces et 100 événements par poste : ce n'est pas un
 historique exhaustif. Le KPI standard porte sur les huit dernières heures ; seul
 un shift actif fournit un objectif. Image, nombre de joints, signalement
 opérateur transactionnel et notification maintenance restent indisponibles.
+Les emplacements correspondants restent visibles avec « indisponible » ou
+« inconnu ». Les graphiques horaires sont construits depuis les pièces Core
+uniquement lorsque la liste plafonnée à 500 éléments est complète. Si cette
+limite est atteinte, ils restent affichés avec un état indisponible. Le Core
+ne fournit pas de ligne industrielle : l'atelier affiche « Ligne non
+configurée » et les cellules réellement signalées par les postes. La bande
+chronologique d'un shift clos n'est pas reconstruite sans historique de shift.
 
 ## Démarrage isolé en PowerShell
 
@@ -99,8 +108,9 @@ graphique historique, omettre `VITE_LIVE_INDUSTRIAL` ou le mettre à `false`.
 
 ## Fichiers partagés et intégration Git
 
-Les quatre pages de rôle ont uniquement une bifurcation vers leurs composants
-live ; leur contenu de démonstration reste présent. `src/App.tsx` adapte
+Les quatre pages de rôle gardent leurs composants d'origine. Le mode live leur
+fournit des vues adaptées par `src/api/industrial-view.ts`, sans seconde page.
+`LiveScreens.tsx` a été supprimé. `src/App.tsx` adapte
 seulement le badge. `src/vite-env.d.ts` déclare le nouveau drapeau.
 `vite.config.ts` ajoute le proxy Edge et conserve `/api`, donc les routes
 MLOps existantes. `src/hooks/useApi.ts` efface l'erreur après une réponse
@@ -114,3 +124,5 @@ Revoir les conflits éventuels
 sur ces quatre fichiers partagés : `App.tsx`, `vite.config.ts`,
 `vite-env.d.ts`, `hooks/useApi.ts`. Aucun fichier AI Leader, MLOps, Core,
 Production Engine, contrat commun ou modèle n'est modifié par INT-01.
+Le correctif INT-01-FIX touche aussi `components/charts.tsx` pour rendre
+explicitement un objectif horaire inconnu, sans changer les données mock.
