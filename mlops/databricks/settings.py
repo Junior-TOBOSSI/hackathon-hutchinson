@@ -1,0 +1,130 @@
+"""Configuration of the ARGOS Databricks integration (environment + managed model list).
+
+Nothing else in the code names a Databricks resource: change a resource here (or in the
+JSON file given by ``ARGOS_DBX_MODELS_FILE``), never in the services.
+
+| Variable                       | Default                                          |
+|--------------------------------|--------------------------------------------------|
+| ``DATABRICKS_CONFIG_PROFILE``  | ``ARGOS`` (CLI OAuth profile; no token handled)  |
+| ``ARGOS_DBX_MODELS_FILE``      | none -> the DBX-00 POC model below               |
+| ``ARGOS_DBX_EXPERIMENTS``      | ``/Shared/ARGOS-POC/quality-demo`` (comma list)   |
+| ``ARGOS_DBX_CATALOG``          | ``workspace``                                    |
+| ``ARGOS_DBX_MONITORING_TABLE`` | ``workspace.argos_poc.drift_report``             |
+| ``ARGOS_DBX_WAREHOUSE_ID``     | first warehouse of the workspace                 |
+| ``ARGOS_DBX_WAREHOUSE_AUTOSTART`` | ``false``: monitoring never starts a warehouse |
+| ``ARGOS_DBX_CACHE_SECONDS``    | ``300`` (monitoring cache, avoids SQL polling)   |
+| ``ARGOS_DBX_INFERENCE_TIMEOUT``| ``30`` seconds                                   |
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from pydantic import BaseModel, Field
+
+
+class ManagedModel(BaseModel):
+    """A model ARGOS manages. ``id`` is the stable id used by the frontend."""
+
+    id: str
+    display_name: str
+    use_case: str = Field(description="Qualité | EPI | Comportement | Poste (frontend labels)")
+    argos_use_case: str = Field(description="quality | safety | workstation (ARGOS contracts)")
+    scope: str
+    uc_name: str = Field(description="Unity Catalog model catalog.schema.model")
+    endpoint: str | None = Field(default=None, description="Serving endpoint, if served")
+    training_job: str | None = Field(default=None, description="Existing Lakeflow job name")
+    synthetic: bool = False
+
+
+DEFAULT_MODELS = [
+    ManagedModel(
+        id="quality-poc",
+        display_name="Qualité (POC synthétique DBX-00)",
+        use_case="Qualité",
+        argos_use_case="quality",
+        scope="Démonstration — données synthétiques",
+        uc_name="workspace.argos_poc.quality_demo",
+        endpoint="argos-quality-poc",
+        training_job="argos-poc-quality-training",
+        synthetic=True,
+    )
+]
+
+
+def _truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+@dataclass(frozen=True)
+class DatabricksSettings:
+    profile: str = "ARGOS"
+    catalog: str = "workspace"
+    experiments: tuple[str, ...] = ("/Shared/ARGOS-POC/quality-demo",)
+    monitoring_table: str = "workspace.argos_poc.drift_report"
+    warehouse_id: str | None = None
+    warehouse_autostart: bool = False
+    cache_seconds: int = 300
+    inference_timeout_s: int = 30
+    models: tuple[ManagedModel, ...] = field(default_factory=lambda: tuple(DEFAULT_MODELS))
+    # Jobs that may be triggered through the API besides the models' training jobs.
+    extra_triggerable_jobs: tuple[str, ...] = ("argos-poc-drift-monitor",)
+
+    @property
+    def triggerable_jobs(self) -> set[str]:
+        return {m.training_job for m in self.models if m.training_job} | set(
+            self.extra_triggerable_jobs
+        )
+
+    @classmethod
+    def from_env(cls) -> DatabricksSettings:
+        env = os.environ
+        models = DEFAULT_MODELS
+        if env.get("ARGOS_DBX_MODELS_FILE"):
+            raw = json.loads(Path(env["ARGOS_DBX_MODELS_FILE"]).read_text(encoding="utf-8"))
+            models = [ManagedModel.model_validate(m) for m in raw]
+        experiments = env.get("ARGOS_DBX_EXPERIMENTS", "/Shared/ARGOS-POC/quality-demo")
+        return cls(
+            profile=env.get("DATABRICKS_CONFIG_PROFILE", "ARGOS"),
+            catalog=env.get("ARGOS_DBX_CATALOG", "workspace"),
+            experiments=tuple(e.strip() for e in experiments.split(",") if e.strip()),
+            monitoring_table=env.get(
+                "ARGOS_DBX_MONITORING_TABLE", "workspace.argos_poc.drift_report"
+            ),
+            warehouse_id=env.get("ARGOS_DBX_WAREHOUSE_ID") or None,
+            warehouse_autostart=_truthy(env.get("ARGOS_DBX_WAREHOUSE_AUTOSTART")),
+            cache_seconds=int(env.get("ARGOS_DBX_CACHE_SECONDS", 300)),
+            inference_timeout_s=int(env.get("ARGOS_DBX_INFERENCE_TIMEOUT", 30)),
+            models=tuple(models),
+            extra_triggerable_jobs=tuple(
+                j.strip()
+                for j in env.get("ARGOS_DBX_TRIGGERABLE_JOBS", "argos-poc-drift-monitor").split(",")
+                if j.strip()
+            ),
+        )
+
+    def model(self, model_id: str) -> ManagedModel | None:
+        return next((m for m in self.models if m.id == model_id), None)
+
+    def apply_process_environment(self) -> None:
+        """MLflow on Databricks for THIS process only (never the Windows environment)."""
+        os.environ["DATABRICKS_CONFIG_PROFILE"] = self.profile
+        os.environ["MLFLOW_TRACKING_URI"] = "databricks"
+        os.environ["MLFLOW_REGISTRY_URI"] = "databricks-uc"
+        os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
+        ensure_cli_on_path()
+
+
+def ensure_cli_on_path() -> None:
+    """The ARGOS profile uses auth_type=databricks-cli: the SDK calls the CLI for tokens.
+    WinGet installs it outside some shells' PATH: append it for this process only."""
+    if shutil.which("databricks"):
+        return
+    packages = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WinGet" / "Packages"
+    for exe in sorted(packages.glob("Databricks.DatabricksCLI_*/databricks.exe")):
+        os.environ["PATH"] = os.environ.get("PATH", "") + os.pathsep + str(exe.parent)
+        return
