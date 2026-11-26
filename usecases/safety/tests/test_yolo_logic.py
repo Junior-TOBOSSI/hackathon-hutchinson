@@ -148,3 +148,10 @@ def test_output_respects_the_contract_and_holds_no_image():
     assert person.vest == PPEState.UNCERTAIN  # not checked at this workstation
     dumped = result.model_dump_json()
     assert "image" not in dumped and "face" not in dumped
+
+
+def test_no_alert_at_start_up_before_the_window_is_full():
+    analyzer = make_analyzer([BARE_HAND] * 3)
+    scores = [analyzer.analyze(IMAGE, meta(i)).score for i in range(3)]
+    assert scores[0] == 0.0 and scores[1] == 0.0
+    assert decide(scores[2], THRESHOLDS) == Decision.ANOMALIE

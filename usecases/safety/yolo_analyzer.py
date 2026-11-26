@@ -212,7 +212,9 @@ class YoloSafetyAnalyzer(Analyzer):
 
         assessed, raw_score = assess_frame(dets, phones, self.p)
         self.recent.append(raw_score)
-        score = min(self.recent)  # smoothing: the problem must last several frames
+        # Smoothing: the problem must last the whole window. While the window is not full
+        # yet (start-up), no alert: one frame alone is never enough.
+        score = min(self.recent) if len(self.recent) == self.recent.maxlen else 0.0
 
         persons = []
         has_shoes_field = "shoes" in PersonPPE.model_fields  # once the contract has it
