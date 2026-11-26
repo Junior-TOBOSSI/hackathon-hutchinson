@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Scenario } from '../api/mock';
+import { HovisLogo } from '../components/brand';
 import { Clock, Icon, ICONS, Loading } from '../components/ui';
 import { useApi } from '../hooks/useApi';
 
@@ -22,24 +23,23 @@ export default function Cellule() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--navy)', color: '#fff', padding: '36px 48px', display: 'flex', flexDirection: 'column', gap: 28 }}>
       <div className="row" style={{ gap: 16 }}>
-        <img src="/img/argos-icone.png" alt="" style={{ height: 56 }} />
-        <img src="/img/argos-wordmark.png" alt="ARGOS" style={{ height: 28 }} />
+        <HovisLogo size={44} tone="light" />
         <span className="cond" style={{ fontWeight: 700, fontSize: 40 }}>POSTE {live.stationId}</span>
         <span style={{ flex: 1 }} />
         <Clock iso={live.now} />
       </div>
       <div className="grid-2" style={{ flex: 1, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 24 }}>
         {tiles.map((t) => (
-          <div key={t.title} style={{ background: t.issue ? '#3a0d16' : 'var(--navy-2)', border: t.issue ? '3px solid #ff4d5b' : '3px solid transparent', borderRadius: 30, padding: 25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
+          <div key={t.title} style={{ background: t.issue ? 'var(--red-deep)' : 'var(--navy-2)', border: t.issue ? '3px solid var(--red-on-navy)' : '3px solid transparent', borderRadius: 30, padding: 25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
             <div style={{ flex: 1, width: 120, minHeight: 260, borderRadius: 60, background: t.issue ? 'var(--red)' : 'var(--green)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Icon d={t.icon} size={56} color="#fff" stroke={2.2} />
             </div>
             <span className="cond" style={{ fontWeight: 700, fontSize: 30, textAlign: 'center', lineHeight: 1.05 }}>{t.issue ? t.issue.label : t.title}</span>
-            {t.issue && <span style={{ fontSize: 18, color: '#ffc2c7' }}>{t.issue.instruction}</span>}
+            {t.issue && <span style={{ fontSize: 18, color: 'var(--red-light)' }}>{t.issue.instruction}</span>}
           </div>
         ))}
       </div>
-      <div className="between" style={{ color: '#a9bedd', fontSize: 15 }}>
+      <div className="between" style={{ color: 'var(--on-navy-muted)', fontSize: 15 }}>
         <span>Caméra frontale · visage flouté · analyse en mémoire, rien n’est enregistré</span>
         <span>Dernière pièce : {live.part.verdict} · {live.counters.good} / {live.objective.shiftTarget}</span>
       </div>

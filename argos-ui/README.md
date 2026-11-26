@@ -1,6 +1,6 @@
-# ARGOS : interface utilisateur
+# HOVIS : interface utilisateur
 
-Front-end de la solution ARGOS (hackathon Hutchinson × ESIGELEC, sujet 3 « AI & Industrial Vision »).
+Front-end de la solution HOVIS (anciennement ARGOS) (hackathon Hutchinson × ESIGELEC, sujet 3 « AI & Industrial Vision »).
 React 18 + TypeScript + Vite, sans librairie de composants ni de graphiques : tout est dans `src/`.
 
 ## Lancer
@@ -90,11 +90,19 @@ Si vous exposez des WebSockets (`/api/ws/stations/{id}`, `/api/ws/alerts`) qui p
 ```
 src/
   api/        types.ts (contrat), client.ts (appels), mock.ts (démo)
-  components/ ui.tsx (bandeau, badges, icônes), charts.tsx (anneau, jauges, histogramme, camembert, courbes), priority.ts
+  components/ brand.tsx (logo HOVIS en SVG), ui.tsx (bandeau, badges, icônes), charts.tsx (anneau, jauges, histogramme, camembert, courbes), priority.ts
   pages/      Login, Operateur, Cellule, Superviseur, PosteDetail, AiLeader, Admin
-  theme.css   couleurs et styles communs (bleu, blanc, vert ; rouge pour les alertes)
-public/img/   logo ARGOS et images de démonstration
+  theme.css   charte HOVIS : couleurs et styles communs (marine, blanc ; rouge pour les alertes)
+public/img/   icône HOVIS (favicon) et images de démonstration
 ```
+
+## Charte graphique HOVIS
+
+- **Marine HOVIS** `#0B1F3F` : identité, bandeaux, actions. **Rouge Signal** `#C8102E` : alertes uniquement. **Blanc** `#FFFFFF`.
+- Vert et ambre conservés pour les états « conforme » / « à vérifier » : ce sont des codes métier, pas de la décoration.
+- Police **Jost** (géométrique proche du logotype), servie en local par `@fontsource-variable/jost` : aucun appel à Google Fonts.
+- Le logo est dessiné en SVG dans `src/components/brand.tsx` d'après la fiche de construction (grille 120 × 120).
+- Toutes les couleurs passent par les variables de `src/theme.css` : changer de charte ne touche qu'un fichier.
 
 ## Images de démonstration
 

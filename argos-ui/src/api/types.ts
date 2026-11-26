@@ -1,4 +1,4 @@
-// Contrat de données entre le backend et l'interface ARGOS.
+// Contrat de données entre le backend et l'interface HOVIS.
 // Chaque type correspond à la réponse d'un endpoint décrit dans client.ts.
 // Règle RGPD : aucune image de personne n'est envoyée aux écrans superviseur et AI Leader.
 

@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
+import { HovisLogo } from './brand';
 
 /* Icônes au trait (24×24). */
 export const ICONS = {
@@ -39,14 +40,13 @@ export function TopBar({ title, sub, right }: { title: ReactNode; sub?: ReactNod
   const nav = useNavigate();
   return (
     <header className="topbar">
-      <img src="/img/argos-icone.png" alt="" className="hide-mobile" style={{ height: 54 }} />
-      <img src="/img/argos-wordmark.png" alt="ARGOS" style={{ height: 24 }} />
+      <HovisLogo size={34} tone="light" />
       <span className="sep hide-mobile" />
       <span className="cond topbar-title" style={{ fontWeight: 600, fontSize: 22 }}>{title}</span>
       {sub && <span className="sub hide-mobile">{sub}</span>}
       <span style={{ flex: 1 }} />
       {right}
-      <button aria-label="Se déconnecter" onClick={() => { setUser(null); nav('/'); }} style={{ background: 'none', border: 'none', color: '#a9bedd', padding: 6 }}>
+      <button aria-label="Se déconnecter" onClick={() => { setUser(null); nav('/'); }} style={{ background: 'none', border: 'none', color: 'var(--on-navy-muted)', padding: 6 }}>
         <Icon d={ICONS.logout} size={22} />
       </button>
     </header>

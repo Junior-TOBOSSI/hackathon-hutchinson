@@ -128,9 +128,9 @@ export const mockAi: AiOverview = {
   threshold: 85,
   counts: { healthy: 139, watch: 8, retrain: 3 },
   series: [
-    { name: 'Qualité QC 702 · A1·P06', color: '#1660F0', values: [95, 95, 94, 95, 94, 93, 93, 92, 90, 89, 87, 85, 83, 81] },
-    { name: 'EPI · ligne A', color: '#02162F', values: [93, 92, 93, 92, 91, 91, 90, 88, 87, 85, 83, 81, 80, 78] },
-    { name: 'Téléphone · usine', color: '#8FB4FF', values: [92, 92, 91, 92, 91, 90, 91, 90, 89, 89, 88, 89, 88, 88] },
+    { name: 'Qualité QC 702 · A1·P06', color: '#3D5A8A', values: [95, 95, 94, 95, 94, 93, 93, 92, 90, 89, 87, 85, 83, 81] },
+    { name: 'EPI · ligne A', color: '#0B1F3F', values: [93, 92, 93, 92, 91, 91, 90, 88, 87, 85, 83, 81, 80, 78] },
+    { name: 'Téléphone · usine', color: '#9AAED0', values: [92, 92, 91, 92, 91, 90, 91, 90, 89, 89, 88, 89, 88, 88] },
   ],
   drifts: [
     { modelId: 'm2', title: 'Qualité QC 702 · poste A1·P06', detail: 'Santé 81 % (seuil 85 %) · dérive des données : images plus sombres depuis mardi', healthPct: 81, mode: 'MANUEL' },

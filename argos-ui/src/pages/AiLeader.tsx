@@ -73,11 +73,11 @@ export default function AiLeader() {
               {[...ai.models].sort((a, b) => a.healthPct - b.healthPct).map((m) => {
                 const [c, t] = tone(m.healthPct, ai.threshold);
                 return (
-                  <tr key={m.id} style={{ borderTop: '1px solid #eef2f8' }}>
+                  <tr key={m.id} style={{ borderTop: '1px solid var(--line-soft)' }}>
                     <td style={{ padding: '9px 0', fontWeight: 600 }}>{m.name}</td><td>{m.useCase}</td><td>{m.scope}</td><td>{m.version}</td>
                     <td><div className="row" style={{ gap: 10 }}><div className="track grow" style={{ height: 10, overflow: 'visible' }}><div className="fill" style={{ width: `${m.healthPct}%`, background: c }} /><div style={{ position: 'absolute', left: `${ai.threshold}%`, top: -4, width: 2, height: 18, background: 'var(--navy)' }} /></div><b style={{ width: 44, color: t }}>{m.healthPct} %</b></div></td>
                     <td>{m.recallKoPct ? `${m.recallKoPct} %` : '—'}</td>
-                    <td><button className="btn" style={{ background: 'none', color: 'var(--blue)', padding: 0 }} onClick={() => m.healthPct < ai.threshold && api.retrain(m.id).then(() => setMsg(`${m.name} : entraînement relancé.`))}>{m.healthPct < ai.threshold ? 'Réentraîner' : 'Voir'}</button></td>
+                    <td><button className="btn" style={{ background: 'none', color: 'var(--primary)', padding: 0 }} onClick={() => m.healthPct < ai.threshold && api.retrain(m.id).then(() => setMsg(`${m.name} : entraînement relancé.`))}>{m.healthPct < ai.threshold ? 'Réentraîner' : 'Voir'}</button></td>
                   </tr>
                 );
               })}
@@ -91,8 +91,8 @@ export default function AiLeader() {
             {STEPS.map((s, i) => {
               const done = i < tr.step, cur = i === tr.step;
               return (
-                <div key={s} className="row grow" style={{ height: 52, borderRadius: 14, padding: '0 14px', gap: 10, fontWeight: 700, background: cur ? 'var(--blue)' : done ? 'var(--green-soft)' : 'var(--op-bg)', color: cur ? '#fff' : done ? 'var(--green-text)' : 'var(--muted)' }}>
-                  <span style={{ width: 26, height: 26, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, background: cur ? '#fff' : done ? 'var(--green)' : 'var(--track)', color: cur ? 'var(--blue)' : done ? '#fff' : 'var(--muted)' }}>{done ? <Icon d={ICONS.check} size={16} color="#fff" stroke={3} /> : i + 1}</span>{s}
+                <div key={s} className="row grow" style={{ height: 52, borderRadius: 14, padding: '0 14px', gap: 10, fontWeight: 700, background: cur ? 'var(--primary)' : done ? 'var(--green-soft)' : 'var(--op-bg)', color: cur ? '#fff' : done ? 'var(--green-text)' : 'var(--muted)' }}>
+                  <span style={{ width: 26, height: 26, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, background: cur ? '#fff' : done ? 'var(--green)' : 'var(--track)', color: cur ? 'var(--primary)' : done ? '#fff' : 'var(--muted)' }}>{done ? <Icon d={ICONS.check} size={16} color="#fff" stroke={3} /> : i + 1}</span>{s}
                 </div>
               );
             })}

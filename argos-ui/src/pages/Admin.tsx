@@ -58,7 +58,7 @@ export default function Admin() {
                 </tr></thead>
                 <tbody>
                   {shown.map((u) => (
-                    <tr key={u.id} style={{ borderTop: '1px solid #eef2f8', opacity: u.active ? 1 : 0.55 }}>
+                    <tr key={u.id} style={{ borderTop: '1px solid var(--line-soft)', opacity: u.active ? 1 : 0.55 }}>
                       <td style={{ padding: '10px 0', fontWeight: 700 }}>{u.name}</td>
                       <td className="muted">{u.login}</td>
                       <td className="muted">{u.badge ?? '—'}</td>
@@ -90,7 +90,7 @@ export default function Admin() {
               <thead><tr><th style={{ textAlign: 'left', padding: '8px 0' }} className="muted">DROIT</th>{roles.map((r) => <th key={r.role} style={{ padding: '8px 6px' }}>{r.label}</th>)}</tr></thead>
               <tbody>
                 {(Object.keys(PERM_LABEL) as Permission[]).map((p) => (
-                  <tr key={p} style={{ borderTop: '1px solid #eef2f8' }}>
+                  <tr key={p} style={{ borderTop: '1px solid var(--line-soft)' }}>
                     <td style={{ padding: '12px 0' }}>{PERM_LABEL[p]}</td>
                     {roles.map((r) => (
                       <td key={r.role} style={{ textAlign: 'center' }}>
@@ -102,7 +102,7 @@ export default function Admin() {
               </tbody>
             </table>
             <div className="grid-2" style={{ marginTop: 16, gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
-              {roles.map((r) => <div key={r.role} className="col" style={{ gap: 4, padding: 12, borderRadius: 14, background: 'var(--blue-soft)' }}><b>{r.label}</b><span className="muted" style={{ fontSize: 14 }}>{r.description}</span></div>)}
+              {roles.map((r) => <div key={r.role} className="col" style={{ gap: 4, padding: 12, borderRadius: 14, background: 'var(--primary-soft)' }}><b>{r.label}</b><span className="muted" style={{ fontSize: 14 }}>{r.description}</span></div>)}
             </div>
           </div>
         )}
@@ -111,7 +111,7 @@ export default function Admin() {
           <div className="card col" style={{ gap: 0 }}>
             <h2 className="h2" style={{ marginBottom: 10 }}>Journal des modifications d’accès</h2>
             {audit.map((a, i) => (
-              <div key={i} className="row" style={{ padding: '12px 0', borderTop: i ? '1px solid #eef2f8' : 'none' }}>
+              <div key={i} className="row" style={{ padding: '12px 0', borderTop: i ? '1px solid var(--line-soft)' : 'none' }}>
                 <span className="cond" style={{ width: 120, fontWeight: 700, fontSize: 18 }}>{a.at}</span>
                 <span><b>{a.by}</b> {a.action}</span>
               </div>

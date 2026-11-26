@@ -1,35 +1,58 @@
-/* Charte ARGOS : bleu, blanc, vert ; rouge réservé aux alertes. */
+/*
+ * Charte HOVIS : Marine HOVIS #0B1F3F, Rouge Signal #C8102E, Blanc #FFFFFF.
+ * Le marine porte l'identité et les actions ; le rouge est réservé aux alertes.
+ * Le vert et l'ambre restent pour les états "conforme" / "à vérifier" (sens métier).
+ */
 :root {
-  --navy: #02162f;
-  --navy-2: #0a2547;
-  --blue: #1660f0;
-  --blue-soft: #eef3fb;
-  --blue-light: #8fb4ff;
+  /* Marques */
+  --navy: #0b1f3f;          /* Marine HOVIS */
+  --navy-2: #16305a;        /* surfaces sur fond marine */
+  --navy-line: #2a4068;     /* séparateurs sur fond marine */
+  --on-navy-muted: #a7b6cf; /* texte secondaire sur fond marine */
+  --primary: #0b1f3f;       /* actions, onglet actif */
+  --primary-soft: #eceff5;
+  --primary-light: #9aaed0;
+
+  /* États */
   --green: #0e9f4f;
   --green-text: #0a7a3c;
   --green-soft: #e7f6ee;
   --green-light: #8bd3ac;
-  --red: #d61f2c;
-  --red-text: #b0111e;
-  --red-dark: #8e0f19;
-  --red-soft: #fce4e6;
-  --red-bg: #fff4f5;
+  --green-pale: #bfe6cf;
+  --red: #c8102e;           /* Rouge Signal */
+  --red-text: #a60d26;
+  --red-dark: #7e0a1d;
+  --red-soft: #fbe3e7;
+  --red-light: #f5c9d1;
+  --red-bg: #fff4f6;
+  --red-tint: #fbeef1;
+  --red-on-navy: #f0566b;   /* bordure d'alerte sur fond marine */
+  --red-deep: #3a0e1a;      /* tuile en alerte sur fond marine */
   --amber: #e08a00;
   --amber-text: #8a5300;
   --amber-soft: #fdebd3;
-  --ink: #02162f;
-  --muted: #4a5a75;
-  --line: #d3dce9;
-  --track: #e4eaf3;
-  --app-bg: #e3e9f2;
-  --op-bg: #f3f6fb;
-  --cat-securite: #d61f2c;
-  --cat-poste: #0b3d91;
-  --cat-qualite: #1660f0;
-  --cat-rythme: #5fa8ff;
-  --cat-equipement: #b5d8ff;
-  --font: 'Barlow', system-ui, sans-serif;
-  --font-cond: 'Barlow Condensed', 'Barlow', sans-serif;
+
+  /* Neutres */
+  --ink: #0b1f3f;
+  --muted: #4a5d7e;
+  --line: #d6dde8;
+  --line-soft: #edf0f5;
+  --line-strong: #c5cfdf;
+  --track: #e6eaf1;
+  --surface-soft: #f7f9fc;
+  --app-bg: #eef1f6;
+  --op-bg: #f6f8fb;
+
+  /* Catégories de graphiques : dégradé de marine, rouge pour la sécurité */
+  --cat-securite: #c8102e;
+  --cat-poste: #0b1f3f;
+  --cat-qualite: #3d5a8a;
+  --cat-rythme: #7f96bf;
+  --cat-equipement: #c3cfe3;
+
+  /* Jost : géométrique proche du logotype, servie en local (aucun appel externe). */
+  --font: 'Jost Variable', system-ui, sans-serif;
+  --font-cond: 'Jost Variable', system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -40,14 +63,14 @@ a { color: inherit; text-decoration: none; }
 
 .cond { font-family: var(--font-cond); }
 .muted { color: var(--muted); }
-.num { font-family: var(--font-cond); font-weight: 700; line-height: 1; }
+.num { font-family: var(--font-cond); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 .label-caps { font-family: var(--font-cond); font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); font-size: 16px; }
 .h2 { font-family: var(--font-cond); font-weight: 700; font-size: 24px; margin: 0; }
 
 .card {
   background: #fff;
   border-radius: 22px;
-  box-shadow: 0 0 0 1px var(--line), 0 2px 6px rgba(2, 22, 47, 0.06);
+  box-shadow: 0 0 0 1px var(--line), 0 2px 6px rgba(11, 31, 63, 0.06);
   padding: 18px 22px;
 }
 .card-op { background: #fff; border-radius: 28px; padding: 22px; }
@@ -58,17 +81,17 @@ a { color: inherit; text-decoration: none; }
 .grow { flex: 1; min-width: 0; }
 
 .btn { height: 44px; padding: 0 18px; border-radius: 12px; border: none; font-size: 15px; font-weight: 700; }
-.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary { background: var(--primary); color: #fff; }
 .btn-dark { background: var(--navy); color: #fff; }
-.btn-ghost { background: #fff; color: var(--ink); border: 2px solid #c9d4e5; }
-.btn-soft { background: var(--blue-soft); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; }
+.btn-ghost { background: #fff; color: var(--ink); border: 2px solid var(--line-strong); }
+.btn-soft { background: var(--primary-soft); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; }
 .btn-green { background: var(--green); color: #fff; }
 
 .pill { padding: 4px 10px; border-radius: 10px; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .pill-red { background: var(--red-soft); color: var(--red-dark); }
 .pill-green { background: var(--green-soft); color: var(--green-text); }
 .pill-amber { background: var(--amber-soft); color: var(--amber-text); }
-.pill-blue { background: var(--blue-soft); color: var(--ink); }
+.pill-blue { background: var(--primary-soft); color: var(--ink); }
 .pill-solid-red { background: var(--red); color: #fff; }
 
 .badge { min-width: 24px; height: 24px; padding: 0 7px; border-radius: 12px; color: #fff; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
@@ -76,9 +99,9 @@ a { color: inherit; text-decoration: none; }
 .track { position: relative; height: 14px; border-radius: 7px; background: var(--track); overflow: hidden; }
 .track > .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; }
 
-.topbar { height: 64px; background: var(--navy); color: #fff; display: flex; align-items: center; gap: 16px; padding: 0 24px 0 10px; }
-.topbar .sep { width: 1px; height: 30px; background: #2a4268; }
-.topbar .sub { color: #a9bedd; font-size: 15px; }
+.topbar { height: 64px; background: var(--navy); color: #fff; display: flex; align-items: center; gap: 16px; padding: 0 24px; }
+.topbar .sep { width: 1px; height: 30px; background: var(--navy-line); }
+.topbar .sub { color: var(--on-navy-muted); font-size: 15px; }
 
 .alert-red { border: 2px solid var(--red) !important; }
 .screen { min-height: 100vh; display: flex; flex-direction: column; }
@@ -86,7 +109,7 @@ a { color: inherit; text-decoration: none; }
 /* ---------- Superviseur : onglets ---------- */
 .tabs { background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: flex-end; gap: 4px; padding: 0 24px; overflow-x: auto; }
 .tab { height: 58px; padding: 0 18px; border: none; background: none; display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; color: var(--muted); white-space: nowrap; }
-.tab[aria-selected='true'] { font-weight: 700; color: var(--blue); box-shadow: inset 0 -4px 0 var(--blue); }
+.tab[aria-selected='true'] { font-weight: 700; color: var(--primary); box-shadow: inset 0 -4px 0 var(--primary); }
 
 .grid-5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
@@ -106,4 +129,9 @@ a { color: inherit; text-decoration: none; }
   .topbar .sub { display: none; }
   .topbar { gap: 10px; padding: 0 10px; }
   .topbar-title { font-size: 18px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+}
+
+/* Connexion : le logo réduit sur téléphone pour tenir dans la largeur. */
+@media (max-width: 760px) {
+  .login-logo { zoom: 0.6; }
 }

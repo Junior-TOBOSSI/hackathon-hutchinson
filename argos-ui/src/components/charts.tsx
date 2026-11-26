@@ -26,7 +26,7 @@ export function ProgressRing({ value, target, expected, size = 220 }: { value: n
 /** Jauges heure par heure (opérateur). */
 export function HourlyGauges({ hours, perHour, currentHour, height = 56 }: { hours: { hour: number; good: number | null }[]; perHour: number; currentHour: number; height?: number }) {
   return (
-    <div className="col" style={{ gap: 8, borderTop: '1px solid #eef2f8', paddingTop: 12 }}>
+    <div className="col" style={{ gap: 8, borderTop: '1px solid var(--line-soft)', paddingTop: 12 }}>
       <div className="between">
         <span className="label-caps">Heure par heure</span>
         <span className="muted" style={{ fontSize: 14 }}>objectif {perHour} pièces / h · heure en cours en vert clair</span>
@@ -41,7 +41,7 @@ export function HourlyGauges({ hours, perHour, currentHour, height = 56 }: { hou
               <span style={{ fontSize: 14, fontWeight: 700, height: 18, color: ok || cur ? 'var(--green-text)' : 'var(--amber-text)' }}>{h.good ?? ''}</span>
               <div style={{ position: 'relative', width: '100%', height, borderRadius: 8, background: 'var(--track)', overflow: 'hidden' }}>
                 {h.good === null
-                  ? <div style={{ position: 'absolute', inset: 0, border: '2px dashed #c9d4e5', borderRadius: 8 }} />
+                  ? <div style={{ position: 'absolute', inset: 0, border: '2px dashed var(--line-strong)', borderRadius: 8 }} />
                   : <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.min(100, (h.good / perHour) * 100)}%`, background: color }} />}
               </div>
               <span style={{ fontSize: 12, fontWeight: cur ? 700 : 400 }} className={cur ? '' : 'muted'}>{h.hour} h</span>
@@ -62,7 +62,7 @@ export function HourlyBars({ hours, perHour, currentHour, barMax = 120 }: { hour
         <div key={h.hour} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
           <span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>{h.good ?? ''}</span>
           {h.good === null
-            ? <div style={{ width: '100%', height: barMax, border: '2px dashed #c9d4e5', borderRadius: '8px 8px 3px 3px' }} />
+            ? <div style={{ width: '100%', height: barMax, border: '2px dashed var(--line-strong)', borderRadius: '8px 8px 3px 3px' }} />
             : <div style={{ width: '100%', height: Math.round((h.good / perHour) * barMax), borderRadius: '8px 8px 3px 3px', background: h.hour === currentHour ? 'var(--green-light)' : 'var(--green)' }} />}
           <span style={{ fontSize: 13, fontWeight: 700, height: 16, color: h.ko ? 'var(--red-text)' : 'transparent' }}>{h.ko ? `${h.ko} KO` : ''}</span>
           <span className="muted" style={{ fontSize: 13, height: 16 }}>{h.hour} h</span>
@@ -124,7 +124,7 @@ export function Donut({ items, size = 190, centerLabel }: { items: { name: strin
     <div className="row stack-mobile" style={{ gap: 20 }}>
       <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
         <svg width={size} height={size} viewBox="0 0 200 200" role="img" aria-label={`Répartition de ${total} ${centerLabel}`}>
-          <circle cx="100" cy="100" r={r} fill="none" stroke="#eef2f8" strokeWidth="34" />
+          <circle cx="100" cy="100" r={r} fill="none" stroke="var(--line-soft)" strokeWidth="34" />
           {items.map((i) => {
             const f = i.value / total;
             const el = <circle key={i.name} cx="100" cy="100" r={r} fill="none" stroke={i.color} strokeWidth="34" strokeDasharray={`${f * c} ${c}`} strokeDashoffset={-cum * c} transform="rotate(-90 100 100)" />;
@@ -161,7 +161,7 @@ export function HealthChart({ series, threshold, min = 70, max = 100 }: { series
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label="Santé des modèles sur 14 jours">
       {[100, 90, 80, 70].map((v) => (
         <g key={v}>
-          <line x1={x0} y1={y(v)} x2={x1} y2={y(v)} stroke="#eef2f8" />
+          <line x1={x0} y1={y(v)} x2={x1} y2={y(v)} stroke="var(--line-soft)" />
           <text x={30} y={y(v) + 4} fontSize="12" fill="var(--muted)" textAnchor="end">{v} %</text>
         </g>
       ))}

@@ -12,7 +12,7 @@ export default function PosteDetail() {
 
   return (
     <div className="screen">
-      <TopBar title={<>Poste {d.stationId}</>} sub={d.product} right={<Link to="/superviseur" style={{ color: '#a9bedd', fontWeight: 600 }}>← Atelier</Link>} />
+      <TopBar title={<>Poste {d.stationId}</>} sub={d.product} right={<Link to="/superviseur" style={{ color: 'var(--on-navy-muted)', fontWeight: 600 }}>← Atelier</Link>} />
       <main className="col" style={{ padding: '20px 24px', gap: 16 }}>
         <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
           {['Shift A · 5 h – 13 h', 'Shift B · en cours', 'Shift C · 21 h – 5 h', 'Journée'].map((s, i) => (
@@ -36,9 +36,9 @@ export default function PosteDetail() {
             <div key={l.name} className="row" style={{ gap: 14 }}>
               <span style={{ width: 92, fontWeight: 600 }}>{l.name}</span>
               <div className="track grow" style={{ height: 26, borderRadius: 8 }}>
-                <div className="fill" style={{ width: `${(282 / SHIFT_MIN) * 100}%`, background: '#bfe6cf', borderRadius: 0 }} />
+                <div className="fill" style={{ width: `${(282 / SHIFT_MIN) * 100}%`, background: 'var(--green-pale)', borderRadius: 0 }} />
                 {l.episodes.map(([a, b], i) => (
-                  <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${(a / SHIFT_MIN) * 100}%`, width: `${Math.max(0.6, ((b - a) / SHIFT_MIN) * 100)}%`, background: l.soft ? '#f2a7ae' : 'var(--red)' }} />
+                  <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${(a / SHIFT_MIN) * 100}%`, width: `${Math.max(0.6, ((b - a) / SHIFT_MIN) * 100)}%`, background: l.soft ? 'var(--red-light)' : 'var(--red)' }} />
                 ))}
               </div>
             </div>
@@ -53,7 +53,7 @@ export default function PosteDetail() {
           <div className="card col" style={{ gap: 4 }}>
             <h2 className="h2" style={{ marginBottom: 6 }}>EPI et comportements · aujourd’hui</h2>
             {d.epiCounts.map((e) => (
-              <div key={e.label} className="row" style={{ padding: '8px 0', borderBottom: '1px solid #eef2f8' }}>
+              <div key={e.label} className="row" style={{ padding: '8px 0', borderBottom: '1px solid var(--line-soft)' }}>
                 <span className="grow">{e.label}</span>
                 <span className={`pill ${e.count ? 'pill-red' : 'pill-green'} num`} style={{ fontSize: 18, minWidth: 34, textAlign: 'center' }}>{e.count}</span>
               </div>
@@ -66,7 +66,7 @@ export default function PosteDetail() {
               return (
                 <div key={i} className="col" style={{ gap: 4, padding: '12px 14px', borderRadius: 14, border: `2px solid ${red ? 'var(--red)' : 'var(--line)'}` }}>
                   <div className="row" style={{ gap: 10 }}>
-                    <span className="cond" style={{ fontWeight: 700, fontSize: 22, color: 'var(--blue)' }}>{d.stationId}</span>
+                    <span className="cond" style={{ fontWeight: 700, fontSize: 22, color: 'var(--primary)' }}>{d.stationId}</span>
                     <span className="cond muted" style={{ fontWeight: 700, fontSize: 22 }}>{e.time}</span>
                     <span className={`pill ${red ? 'pill-red' : 'pill-blue'}`}>{e.category === 'EPI' ? 'EPI' : e.category === 'COMPORTEMENT' ? 'Comportement' : 'Poste de travail'}</span>
                     <span style={{ flex: 1 }} />

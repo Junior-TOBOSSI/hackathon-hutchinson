@@ -32,7 +32,7 @@ export default function Operateur() {
   const report = async () => { await api.reportProblem(stationId); setReported(true); setTimeout(() => setReported(false), 4000); };
 
   return (
-    <div className="screen" style={{ background: ko || envIssues.length ? '#fbeff0' : 'var(--op-bg)' }}>
+    <div className="screen" style={{ background: ko || envIssues.length ? 'var(--red-tint)' : 'var(--op-bg)' }}>
       <TopBar title={`POSTE ${live.stationId}`} sub={`Presse injection · ${live.product}`} right={<><span className="sub hide-mobile">Shift {live.shift.code} · {live.shift.start.slice(0, 2)} h – {live.shift.end.slice(0, 2)} h</span><Clock iso={live.now} /></>} />
 
       {envIssues.length > 0 && <ProblemBanner actions={actions} />}
@@ -78,7 +78,7 @@ export default function Operateur() {
             <StatusTile ok icon={ICONS.check} okTitle={ko ? 'Qualité' : 'Qualité OK'} okSub={`Taux KO ${live.checks.koRatePct.toLocaleString('fr-FR')} %`} koTitle="" koSub="" />
           </div>
 
-          <button onClick={report} className="cond" style={{ height: 88, border: 'none', borderRadius: 26, background: reported ? 'var(--navy)' : 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, fontWeight: 700, fontSize: 36, letterSpacing: '0.06em' }}>
+          <button onClick={report} className="cond" style={{ height: 88, border: 'none', borderRadius: 26, background: reported ? 'var(--navy)' : 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, fontWeight: 700, fontSize: 36, letterSpacing: '0.06em' }}>
             <Icon d={ICONS.flag} size={40} color="#fff" />
             {reported ? 'SUPERVISEUR PRÉVENU' : 'SIGNALER UN PROBLÈME'}
           </button>
@@ -145,7 +145,7 @@ function SnapshotPanel({ live, instruction }: { live: StationLive; instruction: 
       <div style={{ borderRadius: 18, overflow: 'hidden', border: '5px solid var(--red)', lineHeight: 0 }}>
         <img src={live.frontSnapshotUrl} alt="Image de la caméra frontale, visage flouté, manquement encadré en rouge" style={{ width: '100%', display: 'block' }} />
       </div>
-      <div className="col" style={{ flex: 1, justifyContent: 'center', gap: 6, borderRadius: 20, background: 'var(--red-bg)', border: '2px solid #f7cdd1', padding: '14px 20px' }}>
+      <div className="col" style={{ flex: 1, justifyContent: 'center', gap: 6, borderRadius: 20, background: 'var(--red-bg)', border: '2px solid var(--red-light)', padding: '14px 20px' }}>
         <span className="cond" style={{ fontWeight: 700, fontSize: 30, color: 'var(--red-text)' }}>{instruction}</span>
         <span style={{ fontSize: 16, color: 'var(--red-dark)' }}>Le cadre rouge montre ce qui manque. Le voyant repasse au vert tout seul.</span>
       </div>
@@ -163,7 +163,7 @@ function MultiCard({ live, actions }: { live: StationLive; actions: OperatorActi
       <ol className="col grow" style={{ justifyContent: 'center', gap: 14, margin: 0, padding: 0, listStyle: 'none' }}>
         {actions.map((a, i) => (
           <li key={a.key} className="row" style={{ alignItems: 'flex-start' }}>
-            <span style={{ width: 34, height: 34, borderRadius: 17, background: a.strong ? 'var(--red)' : '#f7cdd1', color: a.strong ? '#fff' : 'var(--red-dark)', fontWeight: 700, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+            <span style={{ width: 34, height: 34, borderRadius: 17, background: a.strong ? 'var(--red)' : 'var(--red-light)', color: a.strong ? '#fff' : 'var(--red-dark)', fontWeight: 700, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
             <div><div className="cond" style={{ fontWeight: 700, fontSize: 24, color: a.strong ? 'var(--red-text)' : 'var(--ink)' }}>{a.title}</div><div className="muted" style={{ fontSize: 14 }}>{a.subtitle}</div></div>
           </li>
         ))}
@@ -207,9 +207,9 @@ function ScenarioSwitcher({ value, onChange }: { value: Scenario; onChange: (s: 
   const opts: [Scenario, string][] = [['ok', 'Tout va bien'], ['ko', 'Pièce KO'], ['epi', 'EPI manquant'], ['multi', 'Plusieurs problèmes']];
   return (
     <div style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 4, background: 'var(--navy)', color: '#fff', borderRadius: 12, padding: 4, display: 'flex', gap: 4, boxShadow: '0 8px 24px rgba(0,0,0,.3)', fontSize: 12 }}>
-      <span style={{ alignSelf: 'center', padding: '0 6px', color: '#a9bedd' }}>Démo</span>
+      <span style={{ alignSelf: 'center', padding: '0 6px', color: 'var(--on-navy-muted)' }}>Démo</span>
       {opts.map(([k, l]) => (
-        <button key={k} onClick={() => onChange(k)} style={{ border: 'none', borderRadius: 9, padding: '5px 9px', fontWeight: 700, background: value === k ? 'var(--blue)' : 'transparent', color: '#fff' }}>{l}</button>
+        <button key={k} onClick={() => onChange(k)} style={{ border: 'none', borderRadius: 9, padding: '5px 9px', fontWeight: 700, background: value === k ? 'var(--primary)' : 'transparent', color: '#fff' }}>{l}</button>
       ))}
     </div>
   );

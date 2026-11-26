@@ -132,7 +132,7 @@ function LineCard({ line, onOpen }: { line: LineSummary; onOpen: () => void }) {
         ))}
       </div>
       <span className="muted" style={{ fontSize: 13 }}>Shifts A, B, C · {fmt(dayGood)} pièces bonnes sur {fmt(dayTarget)} pour la journée</span>
-      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--blue)' }}>Voir la production de la ligne →</span>
+      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--primary)' }}>Voir la production de la ligne →</span>
     </button>
   );
 }
@@ -159,7 +159,7 @@ function Production({ ov, lineId, setLineId, cellId, setCellId }: { ov: Workshop
         {line.cells.map((c) => {
           const sel = c.id === cell.id;
           return (
-            <button key={c.id} onClick={() => setCellId(c.id)} className="row" style={{ width: '100%', padding: 10, borderRadius: 12, border: 'none', background: sel ? 'var(--blue-soft)' : 'transparent', color: 'var(--ink)', gap: 14 }}>
+            <button key={c.id} onClick={() => setCellId(c.id)} className="row" style={{ width: '100%', padding: 10, borderRadius: 12, border: 'none', background: sel ? 'var(--primary-soft)' : 'transparent', color: 'var(--ink)', gap: 14 }}>
               <span className="cond" style={{ width: 54, fontWeight: 700, fontSize: 22, textAlign: 'left' }}>{c.id}</span>
               <div className="track grow" style={{ height: 22, borderRadius: 6, overflow: 'visible' }}>
                 <div className="fill" style={{ width: `${(c.good / c.target) * 100}%`, background: sel ? 'var(--green)' : 'var(--green-light)' }} />
@@ -178,7 +178,7 @@ function Production({ ov, lineId, setLineId, cellId, setCellId }: { ov: Workshop
           {cell.stations.map((s) => {
             const hot = s.status === 'SECURITE' || s.status === 'QUALITE';
             return (
-              <Link key={s.id} to={`/superviseur/poste/${encodeURIComponent(s.id)}`} className="col" style={{ gap: 6, padding: 14, borderRadius: 16, background: hot ? 'var(--red-bg)' : '#f6f9fd', border: `2px solid ${hot ? 'var(--red)' : 'var(--track)'}` }}>
+              <Link key={s.id} to={`/superviseur/poste/${encodeURIComponent(s.id)}`} className="col" style={{ gap: 6, padding: 14, borderRadius: 16, background: hot ? 'var(--red-bg)' : 'var(--surface-soft)', border: `2px solid ${hot ? 'var(--red)' : 'var(--track)'}` }}>
                 <span className="cond" style={{ fontWeight: 700, fontSize: 22 }}>{s.id.split('·')[1]}</span>
                 <span style={{ fontWeight: 700, fontSize: 15, color: s.deltaVsExpected < 0 ? 'var(--red-text)' : 'var(--green-text)' }}>{deltaText(s.deltaVsExpected, true)}</span>
                 <span className={`pill ${STATUS[s.status][1]}`} style={{ alignSelf: 'flex-start' }}>{STATUS[s.status][0]}</span>
@@ -261,7 +261,7 @@ function Equipment({ ov, alerts }: { ov: WorkshopOverview; alerts: Alert[] }) {
             return (
               <div key={l.id} className="row">
                 <span style={{ width: 70, fontWeight: 600 }}>{l.name}</span>
-                <div className="track grow" style={{ height: 18, background: '#f7cdd1' }}><div className="fill" style={{ width: `${(a / t) * 100}%`, background: 'var(--green)' }} /></div>
+                <div className="track grow" style={{ height: 18, background: 'var(--red-light)' }}><div className="fill" style={{ width: `${(a / t) * 100}%`, background: 'var(--green)' }} /></div>
                 <span style={{ width: 60, textAlign: 'right', fontWeight: 700 }}>{a} / {t}</span>
               </div>
             );
@@ -287,7 +287,7 @@ function Equipment({ ov, alerts }: { ov: WorkshopOverview; alerts: Alert[] }) {
           </tr></thead>
           <tbody>
             {ov.lines.map((l) => (
-              <tr key={l.id} style={{ borderTop: '1px solid #eef2f8' }}>
+              <tr key={l.id} style={{ borderTop: '1px solid var(--line-soft)' }}>
                 <td style={{ padding: '12px 0', fontWeight: 700 }}>{l.name}</td>
                 <td style={st(l.cameras.front)}>{l.cameras.front[0]} / {l.cameras.front[1]}</td>
                 <td style={st(l.cameras.part)}>{l.cameras.part[0]} / {l.cameras.part[1]}</td>

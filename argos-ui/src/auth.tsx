@@ -10,7 +10,7 @@ const Ctx = createContext<AuthCtx>({ user: null, setUser: () => {} });
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(() => {
     try {
-      const raw = sessionStorage.getItem('argos.user');
+      const raw = sessionStorage.getItem('hovis.user');
       return raw ? (JSON.parse(raw) as User) : null;
     } catch {
       return null;
@@ -19,8 +19,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setUser = (u: User | null) => {
     setUserState(u);
     try {
-      if (u) sessionStorage.setItem('argos.user', JSON.stringify(u));
-      else sessionStorage.removeItem('argos.user');
+      if (u) sessionStorage.setItem('hovis.user', JSON.stringify(u));
+      else sessionStorage.removeItem('hovis.user');
     } catch {
       /* stockage indisponible : la session reste en mémoire */
     }
