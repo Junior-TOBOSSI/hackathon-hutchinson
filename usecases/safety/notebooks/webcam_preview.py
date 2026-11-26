@@ -6,6 +6,11 @@ Usage (from the repository root, venv activated):
 
 Keys: q = quit, + / - = raise / lower the display confidence threshold.
 
+Phone: a second, generic model (YOLOv8n trained on COCO, class "cell phone", no training
+needed) finds phones. A phone close to a hand, a gloved hand or a head counts as "in use"
+(red); a phone far from everybody (lying on the bench) is only shown (orange) - that case
+belongs to the workstation use case. --no-phone turns it off.
+
 Privacy (GDPR, AGENTS.md rule "never store or display a face"):
 - faces are pixelated BEFORE anything is drawn or shown;
 - face and head boxes are hidden even with a low confidence (PRIVACY_CONF), lower than the
@@ -35,7 +40,12 @@ DRAWN_CLASSES = {
     "head": (160, 160, 160),
     "hands": (120, 220, 120),
     "foot": (220, 120, 220),
+    "vest": (0, 140, 255),  # name in our retrained model
 }
+PHONE_CLASS = "cell phone"  # COCO class name
+PHONE_ZONE = ("hands", "gloves", "head")  # a phone near one of these is "in use"
+PHONE_MARGIN = 0.5  # phone box widened by 50% of its size before checking the contact
+PHONE_IN_USE_COLOR, PHONE_IDLE_COLOR = (0, 0, 255), (0, 165, 255)
 FACE_CLASS, HEAD_CLASS, PERSON_CLASS = "face", "head", "person"
 PRIVACY_CONF = 0.10  # faces and heads are hidden from this confidence on
 HEAD_HIDDEN_PART = 0.6  # lower 60% of a head box is hidden (the top keeps the helmet visible)
@@ -92,13 +102,40 @@ def draw(image: np.ndarray, detections, threshold: float) -> list[str]:
     return seen
 
 
-def draw_banner(image: np.ndarray, fps: float, threshold: float, seen: list[str]) -> None:
+def touches(a: tuple[int, ...], b: tuple[int, ...], margin: float) -> bool:
+    """True if box a, widened by margin x its own size, overlaps box b."""
+    dx, dy = margin * (a[2] - a[0]), margin * (a[3] - a[1])
+    return a[0] - dx < b[2] and b[0] < a[2] + dx and a[1] - dy < b[3] and b[1] < a[3] + dy
+
+
+def phones_in_use(phones, detections, threshold: float) -> list[bool]:
+    """For each phone: is it held or at the ear (close to a hand, gloved hand or head)?"""
+    zones = [box for name, conf, box in detections if name in PHONE_ZONE and conf >= threshold]
+    return [any(touches(box, z, PHONE_MARGIN) for z in zones) for _, box in phones]
+
+
+def draw_phones(image: np.ndarray, phones, in_use: list[bool]) -> None:
+    for (conf, (x1, y1, x2, y2)), used in zip(phones, in_use, strict=True):
+        color = PHONE_IN_USE_COLOR if used else PHONE_IDLE_COLOR
+        cv2.rectangle(image, (x1, y1), (x2, y2), color, 3 if used else 2)
+        label = f"PHONE IN USE {conf:.2f}" if used else f"phone {conf:.2f}"
+        cv2.putText(image, label, (x1, max(14, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
+
+
+def draw_banner(
+    image: np.ndarray, fps: float, threshold: float, seen: list[str], phone_alert: bool = False
+) -> None:
     counts = {n: seen.count(n) for n in DRAWN_CLASSES if n in seen}
     text = ", ".join(f"{n} x{c}" for n, c in counts.items()) or "nothing detected"
     cv2.rectangle(image, (0, 0), (image.shape[1], 48), (0, 0, 0), -1)
     status = f"{fps:4.1f} FPS | threshold {threshold:.2f} | q quit, +/- threshold"
     cv2.putText(image, status, (8, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
     cv2.putText(image, text, (8, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1, cv2.LINE_AA)
+    if phone_alert:
+        x = image.shape[1] - 190
+        cv2.putText(
+            image, "PHONE IN USE", (x, 32), cv2.FONT_HERSHEY_SIMPLEX, 0.7, PHONE_IN_USE_COLOR, 2
+        )
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -108,10 +145,17 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--camera", type=int, default=0, help="webcam index")
     parser.add_argument("--threshold", type=float, default=0.25, help="display confidence")
     parser.add_argument("--imgsz", type=int, default=640, help="model input size")
+    parser.add_argument("--phone-weights", default="data/models/yolov8n_coco.pt")
+    parser.add_argument("--phone-conf", type=float, default=0.30, help="phone threshold")
+    parser.add_argument("--no-phone", action="store_true", help="do not look for phones")
     args = parser.parse_args(argv)
 
     model = YOLO(args.weights)
     names = {i: str(n).lower() for i, n in model.names.items()}
+    phone_model = None if args.no_phone else YOLO(args.phone_weights)
+    phone_id = None
+    if phone_model is not None:
+        phone_id = next(i for i, n in phone_model.names.items() if n == PHONE_CLASS)
     capture = cv2.VideoCapture(args.camera)
     if not capture.isOpened():
         raise SystemExit(
@@ -141,13 +185,23 @@ def main(argv: list[str] | None = None) -> None:
                 (names[int(c)], float(s), tuple(int(v) for v in xyxy))
                 for c, s, xyxy in zip(boxes.cls, boxes.conf, boxes.xyxy, strict=True)
             ]
+            phones = []
+            if phone_model is not None:  # only the phone class of the COCO model
+                found = phone_model.predict(frame, conf=args.phone_conf, classes=[phone_id],
+                                            imgsz=args.imgsz, device="cpu", verbose=False)[0]  # fmt: skip
+                phones = [
+                    (float(s), tuple(int(v) for v in xyxy))
+                    for s, xyxy in zip(found.boxes.conf, found.boxes.xyxy, strict=True)
+                ]
             hide_faces(frame, detections)  # FIRST: nothing is shown before this line
             seen = draw(frame, detections, threshold)
+            in_use = phones_in_use(phones, detections, threshold)
+            draw_phones(frame, phones, in_use)
 
             now = time.perf_counter()
             fps = 0.9 * fps + 0.1 / max(now - last, 1e-6)  # smoothed frame rate
             last = now
-            draw_banner(frame, fps, threshold, seen)
+            draw_banner(frame, fps, threshold, seen, phone_alert=any(in_use))
             cv2.imshow(window, frame)
 
             key = cv2.waitKey(1) & 0xFF
