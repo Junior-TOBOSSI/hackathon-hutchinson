@@ -123,3 +123,8 @@ def test_shift_contracts():
     )
     assert shift.planned_end_at == datetime(2026, 1, 1, 14, 0, tzinfo=UTC)
     assert "planned_end_at" in shift.model_dump(mode="json")
+    # Our own JSON is accepted back (Edge -> Core); an inconsistent end is rejected.
+    assert Shift.model_validate_json(shift.model_dump_json()) == shift
+    tampered = {**shift.model_dump(mode="json"), "planned_end_at": "2026-01-01T15:00:00Z"}
+    with pytest.raises(ValidationError):
+        Shift.model_validate(tampered)

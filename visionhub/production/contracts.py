@@ -16,9 +16,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import Field, computed_field, model_validator
+from pydantic import Field, TypeAdapter, computed_field, model_validator
 
 from visionhub.contracts import Contract, Decision, Score, Thresholds
 
@@ -171,6 +171,27 @@ class Shift(Contract):
     planned_duration_min: int
     target_parts: int
     ended_at: datetime | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_serialized_end(cls, data: Any) -> Any:
+        """Accept our own JSON back: ``planned_end_at`` is derived, so it is dropped here
+        and recomputed (a value inconsistent with the other fields is rejected below)."""
+        if not (isinstance(data, dict) and "planned_end_at" in data):
+            return data
+        data = dict(data)
+        received = data.pop("planned_end_at")
+        try:
+            to_datetime = TypeAdapter(datetime).validate_python
+            expected = to_datetime(data["started_at"]) + timedelta(
+                minutes=int(data["planned_duration_min"])
+            )
+            consistent = to_datetime(received) == expected
+        except (KeyError, TypeError, ValueError):
+            return data  # let the field validation report the real problem
+        if not consistent:
+            raise ValueError("planned_end_at must equal started_at + planned_duration_min")
+        return data
 
     @computed_field
     @property
