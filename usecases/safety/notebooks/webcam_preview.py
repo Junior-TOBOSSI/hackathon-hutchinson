@@ -103,7 +103,8 @@ def draw_banner(image: np.ndarray, fps: float, threshold: float, seen: list[str]
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--weights", default="data/models/safety/sh17_yolov8n.pt")
+    # yolov8s: best ready-made option on SH17 val (mAP50 0.56 vs 0.53 for n), ~60 ms on CPU.
+    parser.add_argument("--weights", default="data/models/safety/sh17_yolov8s.pt")
     parser.add_argument("--camera", type=int, default=0, help="webcam index")
     parser.add_argument("--threshold", type=float, default=0.25, help="display confidence")
     parser.add_argument("--imgsz", type=int, default=640, help="model input size")
