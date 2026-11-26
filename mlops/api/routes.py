@@ -300,6 +300,23 @@ def build_overview(c: DatabricksConnector) -> dict[str, Any]:
             )
         elif not monitoring.available:
             unavailable.append(f"monitoring {managed.id}: {monitoring.reason}")
+            snap = monitoring.last_snapshot
+            if snap and snap.metrics and any(d.alert for d in snap.metrics.drift):
+                alerts = ", ".join(
+                    f"{d.feature} PSI {d.value:.2f}" for d in snap.metrics.drift if d.alert
+                )
+                drifts.append(
+                    {
+                        "modelId": managed.id,
+                        "title": managed.display_name,
+                        "detail": "Dernier résultat connu "
+                        f"(lu le {snap.read_at:%d/%m/%Y %H:%M} UTC) : "
+                        f"dérive des données {alerts} (seuil 0,2)",
+                        "healthPct": health,
+                        "mode": _policy_mode(),
+                        "stale": True,
+                    }
+                )
         if training is None and status.versions:
             latest = status.versions[-1]
             previous = status.versions[-2] if len(status.versions) > 1 else None

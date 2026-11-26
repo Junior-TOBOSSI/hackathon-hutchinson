@@ -61,7 +61,7 @@ def run(run_id, metrics=None, params=None):
 
 
 @pytest.fixture
-def connector(monkeypatch):
+def connector(monkeypatch, tmp_path):
     w, ml = MagicMock(), MagicMock()
     w.config.host = "https://example.cloud.databricks.com"
     ml.get_registered_model.return_value = SimpleNamespace(
@@ -97,7 +97,9 @@ def connector(monkeypatch):
     w.serving_endpoints.get.return_value = endpoint
     w.warehouses.list.return_value = [SimpleNamespace(id="wh")]
     w.warehouses.get.return_value = SimpleNamespace(state=SimpleNamespace(value="STOPPED"))
-    settings = DatabricksSettings(models=(MODEL,), extra_triggerable_jobs=())
+    settings = DatabricksSettings(
+        models=(MODEL,), extra_triggerable_jobs=(), snapshot_dir=str(tmp_path / "cache")
+    )
     for key in ("DATABRICKS_CONFIG_PROFILE", "MLFLOW_TRACKING_URI", "MLFLOW_REGISTRY_URI"):
         monkeypatch.setenv(key, "x")  # restored after the test
     return DatabricksConnector(settings, workspace=w, mlflow_client=ml)
@@ -291,3 +293,13 @@ def test_analyzer_returns_the_argos_contract(endpoint_client, monkeypatch):
     assert isinstance(result, AnalysisResult) and isinstance(result.details, QualityDetails)
     assert result.score == 0.1 and result.model_version == "1"
     assert AnalysisResult.model_validate_json(result.model_dump_json()) == result
+
+
+def test_monitoring_snapshot_is_returned_as_such(connector):
+    from mlops.databricks.connector import MonitoringReport
+
+    snapshot = MonitoringReport(available=True, table="t", accuracies={"accuracy_reference": 0.86})
+    connector._save_snapshot("q", snapshot)
+    report = connector.monitoring("q", refresh=True)
+    assert not report.available  # never presented as a live read
+    assert report.last_snapshot.accuracies == {"accuracy_reference": 0.86}

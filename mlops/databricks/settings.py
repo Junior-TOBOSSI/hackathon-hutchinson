@@ -13,6 +13,7 @@ JSON file given by ``ARGOS_DBX_MODELS_FILE``), never in the services.
 | ``ARGOS_DBX_WAREHOUSE_ID``     | first warehouse of the workspace                 |
 | ``ARGOS_DBX_WAREHOUSE_AUTOSTART`` | ``false``: monitoring never starts a warehouse |
 | ``ARGOS_DBX_CACHE_SECONDS``    | ``300`` (monitoring cache, avoids SQL polling)   |
+| ``ARGOS_DBX_SNAPSHOT_DIR``     | ``<ARGOS_MLOPS_HOME>/dbx_cache`` (last good read) |
 | ``ARGOS_DBX_INFERENCE_TIMEOUT``| ``30`` seconds                                   |
 """
 
@@ -56,6 +57,10 @@ DEFAULT_MODELS = [
 ]
 
 
+def _mlops_home() -> Path:
+    return Path(os.environ.get("ARGOS_MLOPS_HOME", Path.home() / "ARGOS_MLOPS_LOCAL"))
+
+
 def _truthy(value: str | None) -> bool:
     return (value or "").strip().lower() in ("1", "true", "yes", "on")
 
@@ -69,6 +74,7 @@ class DatabricksSettings:
     warehouse_id: str | None = None
     warehouse_autostart: bool = False
     cache_seconds: int = 300
+    snapshot_dir: str = field(default_factory=lambda: str(_mlops_home() / "dbx_cache"))
     inference_timeout_s: int = 30
     models: tuple[ManagedModel, ...] = field(default_factory=lambda: tuple(DEFAULT_MODELS))
     # Jobs that may be triggered through the API besides the models' training jobs.
@@ -98,6 +104,7 @@ class DatabricksSettings:
             warehouse_id=env.get("ARGOS_DBX_WAREHOUSE_ID") or None,
             warehouse_autostart=_truthy(env.get("ARGOS_DBX_WAREHOUSE_AUTOSTART")),
             cache_seconds=int(env.get("ARGOS_DBX_CACHE_SECONDS", 300)),
+            snapshot_dir=env.get("ARGOS_DBX_SNAPSHOT_DIR", str(_mlops_home() / "dbx_cache")),
             inference_timeout_s=int(env.get("ARGOS_DBX_INFERENCE_TIMEOUT", 30)),
             models=tuple(models),
             extra_triggerable_jobs=tuple(

@@ -14,6 +14,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict
@@ -141,6 +142,12 @@ class MonitoringReport(_Model):
     metrics: MonitoringMetrics | None = None
     accuracies: dict[str, float | None] = {}
     read_at: datetime | None = None
+    # Last SUCCESSFUL read, persisted locally; shown as such (with its read_at) when the
+    # live read is unavailable. Never presented as fresh data.
+    last_snapshot: MonitoringReport | None = None
+
+
+MonitoringReport.model_rebuild()
 
 
 # --------------------------------------------------------------------------- connector
@@ -551,7 +558,12 @@ class DatabricksConnector:
                 f"computed_at FROM {table}"
             )
         except ConflictError as exc:
-            report = MonitoringReport(available=False, reason=str(exc), table=table)
+            report = MonitoringReport(
+                available=False,
+                reason=str(exc),
+                table=table,
+                last_snapshot=self._snapshot(model_id),
+            )
             self._cache[key] = (time.time(), report)
             return report
         drift, accuracies, n, computed = [], {}, 0, []
@@ -593,4 +605,21 @@ class DatabricksConnector:
             read_at=datetime.now(UTC),
         )
         self._cache[key] = (time.time(), report)
+        self._save_snapshot(model_id, report)
         return report
+
+    def _snapshot_file(self, model_id: str) -> Path:
+        return Path(self.settings.snapshot_dir) / f"monitoring_{model_id}.json"
+
+    def _snapshot(self, model_id: str) -> MonitoringReport | None:
+        path = self._snapshot_file(model_id)
+        if not path.is_file():
+            return None
+        return MonitoringReport.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def _save_snapshot(self, model_id: str, report: MonitoringReport) -> None:
+        path = self._snapshot_file(model_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            report.model_copy(update={"last_snapshot": None}).model_dump_json(), encoding="utf-8"
+        )

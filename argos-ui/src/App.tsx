@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { LIVE_AI_LEADER, USE_MOCK } from './api/client';
 import type { Role } from './api/types';
 import { AuthProvider, homeFor, useAuth } from './auth';
 import Admin from './pages/Admin';
@@ -18,9 +19,20 @@ function Guard({ roles, children }: { roles: Role[]; children: ReactElement }) {
   return children;
 }
 
+/** Rappel permanent : en démo, les écrans affichent des données simulées. */
+function DemoBadge() {
+  if (!USE_MOCK) return null;
+  return (
+    <div className="pill pill-amber" style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 50, boxShadow: '0 2px 8px rgba(11,31,63,.15)' }}>
+      Démo · données simulées{LIVE_AI_LEADER ? ' (sauf AI Leader : données réelles)' : ''}
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
+      <DemoBadge />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Login />} />

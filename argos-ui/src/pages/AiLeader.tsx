@@ -1,14 +1,20 @@
 import { useState } from 'react';
-import { api } from '../api/client';
+import { api, LIVE_AI_LEADER } from '../api/client';
 import { HealthChart } from '../components/charts';
 import { Icon, ICONS, Loading, TopBar } from '../components/ui';
 import { useApi } from '../hooks/useApi';
+import AiLeaderLive from './AiLeaderLive';
 
 const STEPS = ['Photos', 'Labels', 'Entraînement', 'Test', 'Registre', 'Déploiement'];
 const tone = (h: number, t: number) => (h < t ? ['var(--red)', 'var(--red-text)'] : h < 90 ? ['var(--amber)', 'var(--amber-text)'] : ['var(--green)', 'var(--green-text)']);
 
-/** Fabrique de modèles : santé, dérives, réentraînement, versions. */
+/** Données réelles (VITE_LIVE_AI_LEADER=true ou VITE_USE_MOCK=false), sinon l'écran de démonstration. */
 export default function AiLeader() {
+  return LIVE_AI_LEADER ? <AiLeaderLive /> : <AiLeaderDemo />;
+}
+
+/** Fabrique de modèles : santé, dérives, réentraînement, versions (DONNÉES DE DÉMONSTRATION). */
+function AiLeaderDemo() {
   const { data: ai, setData } = useApi(() => api.aiOverview(), [], 30000);
   const [msg, setMsg] = useState('');
   if (!ai) return <Loading />;
