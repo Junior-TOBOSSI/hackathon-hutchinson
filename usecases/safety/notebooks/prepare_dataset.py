@@ -15,7 +15,13 @@ Modes:
          a classifier on the hand crop would then tell gloved from bare (separate step).
 
 Every mode applies the same corrections (boxes clipped to the image, invalid lines dropped)
-and keeps the SH17 train/val split. Output: data/processed/safety/sh17_<mode>/.
+and the same split. Output: data/processed/safety/sh17_<mode>/.
+
+Split: SH17 only has train (6,479) / val (1,620). The validation picks the best epoch, so its
+score is slightly optimistic. The SH17 val is therefore cut in two, at random with a FIXED
+seed (same cut for every mode): val (picks the epoch) and test (final number, used once).
+The official SH17 weights never saw any of these 1,620 images: they can be compared to our
+models on the same test images.
 The source is never modified: images are RELATIVE symlinks, labels are new files.
 Run this script on the training machine itself (copying symlinks to a USB key breaks them).
 """
@@ -24,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import random
 import shutil
 from collections import Counter
 from pathlib import Path
@@ -53,6 +60,17 @@ MODES = {
     "hand": {**OURS, "gloves": "hand", "hands": "hand"},
 }
 SAME_OBJECT_IOU = 0.7  # after merging, a hand labelled twice (hands + gloves) is kept once
+SPLIT_SEED = 0  # never change it once results are reported: the test set would change
+
+
+def split_val_test(splits: dict[str, set[str]], test_fraction: float) -> dict[str, set[str]]:
+    """Move a fixed random part of the SH17 'val' split into a new 'test' split."""
+    if test_fraction <= 0 or "test" in splits:
+        return splits
+    val = sorted(splits["val"])  # sorted first: same result on every machine
+    random.Random(SPLIT_SEED).shuffle(val)
+    n_test = round(len(val) * test_fraction)
+    return {**splits, "val": set(val[n_test:]), "test": set(val[:n_test])}
 
 
 def iou(a: Box, b: Box) -> float:
@@ -89,6 +107,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--mode", choices=sorted(MODES), default="ours")
     parser.add_argument("--src", type=Path, default=Path("data/raw/safety/sh17"))
     parser.add_argument("--out", type=Path, default=None, help="default: .../sh17_<mode>")
+    parser.add_argument(
+        "--test-fraction", type=float, default=0.5, help="part of SH17 val used as test"
+    )
     args = parser.parse_args(argv)
     out = args.out or Path(f"data/processed/safety/sh17_{args.mode}")
 
@@ -98,7 +119,7 @@ def main(argv: list[str] | None = None) -> None:
     old_to_new = {SH17_DEFAULT_NAMES.index(o): new_names.index(n) for o, n in mapping.items()}
     merged = new_names.index("hand") if "hand" in new_names else None
 
-    splits = read_splits(args.src)
+    splits = split_val_test(read_splits(args.src), args.test_fraction)
     images = {p.stem: p for p in (args.src / "images").iterdir()}
     shutil.rmtree(out, ignore_errors=True)
     (out / "images").mkdir(parents=True)
@@ -127,7 +148,9 @@ def main(argv: list[str] | None = None) -> None:
         print(f"{split}: {len(lines)} images")
 
     # 'path' is rewritten to an absolute path by train_detector.py on the training machine.
-    data = {"path": str(out.resolve()), "train": "train.txt", "val": "val.txt"}
+    data = {"path": str(out.resolve()), **{s: f"{s}.txt" for s in ("train", "val", "test")}}
+    if "test" not in splits:
+        del data["test"]
     data["names"] = dict(enumerate(new_names))
     (out / "data.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
 
