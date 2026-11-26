@@ -41,6 +41,7 @@ class Alignment:
     valid: np.ndarray | None  # bool (H, W) of the reference: pixels covered by the photo
     inliers: int
     reason: str = ""
+    homography: np.ndarray | None = None  # 3x3, photo pixels -> reference pixels
 
 
 def align_to_reference(
@@ -83,7 +84,7 @@ def align_to_reference(
         return Alignment(
             False, None, None, inliers, "the photo covers less than half the reference"
         )
-    return Alignment(True, aligned, valid, inliers)
+    return Alignment(True, aligned, valid, inliers, homography=homography)
 
 
 def _small_gray(image: np.ndarray, scale: float) -> np.ndarray:

@@ -182,3 +182,19 @@ def test_station_file_is_valid_without_the_data(tmp_path):
     a = ZoneWorkstationAnalyzer()
     a.load({"detector": "none", "align": True, **params})  # loads, references missing
     assert a.analyze(REFERENCE, META).score <= 1.0
+
+
+# ------------------------------------------------------------------ rendering
+
+
+def test_render_draws_on_the_original_photo_with_a_verdict_banner():
+    from usecases.workstation.render import describe, render
+    from visionhub.contracts import Decision
+
+    photo = samples.camera_jitter(REFERENCE, np.random.default_rng(5))
+    samples.box(photo, 0.72, 0.65)
+    a = analyzer()
+    result = a.analyze(photo, META)
+    shown = render(photo, a, result, Decision.ANOMALIE, scale=1.0)
+    assert shown.shape[1] == photo.shape[1] and shown.shape[0] == photo.shape[0] + 48
+    assert any("keep_clear" in line for line in describe(result))

@@ -11,7 +11,9 @@
 # Zones ("empty_zones"): nothing may appear there compared with normal
 #   - zone_rouge : red hatched area next to the press, neither object nor person
 #   - etabli     : bench top, nothing left on it (5S disorder)
-# Slots ("element_slots"): tool groups of the shadow board must stay in their place.
+# Slots ("element_slots"): every element of the station (tool groups, bins, press,
+# control cabinet) must stay in its place; they are also the boxes shown on each photo.
+# The vise has no slot: it stands on the bench, already watched by the "etabli" zone.
 # The busy factory background varies between photos: it is never judged.
 name: presse_5s
 dataset: raw/workstation/presse_5S_20
@@ -33,6 +35,9 @@ views:
       bacs_bleus: [[0.101, 0.375], [0.175, 0.375], [0.175, 0.572], [0.101, 0.572]]
       tournevis: [[0.194, 0.409], [0.244, 0.409], [0.244, 0.486], [0.194, 0.486]]
       pinces: [[0.254, 0.409], [0.304, 0.409], [0.304, 0.517], [0.254, 0.517]]
+      poubelles: [[0.056, 0.683], [0.181, 0.683], [0.181, 0.917], [0.056, 0.917]]
+      presse: [[0.363, 0.123], [0.756, 0.123], [0.756, 0.923], [0.363, 0.923]]
+      coffret_commande: [[0.756, 0.262], [0.851, 0.262], [0.851, 0.591], [0.756, 0.591]]
   # The provided reference (pilot lot)
   - name: pilote
     reference_image: raw/workstation/presse_5S_20/reference.png
@@ -43,3 +48,6 @@ views:
       bacs_bleus: [[0.107, 0.262], [0.181, 0.262], [0.181, 0.486], [0.107, 0.486]]
       tournevis: [[0.192, 0.271], [0.244, 0.271], [0.244, 0.338], [0.192, 0.338]]
       pinces: [[0.254, 0.246], [0.298, 0.246], [0.298, 0.369], [0.254, 0.369]]
+      poubelles: [[0.073, 0.615], [0.202, 0.615], [0.202, 0.886], [0.073, 0.886]]
+      presse: [[0.359, 0.000], [0.776, 0.000], [0.776, 0.892], [0.359, 0.892]]
+      coffret_commande: [[0.746, 0.154], [0.837, 0.154], [0.837, 0.492], [0.746, 0.492]]

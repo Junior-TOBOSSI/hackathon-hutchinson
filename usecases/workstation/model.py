@@ -202,14 +202,18 @@ class ZoneWorkstationAnalyzer(Analyzer):
             self.reset_reference(image)
 
         view, valid = self.views[0], None
+        self.last_alignment = None
         if self.align:
             picked = self._pick_view(image)
             if picked is None:
                 log.warning("Frame %s: alignment failed on every view", meta.frame_id)
+                self.last_view, self.last_view_obj = "-", None
                 return self._result(self.alignment_failed_score, [], [], [ALIGNMENT_FAILED])
             view, alignment = picked
             image, valid = alignment.aligned, alignment.valid
+            self.last_alignment = alignment
         self.last_view = view.name
+        self.last_view_obj = view
 
         h, w = image.shape[:2]
         detections = self.detector(image)

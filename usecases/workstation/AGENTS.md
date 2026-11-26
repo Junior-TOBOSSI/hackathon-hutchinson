@@ -26,6 +26,8 @@ Vérifier que le poste est configuré comme la référence : objets attendus pr�
 - 2026-11-26 — L'arrière-plan de l'atelier (personnes, machines au loin) n'est jamais jugé : seules les zones et les emplacements comptent.
 - 2026-11-26 — Le détecteur ne fait que **nommer** un changement ; YOLO26 COCO activé par défaut, car il nomme les personnes dans la zone rouge (sécurité) et la latence (0,8 s) est sans enjeu pour une photo par prise de poste.
 - 2026-11-26 — Mesure en **validation croisée** : une photo conforme mise de côté à chaque fois (4 photos conformes seulement).
+- 2026-11-26 — Boîtes sur tous les éléments du poste (bacs, outils, poubelles, presse, coffret) redessinées **sur la photo d'origine** par l'homographie inverse ; pas d'emplacement pour l'étau (posé sur l'établi, il était signalé « absent » dès qu'un objet arrivait à côté).
+- 2026-11-26 — Démo Streamlit propre au binôme (`demo_app.py`, port 8502) : 12 photos traitées correctement et précisément, défilement automatique, une photo conforme n'est jamais jugée par un modèle qui l'a apprise.
 - 2026-11-26 — Différence en **couleur**, luminosité compensée ; alignement SIFT + RANSAC ; aucune modification du contrat (`"<label>@<zone>"` dans `misplaced`).
 
 ## Questions ouvertes
