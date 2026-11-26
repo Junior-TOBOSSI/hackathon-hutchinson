@@ -52,7 +52,16 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--patience", type=int, default=20, help="early stopping, in epochs")
     parser.add_argument("--batch", type=int, default=-1, help="-1 = as much as the GPU fits")
     parser.add_argument("--device", default="0", help="0 = first NVIDIA GPU, mps, cpu")
-    parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--workers", type=int, default=16, help="CPU processes loading images")
+    parser.add_argument(
+        "--cache",
+        choices=["ram", "disk", "none"],
+        default="ram",
+        help="ram: decode + resize every image ONCE (SH17 images are ~4500 px wide)",
+    )
+    parser.add_argument(
+        "--no-amp", action="store_true", help="full precision (if the losses become nan)"
+    )
     parser.add_argument("--name", default=None, help="default: <dataset>_s_<imgsz>")
     parser.add_argument("--smoke", action="store_true", help="1 epoch on 2%% of the data")
     args = parser.parse_args(argv)
@@ -70,6 +79,8 @@ def main(argv: list[str] | None = None) -> None:
         batch=8 if args.smoke else args.batch,
         device=args.device,
         workers=args.workers,
+        cache=False if args.cache == "none" else args.cache,
+        amp=not args.no_amp,
         project=str(runs),
         name=name,
         exist_ok=True,
