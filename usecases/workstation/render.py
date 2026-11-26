@@ -8,7 +8,7 @@ Drawn:
 - zones (``empty_zones``): green outline if empty, RED if something is in it;
 - element slots (``element_slots``): green box if the element is in its place, RED if not;
 - found objects: ORANGE box for an unknown object, MAGENTA for a person, with its label;
-- a banner with the verdict (OK / A VERIFIER / NOK) and the score.
+- a banner with the verdict only (OK / A VERIFIER / NOK), no score.
 """
 
 from __future__ import annotations
@@ -75,14 +75,15 @@ def _outline(img: np.ndarray, points: np.ndarray, colour, thickness: int, label:
 
 
 def _banner(img: np.ndarray, result: AnalysisResult, decision: Decision) -> np.ndarray:
+    """Verdict only (OK / A VERIFIER / NOK): the operator does not need the score."""
     text, colour = VERDICT[decision]
     bar = np.full((48, img.shape[1], 3), colour, np.uint8)
     cv2.putText(
         bar,
-        f"{text}   score {result.score:.2f}",
-        (12, 34),
+        text,
+        (12, 36),
         cv2.FONT_HERSHEY_SIMPLEX,
-        1.0,
+        1.2,
         (255, 255, 255),
         2,
         cv2.LINE_AA,
