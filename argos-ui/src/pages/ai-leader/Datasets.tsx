@@ -9,7 +9,7 @@ interface DatasetUse { version: string; splits: Record<string, number>; manifest
 
 export default function Datasets() {
   const { go } = useNav();
-  const { model, status, loading, error } = useSelection();
+  const { model, status, loading, error, statusLoading, statusError } = useSelection();
   const runIds = (status?.versions ?? []).map((v) => v.version.run_id).filter((x): x is string => !!x);
   const runs = useRunMap(runIds);
   const catalogs = useCatalogs();
@@ -38,9 +38,10 @@ export default function Datasets() {
     <>
       <Panel title={`Données de ${model.display_name}`} sub="Déduit des runs MLflow des versions enregistrées"
         right={model.synthetic ? <Badge tone="amber">Données synthétiques</Badge> : undefined}>
-        {runs.loading && <Loading />}
+        {statusError && <Unavailable tone="red">Registre indisponible : {statusError}</Unavailable>}
+        {(statusLoading || runs.loading) && <Loading />}
         {runs.error && <Unavailable tone="red">{runs.error}</Unavailable>}
-        {runs.data && datasets.size === 0 && <Unavailable tone="grey">Aucune version de dataset renseignée dans les runs de ce modèle.</Unavailable>}
+        {!statusLoading && !statusError && runs.data && datasets.size === 0 && <Unavailable tone="grey">Aucune version de dataset renseignée dans les runs de ce modèle.</Unavailable>}
         <div style={grid(320)}>
           {[...datasets.values()].map((d) => {
             const total = Object.values(d.splits).reduce((a, b) => a + b, 0);

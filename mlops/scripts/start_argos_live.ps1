@@ -31,6 +31,7 @@ $api = @"
 Set-Location '$Repo'
 `$env:ARGOS_CORE_DB = 'var/argos-integration-core.sqlite3'
 `$env:MLFLOW_DISABLE_AGENT_HINT = '1'
+`$env:HOVIS_MLOPS_WARMUP = '1'
 & '$python' -m uvicorn mlops.api.platform:app --host 127.0.0.1 --port $ApiPort
 "@
 $ui = @"

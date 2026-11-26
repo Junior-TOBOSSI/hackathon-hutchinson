@@ -10,12 +10,34 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
+/** Read options: `fresh` bypasses the server cache; `signal` cancels the request. */
+export interface ReadOpts { fresh?: boolean; signal?: AbortSignal; timeoutMs?: number }
+
+/** Freshness of a response, from the backend headers (real Databricks read time). */
+export interface ResponseMeta { fetchedAt: string | null; cache: 'hit' | 'miss' | 'mixed' | 'stale' | null }
+const META = new WeakMap<object, ResponseMeta>();
+export const metaOf = (data: unknown): ResponseMeta =>
+  (data !== null && typeof data === 'object' ? META.get(data) : undefined) ?? { fetchedAt: null, cache: null };
+
+const DEFAULT_TIMEOUT_MS = 30_000; // > backend request budget (25 s)
+
+async function call<T>(path: string, init?: RequestInit, opts: ReadOpts = {}): Promise<T> {
+  const url = BASE + path + (opts.fresh ? `${path.includes('?') ? '&' : '?'}fresh=true` : '');
+  const controller = new AbortController();
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onAbort = () => controller.abort();
+  opts.signal?.addEventListener('abort', onAbort);
   let res: Response;
   try {
-    res = await fetch(BASE + path, { headers: { 'Content-Type': 'application/json' }, ...init });
+    res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init, signal: controller.signal });
   } catch {
+    if (opts.signal?.aborted) throw new ApiError(0, 'Requête annulée');
+    if (controller.signal.aborted) throw new ApiError(0, `Délai dépassé (${Math.round(timeoutMs / 1000)} s)`);
     throw new ApiError(0, 'Backend ARGOS injoignable');
+  } finally {
+    clearTimeout(timer);
+    opts.signal?.removeEventListener('abort', onAbort);
   }
   if (!res.ok) {
     let detail = res.statusText;
@@ -28,7 +50,16 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(res.status, detail);
   }
-  return res.status === 204 ? (undefined as T) : res.json();
+  if (res.status === 204) return undefined as T;
+  const data = await res.json();
+  if (data !== null && typeof data === 'object') {
+    const cache = res.headers.get('X-HOVIS-Cache');
+    META.set(data, {
+      fetchedAt: res.headers.get('X-HOVIS-Fetched-At'),
+      cache: cache === 'hit' || cache === 'miss' || cache === 'mixed' || cache === 'stale' ? cache : null,
+    });
+  }
+  return data as T;
 }
 
 /* ------------------------------------------------------------------ types (réponses réelles) */
@@ -112,21 +143,23 @@ export interface LiveOverview {
 const q = encodeURIComponent;
 
 export const mlops = {
-  health: () => call<ConnectionStatus>('/mlops/health'),
-  catalogs: () => call<string[]>('/mlops/catalogs'),
-  schemas: (catalog: string) => call<SchemaInfo[]>(`/mlops/catalogs/${q(catalog)}/schemas`),
-  overview: () => call<LiveOverview>('/models/overview'),
-  models: () => call<ManagedModel[]>('/mlops/models'),
-  status: (id: string) => call<ModelStatus>(`/mlops/models/${q(id)}/status`),
-  run: (runId: string) => call<RunSummary>(`/mlops/runs/${q(runId)}`),
+  health: (o?: ReadOpts) => call<ConnectionStatus>('/mlops/health', undefined, o),
+  catalogs: (o?: ReadOpts) => call<string[]>('/mlops/catalogs', undefined, o),
+  schemas: (catalog: string, o?: ReadOpts) => call<SchemaInfo[]>(`/mlops/catalogs/${q(catalog)}/schemas`, undefined, o),
+  overview: (o?: ReadOpts) => call<LiveOverview>('/models/overview', undefined, o),
+  models: (o?: ReadOpts) => call<ManagedModel[]>('/mlops/models', undefined, o),
+  status: (id: string, o?: ReadOpts) => call<ModelStatus>(`/mlops/models/${q(id)}/status`, undefined, o),
+  run: (runId: string, o?: ReadOpts) => call<RunSummary>(`/mlops/runs/${q(runId)}`, undefined, o),
   compare: (runIds: string[]) => call<Comparison>(`/mlops/runs/compare?ids=${runIds.map(q).join(',')}`),
-  experiments: () => call<ExperimentInfo[]>('/mlops/experiments'),
-  runs: (experimentId: string) => call<RunSummary[]>(`/mlops/experiments/${q(experimentId)}/runs?limit=10`),
-  jobs: () => call<JobInfo[]>('/mlops/jobs'),
+  experiments: (o?: ReadOpts) => call<ExperimentInfo[]>('/mlops/experiments', undefined, o),
+  runs: (experimentId: string, o?: ReadOpts) => call<RunSummary[]>(`/mlops/experiments/${q(experimentId)}/runs?limit=10`, undefined, o),
+  jobs: (o?: ReadOpts) => call<JobInfo[]>('/mlops/jobs', undefined, o),
   jobRun: (runId: number) => call<JobRunInfo>(`/mlops/job-runs/${runId}`),
-  jobRuns: (jobId: number, limit = 10) => call<JobRunInfo[]>(`/mlops/jobs/${jobId}/runs?limit=${limit}`),
-  endpoints: () => call<EndpointInfo[]>('/mlops/endpoints'),
-  monitoring: (id: string, refresh = false) => call<MonitoringReport>(`/mlops/models/${q(id)}/monitoring${refresh ? '?refresh=true' : ''}`),
+  jobRuns: (jobId: number, o?: ReadOpts) => call<JobRunInfo[]>(`/mlops/jobs/${jobId}/runs?limit=10`, undefined, o),
+  endpoints: (o?: ReadOpts) => call<EndpointInfo[]>('/mlops/endpoints', undefined, o),
+  // An explicit live read may wait for a running SQL warehouse: longer, still bounded.
+  monitoring: (id: string, refresh = false, o?: ReadOpts) =>
+    call<MonitoringReport>(`/mlops/models/${q(id)}/monitoring${refresh ? '?refresh=true' : ''}`, undefined, refresh ? { ...o, timeoutMs: 180_000 } : o),
   approve: (id: string, version: string) => call<VersionStatus>(`/mlops/models/${q(id)}/versions/${q(version)}/approve`, { method: 'POST' }),
   promote: (id: string, version: string) => call<ModelStatus>(`/models/${q(id)}/promote`, { method: 'POST', body: JSON.stringify({ version }) }),
   retrain: (id: string) => call<JobRunInfo>(`/models/${q(id)}/retrain`, { method: 'POST' }),

@@ -13,8 +13,12 @@ export interface Selection {
   models: ManagedModel[];
   model: ManagedModel | null;
   status: ModelStatus | null;
+  /** Model list only (configuration, ~30 ms): never waits for the registry status. */
   loading: boolean;
   error: string | null;
+  /** Registry status of the selected model, loaded independently. */
+  statusLoading: boolean;
+  statusError: string | null;
 }
 
 /** Modèle courant = ?model=… s'il existe, sinon le premier modèle géré. */
@@ -29,8 +33,10 @@ export function useSelection(): Selection {
     models,
     model,
     status,
-    loading: managed.loading || statuses.loading,
-    error: managed.error ?? statuses.error,
+    loading: managed.loading,
+    error: managed.error,
+    statusLoading: statuses.loading,
+    statusError: statuses.error,
   };
 }
 

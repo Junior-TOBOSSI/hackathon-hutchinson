@@ -45,12 +45,16 @@ export default function Overview() {
   const jobs = useJobs();
   const experiments = useExperiments();
   const runs = useRuns(experiments.data?.[0]?.experiment_id ?? null);
-  const { models } = useSelection();
+  const { models, loading: modelsLoading, error: modelsError } = useSelection();
 
+  // Last training = last run of the managed models' training jobs (already in /jobs).
+  const trainingJobs = new Set(models.map((m) => m.training_job).filter(Boolean));
+  const lastJob = (jobs.data ?? [])
+    .filter((j) => trainingJobs.has(j.name) && j.last_run?.start_time)
+    .sort((a, b) => (b.last_run?.start_time ?? '').localeCompare(a.last_run?.start_time ?? ''))[0];
   const versions = statuses.data?.reduce((n, s) => n + s.versions.length, 0);
   const readyEndpoints = endpoints.data?.filter((e) => e.ready === 'READY').length;
   const drifting = new Set((overview.data?.drifts ?? []).map((d) => d.modelId)).size;
-  const lastRun = runs.data?.[0];
   const alerts = computeAlerts(overview.data, statuses.data, endpoints.data, jobs.data);
   const v = (x: number | undefined, loading: boolean, error: string | null): ReactNode => (error ? '—' : x == null || loading ? '…' : x);
 
@@ -58,17 +62,18 @@ export default function Overview() {
     <>
       <div style={grid(190)}>
         <Stat label="Connexion Databricks" value={health.error ? 'Coupée' : health.data ? 'Active' : '…'} tone={health.error ? 'red' : health.data ? 'green' : undefined} hint={health.error ?? (health.data ? `profil ${health.data.profile}` : undefined)} />
-        <Stat label="Modèles enregistrés" value={v(models.length, statuses.loading, statuses.error)} hint={`${PENDING_SLOTS.length} en attente de livraison`} onClick={() => go('registry')} />
+        <Stat label="Modèles enregistrés" value={v(models.length, modelsLoading, modelsError)} hint={`${PENDING_SLOTS.length} en attente de livraison`} onClick={() => go('registry')} />
         <Stat label="Versions disponibles" value={v(versions, statuses.loading, statuses.error)} hint="Unity Catalog" onClick={() => go('registry')} />
         <Stat label="Endpoints prêts" value={endpoints.error ? '—' : endpoints.data ? `${readyEndpoints} / ${endpoints.data.length}` : '…'} hint="Model Serving" onClick={() => go('deployment')} />
         <Stat label="Modèles en dérive" value={v(drifting, overview.loading, overview.error)} tone={drifting ? 'red' : 'green'} hint={overview.data?.drifts.some((d) => d.stale) ? "d'après le dernier instantané" : undefined} onClick={() => go('monitoring')} />
-        <Stat label="Dernier entraînement" value={lastRun ? dateTime(lastRun.start_time).split(' ')[0] : runs.error ? '—' : '…'} hint={lastRun ? `${lastRun.run_name} · ${lastRun.status}` : undefined} onClick={() => go('training')} />
+        <Stat label="Dernier job d'entraînement" value={lastJob?.last_run ? dateTime(lastJob.last_run.start_time).split(' ')[0] : jobs.error ? '—' : jobs.data ? 'aucun' : '…'} hint={lastJob?.last_run ? `${dateTime(lastJob.last_run.start_time).split(' ')[1]} · ${lastJob.last_run.result_state ?? lastJob.last_run.life_cycle_state ?? ''}` : undefined} onClick={() => go('training')} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 18 }}>
         <Panel title="Interventions" sub="Calculées depuis l'état réel du registre, du serving, des jobs et du monitoring">
-          {overview.loading && <Loading />}
-          {!overview.loading && alerts.length === 0 && <Unavailable tone="grey">Aucune intervention nécessaire.</Unavailable>}
+          {overview.loading && <span className="muted" style={{ fontSize: 14 }}>Analyse du monitoring en cours… Les autres contrôles s'affichent dès qu'ils sont disponibles.</span>}
+          {overview.error && <Unavailable tone="red">Synthèse indisponible : {overview.error}</Unavailable>}
+          {!overview.loading && !statuses.loading && alerts.length === 0 && <Unavailable tone="grey">Aucune intervention nécessaire.</Unavailable>}
           {alerts.map((a, i) => (
             <button key={i} onClick={() => go(a.section, a.model)} className="col" style={{ textAlign: 'left', gap: 4, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', background: '#fff', border: `2px solid ${a.level === 'red' ? 'var(--red)' : a.level === 'amber' ? 'var(--amber)' : 'var(--line-strong)'}` }}>
               <b>{a.title}</b>

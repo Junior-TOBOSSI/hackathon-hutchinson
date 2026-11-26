@@ -28,6 +28,8 @@ from mlops.connectors.mlflow_client import (
     _run,
     _ts,
 )
+from mlops.databricks.auth_cache import install_host_creds_cache
+from mlops.databricks.read_cache import BudgetExceeded, ReadCache, current_scope, fresh_reads
 from mlops.databricks.settings import DatabricksSettings, ManagedModel
 from visionhub.contracts import UseCase
 from visionhub.integration.mlops import DriftMeasure, ModelRef, MonitoringMetrics
@@ -153,6 +155,24 @@ MonitoringReport.model_rebuild()
 # --------------------------------------------------------------------------- connector
 
 
+FINISHED_RUN_STATES = {"FINISHED", "FAILED", "KILLED"}
+
+
+def build_workspace_client(settings: DatabricksSettings):
+    """SDK client of the configured profile with bounded timeouts (SDK defaults: 60 s per
+    request and up to 300 s of retries). Timeouts go through ``Config``."""
+    from databricks.sdk import WorkspaceClient
+    from databricks.sdk.config import Config
+
+    return WorkspaceClient(
+        config=Config(
+            profile=settings.profile,
+            http_timeout_seconds=settings.http_timeout_seconds,
+            retry_timeout_seconds=settings.retry_timeout_seconds,
+        )
+    )
+
+
 class DatabricksConnector:
     def __init__(
         self, settings: DatabricksSettings | None = None, workspace=None, mlflow_client=None
@@ -160,20 +180,34 @@ class DatabricksConnector:
         self.settings = settings or DatabricksSettings.from_env()
         self.settings.apply_process_environment()
         if workspace is None:
-            from databricks.sdk import WorkspaceClient
-
-            workspace = WorkspaceClient(profile=self.settings.profile)
+            workspace = build_workspace_client(self.settings)
         if mlflow_client is None:
             from mlflow import MlflowClient
 
             mlflow_client = MlflowClient(tracking_uri="databricks", registry_uri="databricks-uc")
+            # Avoid one CLI process + host discovery per MLflow call (see auth_cache.py).
+            install_host_creds_cache(mlflow_client)
         self.w = workspace
         self.mlflow = mlflow_client
         self._cache: dict[str, tuple[float, Any]] = {}
+        self.reads = ReadCache()
+
+    def _cached(self, key: str, loader: Callable[[], T], ttl: Any = None) -> T:
+        """Read through the in-memory cache; the last valid value is served (marked stale)
+        only when Databricks is unreachable, never on 404 / 403."""
+        return self.reads.get(
+            key,
+            loader,
+            ttl if ttl is not None else self.settings.read_ttl_seconds,
+            stale_on=(DatabricksUnavailableError, BudgetExceeded),
+        )
 
     # ------------------------------------------------------------------ plumbing
 
     def _call(self, fn: Callable[[], T], what: str = "resource") -> T:
+        scope = current_scope()
+        if scope is not None:
+            scope.check_budget()  # bounded cumulative time for multi-call endpoints
         try:
             return fn()
         except DatabricksConnectorError:
@@ -213,10 +247,16 @@ class DatabricksConnector:
         )
 
     def list_catalogs(self) -> list[str]:
-        return self._call(lambda: [c.name for c in self.w.catalogs.list()], "catalogs")
+        return self._cached(
+            "catalogs",
+            lambda: self._call(lambda: [c.name for c in self.w.catalogs.list()], "catalogs"),
+        )
 
     def list_schemas(self, catalog: str | None = None) -> list[SchemaInfo]:
         catalog = catalog or self.settings.catalog
+        return self._cached(f"schemas:{catalog}", lambda: self._list_schemas(catalog))
+
+    def _list_schemas(self, catalog: str) -> list[SchemaInfo]:
         return self._call(
             lambda: [
                 SchemaInfo(catalog=catalog, name=s.name, full_name=s.full_name, comment=s.comment)
@@ -228,6 +268,9 @@ class DatabricksConnector:
     # ------------------------------------------------------------------ MLflow tracking
 
     def list_experiments(self) -> list[ExperimentInfo]:
+        return self._cached("experiments", self._list_experiments)
+
+    def _list_experiments(self) -> list[ExperimentInfo]:
         out = []
         for path in self.settings.experiments:
             experiment = self._call(
@@ -245,6 +288,12 @@ class DatabricksConnector:
         )
 
     def list_runs(self, experiment_id: str, max_results: int = 50) -> list[RunSummary]:
+        return self._cached(
+            f"runs:{experiment_id}:{max_results}",
+            lambda: self._list_runs(experiment_id, max_results),
+        )
+
+    def _list_runs(self, experiment_id: str, max_results: int) -> list[RunSummary]:
         runs = self._call(
             lambda: self.mlflow.search_runs(
                 [experiment_id], max_results=max_results, order_by=["attributes.start_time DESC"]
@@ -254,7 +303,16 @@ class DatabricksConnector:
         return [_run(r) for r in runs]
 
     def get_run(self, run_id: str) -> RunSummary:
-        return _run(self._call(lambda: self.mlflow.get_run(run_id), f"run {run_id}"))
+        """A finished run is stable: cached 1 h; a running one like any current state."""
+        return self._cached(
+            f"run:{run_id}",
+            lambda: _run(self._call(lambda: self.mlflow.get_run(run_id), f"run {run_id}")),
+            ttl=lambda r: (
+                self.settings.finished_run_ttl_seconds
+                if r.status in FINISHED_RUN_STATES
+                else self.settings.read_ttl_seconds
+            ),
+        )
 
     def metric_history(self, run_id: str, key: str) -> list[MetricPoint]:
         self.get_run(run_id)
@@ -283,6 +341,10 @@ class DatabricksConnector:
     # ------------------------------------------------------------------ UC registry
 
     def model_versions(self, model_id: str) -> list[ModelVersionInfo]:
+        self.managed(model_id)
+        return self._cached(f"versions:{model_id}", lambda: self._model_versions(model_id))
+
+    def _model_versions(self, model_id: str) -> list[ModelVersionInfo]:
         managed = self.managed(model_id)
         registered = self._call(
             lambda: self.mlflow.get_registered_model(managed.uc_name), managed.uc_name
@@ -362,35 +424,44 @@ class DatabricksConnector:
     ) -> VersionStatus:
         """Record a HUMAN approval on a version (tag). Does not move any alias, serves nothing."""
         managed = self.managed(model_id)
-        self._call(
-            lambda: self.mlflow.get_model_version(managed.uc_name, version), f"version {version}"
-        )
-        self._call(
-            lambda: self.mlflow.set_model_version_tag(
-                managed.uc_name, version, APPROVAL_TAG, "approved"
-            ),
-            "tag",
-        )
-        self._call(
-            lambda: self.mlflow.set_model_version_tag(
-                managed.uc_name, version, "argos_approved_by", approved_by_role
-            ),
-            "tag",
-        )
-        return next(v for v in self.model_status(model_id).versions if v.version.version == version)
+        with self.reads.mutation(f"versions:{model_id}"):
+            # Existence checked on the REAL registry (never on cached data).
+            self._call(
+                lambda: self.mlflow.get_model_version(managed.uc_name, version),
+                f"version {version}",
+            )
+            self._call(
+                lambda: self.mlflow.set_model_version_tag(
+                    managed.uc_name, version, APPROVAL_TAG, "approved"
+                ),
+                "tag",
+            )
+            self._call(
+                lambda: self.mlflow.set_model_version_tag(
+                    managed.uc_name, version, "argos_approved_by", approved_by_role
+                ),
+                "tag",
+            )
+        with fresh_reads():
+            status = self.model_status(model_id)
+        return next(v for v in status.versions if v.version.version == version)
 
     def set_alias(self, model_id: str, alias: str, version: str) -> ModelStatus:
         """Registry promotion (alias). The served version is NOT changed by this call."""
         if alias not in PROMOTABLE_ALIASES:
             raise ForbiddenOperationError(f"alias must be one of {PROMOTABLE_ALIASES}")
         managed = self.managed(model_id)
-        self._call(
-            lambda: self.mlflow.get_model_version(managed.uc_name, version), f"version {version}"
-        )
-        self._call(
-            lambda: self.mlflow.set_registered_model_alias(managed.uc_name, alias, version), "alias"
-        )
-        return self.model_status(model_id)
+        with self.reads.mutation(f"versions:{model_id}"):
+            self._call(
+                lambda: self.mlflow.get_model_version(managed.uc_name, version),
+                f"version {version}",
+            )
+            self._call(
+                lambda: self.mlflow.set_registered_model_alias(managed.uc_name, alias, version),
+                "alias",
+            )
+        with fresh_reads():
+            return self.model_status(model_id)
 
     # ------------------------------------------------------------------ jobs
 
@@ -413,6 +484,9 @@ class DatabricksConnector:
         )
 
     def list_jobs(self) -> list[JobInfo]:
+        return self._cached("jobs", self._list_jobs)
+
+    def _list_jobs(self) -> list[JobInfo]:
         out = []
         for job in self._call(lambda: list(self.w.jobs.list()), "jobs"):
             settings = job.settings
@@ -436,6 +510,9 @@ class DatabricksConnector:
         return out
 
     def job_runs(self, job_id: int, limit: int = 10) -> list[JobRunInfo]:
+        return self._cached(f"jobruns:{job_id}:{limit}", lambda: self._job_runs(job_id, limit))
+
+    def _job_runs(self, job_id: int, limit: int) -> list[JobRunInfo]:
         return [
             self._job_run(r)
             for r in self._call(
@@ -461,7 +538,8 @@ class DatabricksConnector:
             )
         ):
             raise ConflictError(f"job {job_name!r} already has an active run")
-        run_id = self._call(lambda: self.w.jobs.run_now(job.job_id).run_id, f"job {job_name}")
+        with self.reads.mutation("jobs", f"jobruns:{job.job_id}:"):
+            run_id = self._call(lambda: self.w.jobs.run_now(job.job_id).run_id, f"job {job_name}")
         return self.get_job_run(run_id)
 
     # ------------------------------------------------------------------ serving
@@ -490,6 +568,11 @@ class DatabricksConnector:
         )
 
     def list_endpoints(self, include_foundation: bool = False) -> list[EndpointInfo]:
+        return self._cached(
+            f"endpoints:{include_foundation}", lambda: self._list_endpoints(include_foundation)
+        )
+
+    def _list_endpoints(self, include_foundation: bool) -> list[EndpointInfo]:
         endpoints = self._call(lambda: list(self.w.serving_endpoints.list()), "serving endpoints")
         return [
             self._endpoint(self._call(lambda n=e.name: self.w.serving_endpoints.get(n), e.name))
@@ -498,8 +581,11 @@ class DatabricksConnector:
         ]
 
     def get_endpoint(self, name: str) -> EndpointInfo:
-        return self._endpoint(
-            self._call(lambda: self.w.serving_endpoints.get(name), f"endpoint {name}")
+        return self._cached(
+            f"endpoint:{name}",
+            lambda: self._endpoint(
+                self._call(lambda: self.w.serving_endpoints.get(name), f"endpoint {name}")
+            ),
         )
 
     # ------------------------------------------------------------------ monitoring

@@ -9,9 +9,11 @@ import { useSelection, versionRoles } from './selection';
 const VERSION_COLORS = ['var(--navy)', 'var(--primary-light)', 'var(--cat-qualite)', 'var(--cat-rythme)'];
 
 export default function Registry({ onMessage }: { onMessage: (m: string) => void }) {
-  const { model, status, loading, error } = useSelection();
+  const { model, status, loading, error, statusLoading, statusError } = useSelection();
   if (error) return <Unavailable tone="red">Registre indisponible : {error}</Unavailable>;
   if (loading || !model) return <Loading />;
+  if (statusError && !status) return <Unavailable tone="red">Registre indisponible : {statusError}</Unavailable>;
+  if (statusLoading && !status) return <Panel title={model.display_name} sub={`${model.uc_name} · Unity Catalog`}><Loading /></Panel>;
   if (!status) return <Unavailable tone="grey">Aucune information de registre pour ce modèle.</Unavailable>;
   const { served, champion } = versionRoles(status);
 

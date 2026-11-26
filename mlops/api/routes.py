@@ -15,10 +15,11 @@ and only the serving endpoint configuration decides what is served (not changed 
 """
 
 import functools
+import threading
 from collections.abc import Callable
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from mlops.connectors.mlflow_client import ExperimentInfo, MetricPoint, ModelVersionInfo, RunSummary
@@ -34,6 +35,7 @@ from mlops.databricks.connector import (
     SchemaInfo,
     VersionStatus,
 )
+from mlops.databricks.read_cache import BudgetExceeded, read_scope
 from mlops.databricks.training import DatabricksJobBackend
 from visionhub.contracts import UseCase
 from visionhub.integration.mlops import ModelRef, RetrainingPolicy
@@ -62,13 +64,40 @@ def translate(fn: Callable) -> Callable:
             return fn(*args, **kwargs)
         except DatabricksConnectorError as exc:
             raise HTTPException(exc.status_code, str(exc)) from exc
+        except BudgetExceeded as exc:
+            raise HTTPException(503, f"Databricks too slow: {exc}") from exc
 
     return wrapper
 
 
-@functools.lru_cache(maxsize=1)
+_CONNECTOR: DatabricksConnector | None = None
+_CONNECTOR_LOCK = threading.Lock()
+
+
 def default_connector() -> DatabricksConnector:
-    return DatabricksConnector()
+    """One connector per process, built once even under concurrent first requests
+    (warm-up thread + browser requests)."""
+    global _CONNECTOR
+    if _CONNECTOR is None:
+        with _CONNECTOR_LOCK:
+            if _CONNECTOR is None:
+                _CONNECTOR = DatabricksConnector()
+    return _CONNECTOR
+
+
+T = TypeVar("T")
+
+
+def served(c: DatabricksConnector, response: Response, fresh: bool, read: Callable[[], T]) -> T:
+    """Run a read inside a request scope: bounded total time, ``fresh`` = bypass the cache,
+    and freshness headers computed from the REAL remote reads used by the response."""
+    with read_scope(fresh=fresh, budget=c.settings.request_budget_seconds) as scope:
+        result = read()
+    response.headers.update(scope.headers())
+    return result
+
+
+Fresh = Annotated[bool, Query(description="true = bypass the server cache (real read)")]
 
 
 # In-memory retraining policies (one per ARGOS use case). Persisting them is the Core's job.
@@ -89,9 +118,9 @@ def create_mlops_router(
 
     @router.get("/models/overview")
     @translate
-    def models_overview(c: Connector) -> dict[str, Any]:
+    def models_overview(c: Connector, response: Response, fresh: Fresh = False) -> dict[str, Any]:
         """argos-ui ``AiOverview``, filled with real Databricks data where it exists."""
-        return build_overview(c)
+        return served(c, response, fresh, lambda: build_overview(c))
 
     @router.post("/models/{model_id}/retrain", status_code=202)
     @translate
@@ -118,30 +147,36 @@ def create_mlops_router(
 
     @router.get("/mlops/health")
     @translate
-    def health(c: Connector) -> ConnectionStatus:
-        return c.ping()
+    def health(c: Connector, response: Response, fresh: Fresh = False) -> ConnectionStatus:
+        return served(c, response, fresh, lambda: c.ping())
 
     @router.get("/mlops/catalogs")
     @translate
-    def catalogs(c: Connector) -> list[str]:
-        return c.list_catalogs()
+    def catalogs(c: Connector, response: Response, fresh: Fresh = False) -> list[str]:
+        return served(c, response, fresh, lambda: c.list_catalogs())
 
     @router.get("/mlops/catalogs/{catalog}/schemas")
     @translate
-    def schemas(catalog: str, c: Connector) -> list[SchemaInfo]:
-        return c.list_schemas(catalog)
+    def schemas(
+        catalog: str, c: Connector, response: Response, fresh: Fresh = False
+    ) -> list[SchemaInfo]:
+        return served(c, response, fresh, lambda: c.list_schemas(catalog))
 
     @router.get("/mlops/experiments")
     @translate
-    def experiments(c: Connector) -> list[ExperimentInfo]:
-        return c.list_experiments()
+    def experiments(c: Connector, response: Response, fresh: Fresh = False) -> list[ExperimentInfo]:
+        return served(c, response, fresh, lambda: c.list_experiments())
 
     @router.get("/mlops/experiments/{experiment_id}/runs")
     @translate
     def runs(
-        experiment_id: str, c: Connector, limit: int = Query(50, ge=1, le=500)
+        experiment_id: str,
+        c: Connector,
+        response: Response,
+        fresh: Fresh = False,
+        limit: int = Query(50, ge=1, le=500),
     ) -> list[RunSummary]:
-        return c.list_runs(experiment_id, limit)
+        return served(c, response, fresh, lambda: c.list_runs(experiment_id, limit))
 
     @router.get("/mlops/runs/compare")
     @translate
@@ -152,8 +187,8 @@ def create_mlops_router(
 
     @router.get("/mlops/runs/{run_id}")
     @translate
-    def run(run_id: str, c: Connector) -> RunSummary:
-        return c.get_run(run_id)
+    def run(run_id: str, c: Connector, response: Response, fresh: Fresh = False) -> RunSummary:
+        return served(c, response, fresh, lambda: c.get_run(run_id))
 
     @router.get("/mlops/runs/{run_id}/metrics/{key}/history")
     @translate
@@ -167,13 +202,17 @@ def create_mlops_router(
 
     @router.get("/mlops/models/{model_id}/versions")
     @translate
-    def versions(model_id: str, c: Connector) -> list[ModelVersionInfo]:
-        return c.model_versions(model_id)
+    def versions(
+        model_id: str, c: Connector, response: Response, fresh: Fresh = False
+    ) -> list[ModelVersionInfo]:
+        return served(c, response, fresh, lambda: c.model_versions(model_id))
 
     @router.get("/mlops/models/{model_id}/status")
     @translate
-    def status(model_id: str, c: Connector) -> ModelStatus:
-        return c.model_status(model_id)
+    def status(
+        model_id: str, c: Connector, response: Response, fresh: Fresh = False
+    ) -> ModelStatus:
+        return served(c, response, fresh, lambda: c.model_status(model_id))
 
     @router.get("/mlops/models/{model_id}/aliases/{alias}")
     @translate
@@ -197,15 +236,19 @@ def create_mlops_router(
 
     @router.get("/mlops/jobs")
     @translate
-    def jobs(c: Connector) -> list[JobInfo]:
-        return c.list_jobs()
+    def jobs(c: Connector, response: Response, fresh: Fresh = False) -> list[JobInfo]:
+        return served(c, response, fresh, lambda: c.list_jobs())
 
     @router.get("/mlops/jobs/{job_id}/runs")
     @translate
     def job_runs(
-        job_id: int, c: Connector, limit: int = Query(10, ge=1, le=100)
+        job_id: int,
+        c: Connector,
+        response: Response,
+        fresh: Fresh = False,
+        limit: int = Query(10, ge=1, le=100),
     ) -> list[JobRunInfo]:
-        return c.job_runs(job_id, limit)
+        return served(c, response, fresh, lambda: c.job_runs(job_id, limit))
 
     @router.post("/mlops/jobs/{job_name}/run", status_code=202)
     @translate
@@ -219,13 +262,13 @@ def create_mlops_router(
 
     @router.get("/mlops/endpoints")
     @translate
-    def endpoints(c: Connector) -> list[EndpointInfo]:
-        return c.list_endpoints()
+    def endpoints(c: Connector, response: Response, fresh: Fresh = False) -> list[EndpointInfo]:
+        return served(c, response, fresh, lambda: c.list_endpoints())
 
     @router.get("/mlops/endpoints/{name}")
     @translate
-    def endpoint(name: str, c: Connector) -> EndpointInfo:
-        return c.get_endpoint(name)
+    def endpoint(name: str, c: Connector, response: Response, fresh: Fresh = False) -> EndpointInfo:
+        return served(c, response, fresh, lambda: c.get_endpoint(name))
 
     return router
 

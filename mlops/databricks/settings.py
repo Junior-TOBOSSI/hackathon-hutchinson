@@ -74,6 +74,12 @@ class DatabricksSettings:
     warehouse_id: str | None = None
     warehouse_autostart: bool = False
     cache_seconds: int = 300
+    # DBX-PERF-01: read cache, timeouts and per-request time budget (all bounded).
+    read_ttl_seconds: int = 60
+    finished_run_ttl_seconds: int = 3600
+    http_timeout_seconds: int = 15
+    retry_timeout_seconds: int = 30
+    request_budget_seconds: int = 25
     snapshot_dir: str = field(default_factory=lambda: str(_mlops_home() / "dbx_cache"))
     inference_timeout_s: int = 30
     models: tuple[ManagedModel, ...] = field(default_factory=lambda: tuple(DEFAULT_MODELS))
@@ -104,6 +110,8 @@ class DatabricksSettings:
             warehouse_id=env.get("ARGOS_DBX_WAREHOUSE_ID") or None,
             warehouse_autostart=_truthy(env.get("ARGOS_DBX_WAREHOUSE_AUTOSTART")),
             cache_seconds=int(env.get("ARGOS_DBX_CACHE_SECONDS", 300)),
+            read_ttl_seconds=int(env.get("ARGOS_DBX_READ_TTL", 60)),
+            request_budget_seconds=int(env.get("ARGOS_DBX_REQUEST_BUDGET", 25)),
             snapshot_dir=env.get("ARGOS_DBX_SNAPSHOT_DIR", str(_mlops_home() / "dbx_cache")),
             inference_timeout_s=int(env.get("ARGOS_DBX_INFERENCE_TIMEOUT", 30)),
             models=tuple(models),
@@ -123,6 +131,12 @@ class DatabricksSettings:
         os.environ["MLFLOW_TRACKING_URI"] = "databricks"
         os.environ["MLFLOW_REGISTRY_URI"] = "databricks-uc"
         os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
+        # MLflow defaults are 120 s per request and up to 500 s of retries: bound them.
+        os.environ.setdefault("MLFLOW_HTTP_REQUEST_TIMEOUT", str(self.http_timeout_seconds))
+        os.environ.setdefault("MLFLOW_HTTP_REQUEST_MAX_RETRIES", "2")
+        os.environ.setdefault(
+            "MLFLOW_DATABRICKS_ENDPOINT_HTTP_RETRY_TIMEOUT", str(self.retry_timeout_seconds)
+        )
         ensure_cli_on_path()
 
 

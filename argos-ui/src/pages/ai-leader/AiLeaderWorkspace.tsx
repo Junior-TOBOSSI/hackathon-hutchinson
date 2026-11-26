@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Icon, ICONS, TopBar } from '../../components/ui';
 import { SECTIONS, useNav } from './common';
-import { MlopsDataProvider, useHealth, useStore } from './data';
+import { MlopsDataProvider, useFreshness, useHealth, useStore } from './data';
 import Datasets from './Datasets';
 import Deployment from './Deployment';
 import Monitoring from './Monitoring';
@@ -23,6 +23,7 @@ function Workspace() {
   const { section, go } = useNav();
   const health = useHealth();
   const store = useStore();
+  const freshness = useFreshness();
   const [message, setMessage] = useState('');
   const scoped = SECTIONS.find((s) => s.id === section)?.scoped ?? false;
 
@@ -46,7 +47,10 @@ function Workspace() {
           })}
           <span style={{ flex: 1 }} />
           {scoped && <ModelPicker />}
-          <button className="btn btn-ghost" style={{ height: 38, whiteSpace: 'nowrap' }} onClick={() => { store.refresh(); setMessage('Données rechargées depuis Databricks.'); }}>
+          <FreshnessLabel f={freshness} />
+          <button className="btn btn-ghost" style={{ height: 38, whiteSpace: 'nowrap' }} disabled={freshness.refreshing > 0}
+            title="Relit dans Databricks les données affichées (les autres sections seront relues à leur ouverture)"
+            onClick={() => store.refresh()}>
             <span className="row" style={{ gap: 6 }}><Icon d={ICONS.overview} size={16} />Actualiser</span>
           </button>
         </div>
@@ -78,4 +82,23 @@ function ModelPicker() {
       </select>
     </label>
   );
+}
+
+const time = (iso: string) => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+/** Freshness of the DISPLAYED resources: a range when their read times differ, the origin
+    (live read / server cache / last known value) and what is still loading. */
+function FreshnessLabel({ f }: { f: ReturnType<typeof useFreshness> }) {
+  const parts: string[] = [];
+  if (f.oldest && f.newest) {
+    parts.push(time(f.oldest) === time(f.newest) ? `Lu à ${time(f.oldest)}` : `Lu entre ${time(f.oldest)} et ${time(f.newest)}`);
+    if (f.kinds.includes('stale')) parts.push('dernier résultat connu');
+    else if (f.kinds.some((k) => k === 'hit' || k === 'mixed')) parts.push(f.kinds.includes('miss') ? 'en partie depuis le cache serveur' : 'cache serveur');
+    else parts.push('lecture directe');
+  }
+  if (f.refreshing) parts.push(`actualisation… (${f.refreshing})`);
+  else if (f.loading) parts.push(`chargement… (${f.loading})`);
+  if (f.staleAfterError) parts.push(`${f.staleAfterError} en échec : dernier résultat affiché`);
+  if (!parts.length) return null;
+  return <span className="muted" style={{ fontSize: 13, whiteSpace: 'nowrap' }} title="Date réelle de lecture dans Databricks des données affichées à l'écran">{parts.join(' · ')}</span>;
 }
