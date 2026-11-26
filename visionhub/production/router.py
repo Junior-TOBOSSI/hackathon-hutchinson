@@ -11,6 +11,7 @@ The historical POST /events/{id}/feedback does not change a part.
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
@@ -41,6 +42,7 @@ from visionhub.production.store import (
     ProductionError,
     ProductionStore,
 )
+from visionhub.production.sync import OutboxSender, OutboxWorker
 
 DEFAULT_KPI_WINDOW = timedelta(hours=8)
 
@@ -48,10 +50,19 @@ StationPath = Annotated[str, Path(pattern=STATION_ID_PATTERN)]
 Limit = Annotated[int, Query(ge=1, le=1000)]
 
 router = APIRouter(prefix="/production", tags=["production"])
+sync_router = APIRouter(prefix="/edge/sync", tags=["sync"])
 
 
 def engine_of(request: Request) -> ProductionEngine:
     return request.app.state.production
+
+
+@sync_router.get("/status")
+def sync_status(request: Request) -> dict:
+    return {
+        **engine_of(request).store.outbox_status(),
+        "configured": request.app.state.core_sync is not None,
+    }
 
 
 def as_utc(value: datetime) -> datetime:
@@ -185,23 +196,35 @@ def _production_error(request: Request, exc: ProductionError) -> JSONResponse:
     return JSONResponse(status_code=status, content={"detail": str(exc)})
 
 
-def install_production(app: FastAPI, settings: Settings, clock: Clock = utc_now) -> FastAPI:
+def install_production(
+    app: FastAPI, settings: Settings, clock: Clock = utc_now, core_url: str | None = None
+) -> FastAPI:
     """Add the Production Engine to an app built by ``visionhub.api.create_app``."""
     base_lifespan = app.router.lifespan_context
 
     @asynccontextmanager
     async def lifespan(app_: FastAPI):
         async with base_lifespan(app_) as state:
-            store = ProductionStore(settings.db_path)
+            store = ProductionStore(
+                settings.db_path, simulated_default=settings.source == "synthetic"
+            )
             app_.state.production = ProductionEngine(
                 store, app_.state.registry, app_.state.pipeline, clock
             )
+            url = os.environ.get("ARGOS_CORE_URL", "") if core_url is None else core_url
+            worker = OutboxWorker(OutboxSender(store, url)) if url else None
+            app_.state.core_sync = worker
+            if worker is not None:
+                worker.start()
             try:
                 yield state
             finally:
+                if worker is not None:
+                    worker.stop()
                 store.close()
 
     app.router.lifespan_context = lifespan
     app.include_router(router)
+    app.include_router(sync_router, include_in_schema=False)
     app.add_exception_handler(ProductionError, _production_error)
     return app
