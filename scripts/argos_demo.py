@@ -81,6 +81,14 @@ def args_from(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--edge-port", type=int, default=18240)
     parser.add_argument("--core-url")
     parser.add_argument("--edge-url")
+    parser.add_argument(
+        "--demo-shift", action="store_true", help="use the isolated accelerated demo Edge app"
+    )
+    parser.add_argument("--shift-start", default="08:00", help="local demo shift start, HH:MM")
+    parser.add_argument("--shift-duration-min", type=int, default=480)
+    parser.add_argument(
+        "--shift-target", type=int, default=1000, help="good parts per production station"
+    )
     args = parser.parse_args(argv)
     args.run_id = args.run_id or uuid.uuid4().hex[:8]
     if not re.fullmatch(r"[A-Za-z0-9]{4,12}", args.run_id):
@@ -93,6 +101,12 @@ def args_from(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error("disconnect is reserved for autonomous mode")
     if args.rate <= 0 or args.duration < 4 or not 0 <= args.nok_rate <= 1:
         parser.error("require rate > 0, duration >= 4 seconds and nok-rate in [0,1]")
+    if args.demo_shift and (
+        not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", args.shift_start)
+        or not 1 <= args.shift_duration_min <= 720
+        or args.shift_target <= 0
+    ):
+        parser.error("demo shift requires HH:MM, 1..720 minutes and a positive target")
     if args.mode == "connected":
         if not args.core_url or not args.edge_url:
             parser.error("connected mode requires --core-url and --edge-url")
@@ -138,6 +152,14 @@ class OwnedServers:
             "ARGOS_CORE_URL": self.core_url,
             "SOURCE": "synthetic",
         }
+        if args.demo_shift:
+            self.edge_env.update(
+                HOVIS_DEMO_SHIFT_START=args.shift_start,
+                HOVIS_DEMO_SHIFT_DURATION_MIN=str(args.shift_duration_min),
+                HOVIS_DEMO_SHIFT_TARGET=str(args.shift_target),
+                HOVIS_DEMO_SHIFT_RUNTIME_SEC=str(args.duration),
+            )
+        self.demo_shift = args.demo_shift
         self.core_port = args.core_port
         self.edge_port = args.edge_port
 
@@ -186,7 +208,10 @@ class OwnedServers:
         try:
             self.core = self._start("core", "visionhub.core.app:app", self.core_port, self.core_env)
             self.edge = self._start(
-                "edge", "visionhub.argos_app:app", self.edge_port, self.edge_env
+                "edge",
+                "visionhub.demo_shift_app:app" if self.demo_shift else "visionhub.argos_app:app",
+                self.edge_port,
+                self.edge_env,
             )
             return self
         except BaseException:
@@ -445,6 +470,16 @@ def run(args: argparse.Namespace, owned: OwnedServers | None = None) -> dict:
         httpx.Client(base_url=edge_url, timeout=5.0) as edge,
     ):
         check_collision(core, edge, stations)
+        if args.demo_shift:
+            config = _json(edge.get("/production/demo-shift-config"))
+            expected = {
+                "start": args.shift_start,
+                "planned_duration_min": args.shift_duration_min,
+                "target_parts": args.shift_target,
+                "runtime_s": float(args.duration),
+            }
+            if config != expected:
+                raise RuntimeError(f"demo Edge shift configuration differs: {config} != {expected}")
         quality = next(
             (item for item in _json(edge.get("/use-cases")) if item["use_case"] == "quality"),
             None,
@@ -469,8 +504,12 @@ def run(args: argparse.Namespace, owned: OwnedServers | None = None) -> dict:
         for station in production:
             _json(
                 edge.post(
-                    f"/production/stations/{station}/shifts",
-                    json={"name": f"SIM-{args.run_id}", "target_parts": target_per_station},
+                    f"/production/demo/stations/{station}/shifts"
+                    if args.demo_shift
+                    else f"/production/stations/{station}/shifts",
+                    json={"name": f"DEMO-{args.run_id}"}
+                    if args.demo_shift
+                    else {"name": f"SIM-{args.run_id}", "target_parts": target_per_station},
                 )
             )
         started = time.monotonic()

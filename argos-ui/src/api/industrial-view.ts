@@ -17,7 +17,7 @@ export type OperatorView = Omit<StationLive, 'product' | 'shift' | 'part' | 'cou
   effectiveVerdict?: string;
   live?: boolean;
   online?: boolean;
-  shiftWindow?: { startedAt: string; plannedEndAt: string; endedAt: string | null; status: 'OPEN' | 'CLOSED'; target: number; actualGood: number } | null;
+  shiftWindow?: { startedAt: string; plannedEndAt: string; endedAt: string | null; status: 'OPEN' | 'CLOSED'; target: number; actualGood: number; now?: string } | null;
 };
 
 export const active = (alerts: Alert[]) => alerts.filter(activeAlert);
@@ -62,6 +62,14 @@ export async function operatorView(stationId: string): Promise<OperatorView> {
     const [last] = await industrial.edgeShifts(stationId);
     if (last) shift = await industrial.edgeShiftReport(last.shift_id);
   }
+  const demoClock = shift?.shift.name.startsWith('DEMO-')
+    ? await industrial.demoShiftClock(shift.shift.name)
+    : null;
+  const demoExpected = shift && demoClock
+    ? shift.shift.target_parts * Math.max(0, Math.min(1,
+      (new Date(demoClock.now).getTime() - new Date(shift.shift.started_at).getTime()) /
+      (new Date(shift.shift.planned_end_at).getTime() - new Date(shift.shift.started_at).getTime())))
+    : null;
   const camera = station.equipment.find((item) => item.equipment_type === 'camera');
   const problems = active(alerts);
   return {
@@ -70,7 +78,7 @@ export async function operatorView(stationId: string): Promise<OperatorView> {
     now: new Date().toISOString(),
     part: part ? { number: null, verdict: part.effective_verdict === 'NOK' ? 'KO' : part.effective_verdict === 'OK' ? 'OK' : 'A_VERIFIER', jointsDetected: null, score: part.prediction?.score ?? null, imageUrl: null, takenAt: part.created_at } : null,
     counters: { good: shift?.kpi.ok_parts ?? kpi.ok_parts, ko: shift?.kpi.nok_parts ?? kpi.nok_parts },
-    objective: { shiftTarget: shift?.kpi.target_parts ?? null, expectedNow: shift?.kpi.expected_ok_parts_by_now ?? null, perHour: shift && shift.shift.target_parts > 0 ? shift.shift.target_parts / (shift.shift.planned_duration_min / 60) : null },
+    objective: { shiftTarget: shift?.kpi.target_parts ?? null, expectedNow: demoExpected ?? shift?.kpi.expected_ok_parts_by_now ?? null, perHour: shift && shift.shift.target_parts > 0 ? shift.shift.target_parts / (shift.shift.planned_duration_min / 60) : null },
     hourly: null,
     issues: problems.map(issueOf),
     checks: { securite: problems.some((item) => item.use_case === 'safety') ? false : null, poste: problems.some((item) => item.use_case === 'workstation') ? false : null, qualite: part ? part.effective_verdict === 'OK' : null, koRatePct: kpi.nok_rate == null ? null : kpi.nok_rate * 100 },
@@ -78,7 +86,7 @@ export async function operatorView(stationId: string): Promise<OperatorView> {
     partCameraOnline: camera ? camera.status === 'ok' : null,
     industrialPart: part, predictedVerdict: part?.predicted_verdict, effectiveVerdict: part?.effective_verdict,
     online: station.online,
-    shiftWindow: shift ? { startedAt: shift.shift.started_at, plannedEndAt: shift.shift.planned_end_at, endedAt: shift.shift.ended_at, status: shift.shift.status, target: shift.shift.target_parts, actualGood: shift.kpi.ok_parts } : null,
+    shiftWindow: shift ? { startedAt: shift.shift.started_at, plannedEndAt: shift.shift.planned_end_at, endedAt: shift.shift.ended_at, status: shift.shift.status, target: shift.shift.target_parts, actualGood: shift.kpi.ok_parts, now: demoClock?.now } : null,
   };
 }
 

@@ -58,13 +58,13 @@ export function shiftGaugeState(input: ShiftGaugeInput) {
     return {
       position: ((at - start) / (end - start)) * 100,
       hour: `${date.getHours()}h${minute ? String(minute).padStart(2, '0') : ''}`,
-      target: Math.round(target * (at - start) / (end - start) * 10) / 10,
+      target: Math.round(target * (at - start) / (end - start)),
     };
   });
   return { ticks, timeRatio, actualRatio, actual, expected, target, tone, before, finished, hourlyTarget: target / ((end - start) / 3600000) };
 }
 
-/** Continuous operator gauge: fill = good parts, fine marker = elapsed shift time. */
+/** Continuous operator gauge: fill = good parts, fine marker = target due now. */
 export function HourlyGauges({ timeline, height = 56 }: { timeline: ShiftGaugeInput | null; height?: number }) {
   const state = timeline ? shiftGaugeState(timeline) : null;
   return (
@@ -84,7 +84,7 @@ export function HourlyGauges({ timeline, height = 56 }: { timeline: ShiftGaugeIn
                 <div style={{ width: `${state.actualRatio * 100}%`, height: '100%', background: state.tone === 'green' ? 'var(--green)' : state.tone === 'amber' ? 'var(--amber)' : state.tone === 'red' ? 'var(--red)' : 'var(--line-strong)', transition: 'width .5s ease' }} />
                 {state.ticks.slice(1, -1).map((tick) => <span key={`${tick.position}-mark`} style={{ position: 'absolute', left: `${tick.position}%`, top: 0, bottom: 0, width: 1, background: 'rgba(11,31,63,.25)' }} />)}
               </div>
-              <span title="Position théorique dans le temps" style={{ position: 'absolute', left: `${state.timeRatio * 100}%`, top: -5, bottom: -5, width: 3, background: 'var(--navy)', transform: 'translateX(-50%)', borderRadius: 2 }} />
+              <span title={`Objectif théorique actuel : ${Math.round(state.expected).toLocaleString('fr-FR')} pièces bonnes`} style={{ position: 'absolute', left: `${state.timeRatio * 100}%`, top: -5, bottom: -5, width: 3, background: 'var(--navy)', transform: 'translateX(-50%)', borderRadius: 2 }} />
             </div>
             <div style={{ height: 28, position: 'relative', fontSize: 12, fontWeight: 700 }}>
               {state.ticks.map((tick, index) => <span key={`${tick.position}-bottom`} style={{ position: 'absolute', left: `${tick.position}%`, transform: index === 0 ? 'none' : index === state.ticks.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)' }}>{tick.target.toLocaleString('fr-FR')}</span>)}
@@ -92,7 +92,7 @@ export function HourlyGauges({ timeline, height = 56 }: { timeline: ShiftGaugeIn
           </div>
         </div>
       )}
-      {state && <span className="muted" style={{ fontSize: 13 }}>{state.before ? 'Shift non commencé · jauge vide' : state.finished ? 'Shift terminé · résultat final figé' : 'Production en cours'} · {state.actual == null ? 'production indisponible' : `${state.actual.toLocaleString('fr-FR')} pièces bonnes`} · attendu {Math.round(state.expected).toLocaleString('fr-FR')}</span>}
+      {state && <span className="muted" style={{ fontSize: 13 }}>{state.before ? 'Shift non commencé · jauge vide' : state.finished ? 'Shift terminé · résultat final figé' : 'Production en cours'} · {state.actual == null ? 'production indisponible' : `${state.actual.toLocaleString('fr-FR')} / ${state.target.toLocaleString('fr-FR')} pièces bonnes`} · objectif actuel {Math.round(state.expected).toLocaleString('fr-FR')} · {state.actual == null || state.before ? 'écart indisponible' : `écart ${state.actual - Math.round(state.expected) >= 0 ? '+' : '−'}${Math.abs(state.actual - Math.round(state.expected)).toLocaleString('fr-FR')}`}</span>}
     </div>
   );
 }

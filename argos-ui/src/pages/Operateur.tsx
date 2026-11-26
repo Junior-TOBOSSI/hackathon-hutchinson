@@ -15,7 +15,7 @@ function shiftTimeline(view: OperatorView): ShiftGaugeInput | null {
   if (view.shiftWindow) return {
     startedAt: view.shiftWindow.startedAt, plannedEndAt: view.shiftWindow.plannedEndAt,
     endedAt: view.shiftWindow.endedAt, status: view.shiftWindow.status,
-    target: view.shiftWindow.target, actualGood: view.shiftWindow.actualGood, now: view.now,
+    target: view.shiftWindow.target, actualGood: view.shiftWindow.actualGood, now: view.shiftWindow.now ?? view.now,
   };
   if (!view.shift) return null;
   const at = (time: string) => {

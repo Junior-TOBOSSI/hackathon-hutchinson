@@ -132,3 +132,69 @@ sur ces quatre fichiers partagés : `App.tsx`, `vite.config.ts`,
 Production Engine, contrat commun ou modèle n'est modifié par INT-01.
 Le correctif INT-01-FIX touche aussi `components/charts.tsx` pour rendre
 explicitement un objectif horaire inconnu, sans changer les données mock.
+
+## Jauge cumulative du shift de démonstration
+
+La jauge « Heure par heure » d'Operator reste le composant graphique existant.
+Elle affiche une seule barre continue : son remplissage est le nombre de pièces
+effectivement **conformes** du shift, rapporté à l'objectif total. Le trait fin
+indique l'objectif théorique cumulé à l'instant affiché. Les graduations du bas
+sont des entiers calculés depuis la durée et l'objectif du shift Edge. Le pied
+affiche les pièces bonnes sur l'objectif et l'écart signé avec la cible courante.
+
+Pour une démonstration à toute heure, `visionhub.demo_shift_app` ouvre les shifts
+à 08h00 heure locale, planifie 480 minutes et 1 000 pièces bonnes **par poste
+de production**. Il expose une horloge théorique qui va de 08h00 à 16h00 en
+180 secondes réelles. Ces valeurs sont configurées côté Edge ; le frontend lit
+le shift et l'horloge par HTTP. Les cycles, corrections et événements de l'outbox
+gardent leurs horodatages réels, afin que les KPI glissants du Core continuent
+à évoluer. Aucun endpoint du Core ni contrat partagé n'est modifié.
+
+Commandes PowerShell, depuis `C:\Users\GDYZ5751\Desktop\HOVIS_INDUSTRIAL`.
+Utiliser quatre nouveaux terminaux ; les ports 5175, 8021 et 18041 restent
+intacts. `py -3.14` peut être remplacé par le Python du venv du projet si les
+dépendances y sont installées. Choisir un nouveau `run-id` à chaque essai.
+
+```powershell
+# Terminal Core dédié
+New-Item -ItemType Directory -Force var\gauge-demo | Out-Null
+$env:ARGOS_CORE_DB = "$PWD\var\gauge-demo\core.sqlite3"
+py -3.14 -m uvicorn visionhub.core.app:app --host 127.0.0.1 --port 8022
+```
+
+```powershell
+# Terminal Edge de démonstration
+$env:DB_PATH = "$PWD\var\gauge-demo\edge.sqlite3"
+$env:PIPELINE_ENABLED = 'false'
+$env:SOURCE = 'synthetic'
+$env:ARGOS_CORE_URL = 'http://127.0.0.1:8022'
+$env:HOVIS_DEMO_SHIFT_START = '08:00'
+$env:HOVIS_DEMO_SHIFT_DURATION_MIN = '480'
+$env:HOVIS_DEMO_SHIFT_TARGET = '1000'
+$env:HOVIS_DEMO_SHIFT_RUNTIME_SEC = '180'
+py -3.14 -m uvicorn visionhub.demo_shift_app:app --host 127.0.0.1 --port 18042
+```
+
+```powershell
+# Terminal HOVIS de démonstration
+cd argos-ui
+$env:VITE_USE_MOCK = 'true'
+$env:VITE_LIVE_INDUSTRIAL = 'true'
+$env:ARGOS_API_TARGET = 'http://127.0.0.1:8022'
+$env:ARGOS_EDGE_TARGET = 'http://127.0.0.1:18042'
+npm run dev -- --host 127.0.0.1 --port 5176 --strictPort
+```
+
+```powershell
+# Terminal simulation, depuis la racine du worktree
+py -3.14 -m scripts.argos_demo --mode connected --demo-shift --core-url http://127.0.0.1:8022 --edge-url http://127.0.0.1:18042 --scenario multiple --stations 12 --direct-stations 2 --duration 180 --rate 2 --run-id GAUGE02
+```
+
+Ouvrir `http://127.0.0.1:5176/operateur?station=SIMGAUGE02-01` pendant la
+simulation. Le script vérifie que les paramètres Edge correspondent à ses
+options `--shift-start`, `--shift-duration-min`, `--shift-target` et `--duration`.
+Ils peuvent être adaptés ensemble, sans modifier le composant. `DEMO-<run-id>`
+identifie les shifts utilisant l'horloge accélérée. Le Core continue à calculer
+ses autres champs `expected_ok_parts_by_now` selon l'heure réelle ; l'adaptateur
+Operator emploie l'horloge de démonstration pour sa jauge et son objectif courant.
+Les résultats de qualité restent issus des analyseurs synthétiques existants.

@@ -87,6 +87,8 @@ export const industrial = {
   edgeShifts: (stationId: string) =>
     request<Shift[]>(`${edge}/shifts?station_id=${id(stationId)}&limit=1`),
   edgeShiftReport: (shiftId: string) => request<ShiftReport>(`${edge}/shifts/${id(shiftId)}`),
+  demoShiftClock: (name: string) =>
+    request<{ now: string; started_at: string; planned_end_at: string; target_parts: number }>(`${edge}/demo-shift-clock?name=${id(name)}`),
   correct: (part: Part, newVerdict: 'OK' | 'NOK', reason: string, physicalInspection: boolean) =>
     request<Part>(`${edge}/parts/${id(part.part_id)}/corrections`, {
       method: 'POST',
