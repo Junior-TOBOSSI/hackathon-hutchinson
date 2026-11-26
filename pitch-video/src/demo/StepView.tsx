@@ -63,9 +63,9 @@ export function StepView({ index, frames }: { index: number; frames: number }) {
         <Img src={staticFile(`capture/${step.image}`)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: fadeIn }} />
       </DeviceFrame>
       {step.target && <Ripple x={goal.x} y={goal.y} t={ripple} />}
-      {step.device === 'laptop'
-        ? <MouseArrow x={px} y={py} pressed={pressed} />
-        : <Fingertip x={px} y={py} opacity={fingerOpacity} pressed={pressed} />}
+      {/* The TV is only watched: no pointer on it. */}
+      {step.device === 'laptop' && <MouseArrow x={px} y={py} pressed={pressed} />}
+      {step.device === 'tablet' && <Fingertip x={px} y={py} opacity={fingerOpacity} pressed={pressed} />}
     </AbsoluteFill>
   );
 }

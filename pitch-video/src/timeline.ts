@@ -16,7 +16,7 @@ export interface Box { x: number; y: number; width: number; height: number }
 export interface Step {
   image: string;
   section: string | null;
-  device: 'tablet' | 'laptop';
+  device: 'tablet' | 'laptop' | 'tv';
   viewport: { width: number; height: number };
   hold: number;
   caption: string;

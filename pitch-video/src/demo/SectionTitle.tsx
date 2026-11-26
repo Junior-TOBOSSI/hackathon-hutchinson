@@ -15,7 +15,7 @@ export function SectionTitle({ title, device, frames }: { title: string; device:
         <div style={{ width: 64, height: 6, borderRadius: 3, background: 'var(--red)', ...enter(frame, 0.35) }} />
         <span style={{ fontSize: 76, fontWeight: 500, letterSpacing: '0.01em', ...enter(frame, 0.45) }}>{title}</span>
         <span style={{ fontSize: 30, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'var(--on-navy-muted)', ...enter(frame, 0.7) }}>
-          {device === 'tablet' ? 'Tablette' : 'Ordinateur'}
+          {device === 'tablet' ? 'Tablette' : device === 'tv' ? 'Écran TV' : 'Ordinateur'}
         </span>
       </div>
     </Scene>

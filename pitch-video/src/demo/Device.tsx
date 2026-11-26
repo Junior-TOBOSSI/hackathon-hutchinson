@@ -1,6 +1,6 @@
 /**
- * Device frames drawn in CSS: a landscape tablet (operator at the workstation)
- * and a laptop (supervisor, AI leader, admin). `screen` gives where the screen
+ * Device frames drawn in CSS: a landscape tablet (operator at the workstation),
+ * a laptop (team leader, AI leader, admin) and a TV (cell screen next to the line). `screen` gives where the screen
  * sits on the 1920 × 1080 stage, so pointers and zooms can be placed on it.
  */
 import type { ReactNode } from 'react';
@@ -11,12 +11,13 @@ export interface ScreenRect { x: number; y: number; width: number; height: numbe
 // Screen geometry on the stage (stage = 1920 × 1080, caption strip at the bottom).
 const TABLET_W = 1240; // displayed width of the 1280 × 800 viewport
 const LAPTOP_W = 1300; // displayed width of the 1440 × 900 viewport
+const TV_W = 1440; // displayed width of the 1920 × 1080 viewport
 
 export function screenRect(device: Step['device'], viewport: Step['viewport']): ScreenRect {
-  const width = device === 'tablet' ? TABLET_W : LAPTOP_W;
+  const width = device === 'tablet' ? TABLET_W : device === 'tv' ? TV_W : LAPTOP_W;
   const scale = width / viewport.width;
   const height = viewport.height * scale;
-  const top = device === 'tablet' ? 105 : 70;
+  const top = device === 'tablet' ? 105 : device === 'tv' ? 60 : 70;
   return { x: (1920 - width) / 2, y: top, width, height, scale };
 }
 
@@ -31,6 +32,19 @@ export function DeviceFrame({ device, screen, children }: { device: Step['device
           <div style={{ position: 'absolute', left: bezel / 2 - 5, top: '50%', width: 10, height: 10, marginTop: -5, borderRadius: 5, background: '#3b4252' }} />
         </div>
         <Screen screen={screen} radius={14}>{children}</Screen>
+      </>
+    );
+  }
+  if (device === 'tv') {
+    const bezel = 16;
+    return (
+      <>
+        {/* stand */}
+        <div style={{ position: 'absolute', left: x + width / 2 - 40, top: y + height + bezel, width: 80, height: 40, background: 'linear-gradient(180deg, #2a2f3a, #171a21)' }} />
+        <div style={{ position: 'absolute', left: x + width / 2 - 220, top: y + height + bezel + 36, width: 440, height: 14, borderRadius: 7, background: '#1e222b', boxShadow: '0 20px 40px rgba(11, 31, 63, 0.3)' }} />
+        {/* panel */}
+        <div style={{ position: 'absolute', left: x - bezel, top: y - bezel, width: width + 2 * bezel, height: height + 2 * bezel, borderRadius: 14, background: '#0f1218', boxShadow: '0 40px 80px rgba(11, 31, 63, 0.35), inset 0 0 0 2px #2a2f3a' }} />
+        <Screen screen={screen} radius={2}>{children}</Screen>
       </>
     );
   }

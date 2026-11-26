@@ -1,11 +1,11 @@
 # HOVIS : vidéo de pitch (Remotion)
 
-Vidéo de 5 min, **sans son**, projetée derrière l'orateur : on y voit **l'interface HOVIS utilisée sur une tablette (opérateur au poste) puis sur un PC (superviseur, AI Leader, administrateur)**.
+Vidéo de 5 min, **sans son**, projetée derrière l'orateur : on y voit **l'interface HOVIS utilisée sur une tablette (opérateur au poste), affichée sur la TV de la cellule, puis sur un PC (team leader, AI Leader, administrateur)**.
 
 Elle se fabrique en deux temps :
 
 1. **Capture** (`capture/record.mjs`) : un script pilote la vraie interface (`../argos-ui`, données de démo) dans Microsoft Edge, comme un utilisateur (connexion, clics, onglets). À chaque étape, il enregistre une capture nette et la position de l'élément cliqué ensuite.
-2. **Montage** (Remotion, `src/`) : chaque capture est placée dans un cadre de tablette ou de PC. Un doigt ou une souris va cliquer au bon endroit, la caméra zoome sur les moments clés, et une légende courte accompagne chaque étape. Une ouverture et une fin au logo HOVIS encadrent le tout.
+2. **Montage** (Remotion, `src/`) : chaque capture est placée dans un cadre de tablette, de PC ou de TV. Un doigt ou une souris va cliquer au bon endroit, la caméra zoome sur les moments clés, et une légende courte accompagne chaque étape. Une ouverture et une fin au logo HOVIS encadrent le tout.
 
 ## Démarrer
 
@@ -31,7 +31,7 @@ Tout se fait en local : aucune donnée n'est envoyée à un service externe.
 |---|---|
 | changer le parcours, une légende ou la durée d'un écran | `STEPS` dans `capture/record.mjs`, puis `npm run capture` |
 | changer la durée totale (5 min par défaut) | `TARGET_SECONDS` dans `src/timeline.ts` |
-| changer le cadre de la tablette ou du PC | `src/demo/Device.tsx` |
+| changer le cadre de la tablette, du PC ou de la TV | `src/demo/Device.tsx` |
 | changer le curseur, le doigt ou le zoom | `src/demo/Pointer.tsx`, `src/demo/StepView.tsx` |
 | changer l'ouverture ou la fin | `src/scenes/Intro.tsx`, `src/content.ts` |
 
@@ -41,7 +41,7 @@ Si l'interface change, il suffit de relancer `npm run capture` : la vidéo repre
 
 ## Détails techniques (pour le jury)
 
-- **Capture** : `playwright-core` pilote l'Edge déjà installé (pas de navigateur téléchargé). Deux fenêtres sont simulées : tablette 1280 × 800 tactile et PC 1440 × 900, en double résolution. L'horloge est fixée à 16:51 pour que tous les écrans soient cohérents. La barre « Démo » de l'interface est masquée : les changements de scénario (pièce KO, EPI…) apparaissent comme de vraies détections.
+- **Capture** : `playwright-core` pilote l'Edge déjà installé (pas de navigateur téléchargé). Trois fenêtres sont simulées : tablette 1280 × 800 tactile et PC 1440 × 900 en double résolution, TV 1920 × 1080. L'horloge est fixée à 16:51 pour que tous les écrans soient cohérents. La barre « Démo » de l'interface est masquée : les changements de scénario (pièce KO, EPI…) apparaissent comme de vraies détections.
 - **Montage** : une vidéo Remotion est un composant React rendu image par image. `src/timeline.ts` construit la ligne de temps à partir de `public/capture/steps.json`, et `src/demo/StepView.tsx` anime chaque étape (fondu, trajet du pointeur, clic, zoom) en fonction du numéro d'image.
 - `remotion.config.ts` force une seule copie de React, parce que les composants importés depuis `../argos-ui` (logo, charte) chercheraient sinon la leur.
 

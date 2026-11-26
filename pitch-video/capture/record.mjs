@@ -23,7 +23,8 @@ const BASE = `http://localhost:${PORT}`;
 
 const DEVICES = {
   tablet: { width: 1280, height: 800 }, // operator, at the workstation
-  laptop: { width: 1440, height: 900 }, // supervisor, AI leader, admin
+  laptop: { width: 1440, height: 900 }, // team leader, AI leader, admin
+  tv: { width: 1920, height: 1080 }, // cell TV next to the production line
 };
 
 // ---------- helpers used by the scenario ----------
@@ -54,7 +55,7 @@ async function login(page, email) {
 /**
  * The scenario. Fields:
  *  section  optional title card shown before this step (a new role / device)
- *  device   tablet | laptop
+ *  device   tablet | laptop | tv
  *  caption  short text shown under the device (the speaker says the rest)
  *  hold     seconds this screen stays visible
  *  setup    async (page) => {...} run BEFORE the screenshot (navigation, typing…)
@@ -62,35 +63,42 @@ async function login(page, email) {
  *  zoom     (page) => locator the camera zooms on during this step
  */
 const STEPS = [
-  // ---- Operator, on a tablet ----
+  // ---- Operator, on a tablet at the workstation ----
   { section: 'L’opérateur, au poste', device: 'tablet', hold: 7, caption: 'Au poste, l’opérateur se connecte', setup: async (p) => { await p.goto(BASE); await p.locator('#ident').waitFor(); }, target: btn('Se connecter') },
-  { device: 'tablet', hold: 14, caption: 'Tout est au vert : pièce conforme, objectif et cadence du shift', setup: async (p) => { await p.getByText('Heure par heure').waitFor(); await hideDemoBar(p); } },
+  { device: 'tablet', hold: 13, caption: 'Tout est au vert : pièce conforme, objectif et cadence du shift', setup: async (p) => { await p.getByText('Heure par heure').waitFor(); await hideDemoBar(p); } },
   { device: 'tablet', hold: 9, caption: 'Heure par heure : le surplus d’une heure remplit la suivante', zoom: (p) => p.getByText('Heure par heure').locator('xpath=../..') },
-  { device: 'tablet', hold: 14, caption: 'Pièce non conforme : consigne immédiate à l’opérateur', setup: (p) => operatorScenario(p, 'ko'), zoom: (p) => p.locator('section').first() },
-  { device: 'tablet', hold: 14, caption: 'EPI manquant : alerte au poste, sans enregistrer de visage', setup: (p) => operatorScenario(p, 'epi') },
-  { device: 'tablet', hold: 12, caption: 'Plusieurs écarts : l’écran donne les actions dans l’ordre', setup: (p) => operatorScenario(p, 'multi'), target: btn(/SIGNALER/) },
-  { device: 'tablet', hold: 7, caption: 'Un geste pour prévenir le superviseur', setup: async (p) => { await p.getByText(/SUPERVISEUR PRÉVENU/).waitFor(); await hideDemoBar(p); }, target: logout },
+  { device: 'tablet', hold: 13, caption: 'Pièce non conforme : consigne immédiate à l’opérateur', setup: (p) => operatorScenario(p, 'ko'), zoom: (p) => p.locator('section').first() },
+  { device: 'tablet', hold: 12, caption: 'EPI manquant : alerte au poste, sans enregistrer de visage', setup: (p) => operatorScenario(p, 'epi') },
+  { device: 'tablet', hold: 11, caption: 'Plusieurs écarts : l’écran donne les actions dans l’ordre', setup: (p) => operatorScenario(p, 'multi'), target: btn(/SIGNALER/) },
+  { device: 'tablet', hold: 7, caption: 'Un geste pour prévenir le team leader', setup: async (p) => { await p.getByText(/TEAM LEADER PRÉVENU/).waitFor(); await hideDemoBar(p); } },
 
-  // ---- Supervisor, on a laptop ----
-  { section: 'Le superviseur, depuis son PC', device: 'laptop', hold: 5, caption: 'Le superviseur se connecte depuis son PC', setup: async (p) => { await p.locator('#ident').waitFor(); await login(p, 'c.diaz@hutchinson.com'); }, target: btn('Se connecter') },
-  { device: 'laptop', hold: 15, caption: 'Vue d’ensemble de l’atelier : production, pièces KO, alertes, caméras', setup: (p) => p.getByRole('tablist').waitFor(), target: btn(/Ligne B/) },
-  { device: 'laptop', hold: 13, caption: 'Production par ligne, par cellule et par poste', setup: (p) => p.waitForTimeout(400), target: tab(/Alertes/) },
-  { device: 'laptop', hold: 13, caption: 'Les alertes à traiter, les prioritaires en premier', setup: (p) => p.waitForTimeout(400), target: (p) => p.getByRole('button', { name: 'Valider' }).first() },
-  { device: 'laptop', hold: 8, caption: 'Valider ou rejeter en un clic', setup: (p) => p.waitForTimeout(400), target: (p) => p.getByRole('link', { name: 'Voir le poste' }).first() },
-  { device: 'laptop', hold: 13, caption: 'Le détail d’un poste : le shift, les arrêts, les événements', setup: (p) => p.waitForTimeout(600), target: logout },
+  // ---- Cell TV, next to the production line ----
+  { section: 'La TV de la cellule, au bord de la ligne', device: 'tv', hold: 15, caption: 'Toute l’équipe suit la performance des 12 postes, lisible de loin', setup: async (p) => { await p.goto(`${BASE}/tv/C3`); await p.getByText('Pièces bonnes du shift').waitFor(); } },
+
+  // ---- Team leader, on a laptop ----
+  { section: 'Le team leader, depuis son PC', device: 'laptop', hold: 5, caption: 'Le team leader se connecte : il gère les postes de sa cellule', setup: async (p) => { await p.locator('#ident').waitFor(); await login(p, 'c.diaz@hutchinson.com'); }, target: btn('Se connecter') },
+  { device: 'laptop', hold: 13, caption: 'Ses 12 postes : état, rythme, pièces KO et alertes en cours', setup: (p) => p.getByRole('tablist').waitFor(), target: (p) => p.getByRole('button', { name: /^Sécurité ·/ }) },
+  { device: 'laptop', hold: 8, caption: 'Il filtre : les postes avec un problème de sécurité', setup: (p) => p.waitForTimeout(400), target: (p) => p.getByRole('row', { name: /^Poste P06/ }) },
+  { device: 'laptop', hold: 13, caption: 'Il ouvre l’écran du poste : exactement la vue de l’opérateur', setup: async (p) => { await p.getByText(/Vous consultez/).waitFor(); await hideDemoBar(p); }, target: (p) => p.getByRole('button', { name: /Je m’en occupe/ }).first() },
+  { device: 'laptop', hold: 7, caption: 'Il prend l’alerte en charge', setup: async (p) => { await p.getByText('Pris en charge').first().waitFor(); await hideDemoBar(p); }, target: (p) => p.getByRole('link', { name: /Ma cellule/ }) },
+  { device: 'laptop', hold: 11, caption: 'Production de la cellule : le réel face à l’objectif', setup: (p) => p.getByText('Production de la cellule').waitFor(), zoom: (p) => p.getByText('Production de la cellule').locator('xpath=../..') },
+  { device: 'laptop', hold: 4, caption: 'Puis il passe aux alertes de sa cellule', setup: (p) => p.evaluate(() => window.scrollTo(0, 0)), target: tab(/Alertes/) },
+  { device: 'laptop', hold: 11, caption: 'Les alertes de la cellule, les prioritaires en premier', setup: (p) => p.waitForTimeout(400), target: (p) => p.getByRole('button', { name: 'Valider' }).first() },
+  { device: 'laptop', hold: 6, caption: 'Valider ou rejeter en un clic', setup: (p) => p.waitForTimeout(400), target: (p) => p.getByRole('link', { name: 'Historique' }).first() },
+  { device: 'laptop', hold: 10, caption: 'L’historique du shift d’un poste, sans nom ni classement', setup: (p) => p.getByText('Bande du shift').waitFor(), target: logout },
 
   // ---- AI leader ----
   { section: 'L’AI Leader, garant des modèles', device: 'laptop', hold: 5, caption: 'L’AI Leader pilote les modèles', setup: async (p) => { await p.locator('#ident').waitFor(); await login(p, 'a.noui@hutchinson.com'); }, target: btn('Se connecter') },
-  { device: 'laptop', hold: 15, caption: 'Santé des modèles en production, dérives détectées', setup: (p) => p.getByText('Santé des modèles en production').waitFor(), target: (p) => p.getByRole('button', { name: /Relancer l’entraînement/ }).first() },
-  { device: 'laptop', hold: 8, caption: 'Un modèle décroche : on relance son entraînement', setup: (p) => p.getByText('Entraînement relancé.').waitFor(), target: btn('Promouvoir en production') },
-  { device: 'laptop', hold: 9, caption: 'La nouvelle version est validée puis promue en production', setup: (p) => p.getByText(/promu en production/).waitFor(), target: logout },
+  { device: 'laptop', hold: 13, caption: 'Santé des modèles en production, dérives détectées', setup: (p) => p.getByText('Santé des modèles en production').waitFor(), target: (p) => p.getByRole('button', { name: /Relancer l’entraînement/ }).first() },
+  { device: 'laptop', hold: 7, caption: 'Un modèle décroche : on relance son entraînement', setup: (p) => p.getByText('Entraînement relancé.').waitFor(), target: btn('Promouvoir en production') },
+  { device: 'laptop', hold: 8, caption: 'La nouvelle version est validée puis promue en production', setup: (p) => p.getByText(/promu en production/).waitFor(), target: logout },
 
   // ---- Admin ----
   { section: 'L’administrateur, gardien des accès', device: 'laptop', hold: 5, caption: 'L’administrateur gère les accès', setup: async (p) => { await p.locator('#ident').waitFor(); await login(p, 'admin@hutchinson.com'); }, target: btn('Se connecter') },
-  { device: 'laptop', hold: 12, caption: 'Comptes, rôles et périmètres de chacun', setup: (p) => p.getByRole('tablist').waitFor(), target: btn('+ Ajouter un utilisateur') },
-  { device: 'laptop', hold: 8, caption: 'Ajouter un utilisateur en quelques secondes', setup: (p) => p.waitForTimeout(400), target: tab(/Rôles et droits/) },
-  { device: 'laptop', hold: 11, caption: 'Chaque rôle ne voit que ce qui le concerne', setup: (p) => p.waitForTimeout(400), target: tab(/Journal/) },
-  { device: 'laptop', hold: 9, caption: 'Chaque action est tracée dans le journal', setup: (p) => p.waitForTimeout(400) },
+  { device: 'laptop', hold: 10, caption: 'Comptes, rôles et périmètres de chacun', setup: (p) => p.getByRole('tablist').waitFor(), target: btn('+ Ajouter un utilisateur') },
+  { device: 'laptop', hold: 7, caption: 'Ajouter un utilisateur en quelques secondes', setup: (p) => p.waitForTimeout(400), target: tab(/Rôles et droits/) },
+  { device: 'laptop', hold: 10, caption: 'Chaque rôle ne voit que ce qui le concerne', setup: (p) => p.waitForTimeout(400), target: tab(/Journal/) },
+  { device: 'laptop', hold: 8, caption: 'Chaque action est tracée dans le journal', setup: (p) => p.waitForTimeout(400) },
 ];
 
 // ---------- runner ----------
@@ -126,7 +134,8 @@ async function main() {
     const contexts = {};
     const pages = {};
     for (const [name, size] of Object.entries(DEVICES)) {
-      contexts[name] = await browser.newContext({ viewport: size, deviceScaleFactor: 2, locale: 'fr-FR', hasTouch: name === 'tablet' });
+      // Double resolution for the tablet and laptop (shown large in the video); the TV is already 1920 × 1080.
+      contexts[name] = await browser.newContext({ viewport: size, deviceScaleFactor: name === 'tv' ? 1 : 2, locale: 'fr-FR', hasTouch: name === 'tablet' });
       // Same clock on every screen, matching the demo data (shift B, 16:51).
       await contexts[name].clock.setFixedTime(DEMO_TIME);
       pages[name] = await contexts[name].newPage();
