@@ -40,14 +40,16 @@ export function TopBar({ title, sub, right }: { title: ReactNode; sub?: ReactNod
   const nav = useNavigate();
   return (
     <header className="topbar">
-      <HovisLogo size={34} tone="light" />
+      <HovisLogo size={36} tone="light" />
       <span className="sep hide-mobile" />
-      <span className="cond topbar-title" style={{ fontWeight: 600, fontSize: 22 }}>{title}</span>
-      {sub && <span className="sub hide-mobile">{sub}</span>}
+      <span className="topbar-heading">
+        <span className="cond topbar-title">{title}</span>
+        {sub && <span className="sub hide-mobile">{sub}</span>}
+      </span>
       <span style={{ flex: 1 }} />
-      {right}
-      <button aria-label="Se déconnecter" onClick={() => { setUser(null); nav('/'); }} style={{ background: 'none', border: 'none', color: 'var(--on-navy-muted)', padding: 6 }}>
-        <Icon d={ICONS.logout} size={22} />
+      <span className="topbar-right">{right}</span>
+      <button className="topbar-icon" aria-label="Se déconnecter" title="Se déconnecter" onClick={() => { setUser(null); nav('/'); }}>
+        <Icon d={ICONS.logout} size={20} />
       </button>
     </header>
   );
@@ -57,7 +59,7 @@ export function Clock({ iso }: { iso: string }) {
   const t = new Date(iso);
   const hh = String(t.getHours()).padStart(2, '0');
   const mm = String(t.getMinutes()).padStart(2, '0');
-  return <span className="cond" style={{ fontWeight: 600, fontSize: 24 }}>{hh}:{mm}</span>;
+  return <span className="cond clock" style={{ fontWeight: 600, fontSize: 24, fontVariantNumeric: 'tabular-nums' }}>{hh}:{mm}</span>;
 }
 
 export const fmt = (n: number) => n.toLocaleString('fr-FR');

@@ -8,7 +8,7 @@
 
 import * as M from './mock';
 import type {
-  AiOverview, Alert, AppUser, AuditEntry, Role, RoleDefinition, StationDetail, StationLive, User, WorkshopOverview,
+  AiOverview, Alert, AppUser, AuditEntry, CellOverview, Role, RoleDefinition, StationDetail, StationLive, User,
 } from './types';
 
 export const USE_MOCK = (import.meta.env.VITE_USE_MOCK ?? 'true') !== 'false';
@@ -28,30 +28,42 @@ const later = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(structuredC
 export const api = {
   /** POST /api/auth/login  {login, password} | {badge}  ->  User (rôle déduit des droits, OPERATEUR par défaut) */
   login(login: string, password: string): Promise<User> {
-    if (USE_MOCK) return later(M.mockUsers[login.trim().toLowerCase()] ?? { id: 'x', name: login, role: 'OPERATEUR' as Role, stationId: 'A1·P06' });
+    if (USE_MOCK) return later(M.mockUsers[login.trim().toLowerCase()] ?? { id: 'x', name: login, role: 'OPERATEUR' as Role, stationId: 'C3·P06' });
     return http('/auth/login', { method: 'POST', body: JSON.stringify({ login, password }) });
   },
 
   /* ---------------- Opérateur ---------------- */
-  /** GET /api/stations/{id}/live -> StationLive (le paramètre scenario n'existe qu'en démo) */
+  /**
+   * GET /api/stations/{id}/live -> StationLive (le paramètre scenario n'existe qu'en démo).
+   * Utilisé par l'opérateur sur sa tablette ET par le team leader qui consulte l'écran d'un poste.
+   */
   stationLive(stationId: string, scenario: M.Scenario = 'ok'): Promise<StationLive> {
-    if (USE_MOCK) return later(M.mockStationLive(scenario));
+    if (USE_MOCK) return later(M.mockStationLive(scenario, stationId));
     return http(`/stations/${encodeURIComponent(stationId)}/live`);
   },
-  /** POST /api/stations/{id}/report -> 204. Crée une alerte SIGNALEMENT chez le superviseur. */
+  /** POST /api/stations/{id}/report -> 204. Crée une alerte SIGNALEMENT chez le team leader de la cellule. */
   reportProblem(stationId: string): Promise<void> {
     if (USE_MOCK) return later(undefined);
     return http(`/stations/${encodeURIComponent(stationId)}/report`, { method: 'POST' });
   },
 
-  /* ---------------- Superviseur ---------------- */
-  /** GET /api/workshop/overview?date=YYYY-MM-DD -> WorkshopOverview */
-  overview(): Promise<WorkshopOverview> {
-    return USE_MOCK ? later(M.mockOverview) : http('/workshop/overview');
+  /* ---------------- Team leader et écran TV de la cellule ---------------- */
+  /** GET /api/cells/{cellId}/overview -> CellOverview (postes de la cellule, production heure par heure) */
+  cellOverview(cellId: string): Promise<CellOverview> {
+    return USE_MOCK ? later(M.mockCell) : http(`/cells/${encodeURIComponent(cellId)}/overview`);
   },
-  /** GET /api/alerts?status=open -> Alert[]  (déjà dédoublonnées : une alerte = un épisode par poste) */
-  alerts(): Promise<Alert[]> {
-    return USE_MOCK ? later(M.mockAlerts) : http('/alerts?status=open');
+  /** GET /api/cells/{cellId}/alerts?status=open -> Alert[]  (déjà dédoublonnées : une alerte = un épisode par poste) */
+  alerts(cellId: string): Promise<Alert[]> {
+    return USE_MOCK ? later(M.mockAlerts) : http(`/cells/${encodeURIComponent(cellId)}/alerts?status=open`);
+  },
+  /** POST /api/alerts/{id}/acknowledge -> 204. Le team leader indique qu'il prend l'alerte en charge. */
+  acknowledgeAlert(id: string): Promise<void> {
+    if (USE_MOCK) {
+      const a = M.mockAlerts.find((x) => x.id === id);
+      if (a) a.acknowledgedBy = 'C. Díaz';
+      return later(undefined);
+    }
+    return http(`/alerts/${id}/acknowledge`, { method: 'POST' });
   },
   /** POST /api/alerts/{id}/decision {decision: 'VALIDER'|'REJETER'} -> 204. Un rejet alimente la santé du modèle. */
   decideAlert(id: string, decision: 'VALIDER' | 'REJETER'): Promise<void> {

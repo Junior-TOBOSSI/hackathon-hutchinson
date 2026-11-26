@@ -3,16 +3,23 @@ import { api } from '../api/client';
 import { Kpi, Loading, TopBar, deltaText } from '../components/ui';
 import { useApi } from '../hooks/useApi';
 
-/** Détail d'un poste pour le superviseur : indicateurs du poste, jamais de la personne. Aucune image. */
+/** Historique d'un poste pour le team leader : indicateurs du poste, jamais de la personne. Aucune image. */
 export default function PosteDetail() {
-  const { id = 'A1·P06' } = useParams();
+  const { id = 'C3·P06' } = useParams();
   const { data: d } = useApi(() => api.stationDetail(id), [id], 15000);
   if (!d) return <Loading />;
   const SHIFT_MIN = 480;
 
   return (
     <div className="screen">
-      <TopBar title={<>Poste {d.stationId}</>} sub={d.product} right={<Link to="/superviseur" style={{ color: 'var(--on-navy-muted)', fontWeight: 600 }}>← Atelier</Link>} />
+      <TopBar
+        title={<>Poste {id} · historique</>}
+        sub={d.product}
+        right={<>
+          <Link to={`/team-leader/poste/${encodeURIComponent(id)}`} className="chip" style={{ color: '#fff', fontWeight: 600 }}>Écran du poste</Link>
+          <Link to="/team-leader" className="chip" style={{ color: '#fff', fontWeight: 600 }}>← Ma cellule</Link>
+        </>}
+      />
       <main className="col" style={{ padding: '20px 24px', gap: 16 }}>
         <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
           {['Shift A · 5 h – 13 h', 'Shift B · en cours', 'Shift C · 21 h – 5 h', 'Journée'].map((s, i) => (
@@ -66,7 +73,7 @@ export default function PosteDetail() {
               return (
                 <div key={i} className="col" style={{ gap: 4, padding: '12px 14px', borderRadius: 14, border: `2px solid ${red ? 'var(--red)' : 'var(--line)'}` }}>
                   <div className="row" style={{ gap: 10 }}>
-                    <span className="cond" style={{ fontWeight: 700, fontSize: 22, color: 'var(--primary)' }}>{d.stationId}</span>
+                    <span className="cond" style={{ fontWeight: 700, fontSize: 22, color: 'var(--primary)' }}>{id}</span>
                     <span className="cond muted" style={{ fontWeight: 700, fontSize: 22 }}>{e.time}</span>
                     <span className={`pill ${red ? 'pill-red' : 'pill-blue'}`}>{e.category === 'EPI' ? 'EPI' : e.category === 'COMPORTEMENT' ? 'Comportement' : 'Poste de travail'}</span>
                     <span style={{ flex: 1 }} />

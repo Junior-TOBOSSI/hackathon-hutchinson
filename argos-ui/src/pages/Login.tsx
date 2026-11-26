@@ -44,7 +44,7 @@ export default function Login() {
           <span>Au poste : passez votre badge sur le lecteur</span>
         </div>
         <span className="muted" style={{ fontSize: 12, textAlign: 'center' }}>
-          Démo : m.rojas@ (opérateur) · c.diaz@ (superviseur) · a.noui@ (AI Leader) · admin@ (admin), domaine hutchinson.com
+          Démo : m.rojas@ (opérateur) · c.diaz@ (team leader) · a.noui@ (AI Leader) · admin@ (admin), domaine hutchinson.com
         </span>
       </form>
     </div>

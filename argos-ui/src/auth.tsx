@@ -33,7 +33,7 @@ export const useAuth = () => useContext(Ctx);
 /** Page d'accueil de chaque rôle après connexion. */
 export const homeFor: Record<Role, string> = {
   OPERATEUR: '/operateur',
-  SUPERVISEUR: '/superviseur',
+  TEAM_LEADER: '/team-leader',
   AI_LEADER: '/ai-leader',
   ADMIN: '/admin',
 };

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, USE_MOCK } from '../api/client';
 import type { Scenario } from '../api/mock';
-import type { StationLive } from '../api/types';
+import type { Alert, StationLive } from '../api/types';
 import { useAuth } from '../auth';
 import { HourlyGauges, ProgressRing } from '../components/charts';
 import { operatorActions, type OperatorAction } from '../components/priority';
@@ -13,13 +13,20 @@ import { useApi } from '../hooks/useApi';
  * Écran du poste. Un seul écran qui s'adapte à l'état reçu :
  * tout va bien · pièce KO · EPI ou poste en défaut · plusieurs problèmes en même temps.
  * En démo : ?scenario=ok|ko|epi|multi
+ *
+ * Le même écran sert au team leader qui CONSULTE un poste depuis son PC (`consultStationId`) :
+ * il voit exactement ce que voit l'opérateur, sans le bouton Signaler, avec en plus
+ * les alertes du poste qu'il peut acquitter (« je m'en occupe »).
  */
-export default function Operateur() {
+export default function Operateur({ consultStationId }: { consultStationId?: string }) {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const scenario = (params.get('scenario') as Scenario) || 'ok';
-  const stationId = user?.stationId ?? 'A1·P06';
+  const consult = !!consultStationId;
+  const stationId = consultStationId ?? user?.stationId ?? 'C3·P06';
   const { data: live } = useApi(() => api.stationLive(stationId, scenario), [stationId, scenario], 2000);
+  const cellId = user?.cellId ?? 'C3';
+  const { data: cellAlerts, setData: setCellAlerts } = useApi(() => (consult ? api.alerts(cellId) : Promise.resolve([] as Alert[])), [consult, cellId], 5000);
   const [reported, setReported] = useState(false);
 
   if (!live) return <Loading />;
@@ -30,10 +37,21 @@ export default function Operateur() {
   const hour = new Date(live.now).getHours();
 
   const report = async () => { await api.reportProblem(stationId); setReported(true); setTimeout(() => setReported(false), 4000); };
+  const stationAlerts = (cellAlerts ?? []).filter((a) => a.stationId === stationId);
+  const acknowledge = (id: string) => api.acknowledgeAlert(id).then(() => setCellAlerts((cellAlerts ?? []).map((a) => (a.id === id ? { ...a, acknowledgedBy: user?.name ?? 'Team leader' } : a))));
+  const shiftChip = <span className="chip hide-mobile">Shift {live.shift.code} · {live.shift.start.slice(0, 2)} h – {live.shift.end.slice(0, 2)} h</span>;
 
   return (
     <div className="screen" style={{ background: ko || envIssues.length ? 'var(--red-tint)' : 'var(--op-bg)' }}>
-      <TopBar title={`POSTE ${live.stationId}`} sub={`Presse injection · ${live.product}`} right={<><span className="sub hide-mobile">Shift {live.shift.code} · {live.shift.start.slice(0, 2)} h – {live.shift.end.slice(0, 2)} h</span><Clock iso={live.now} /></>} />
+      <TopBar
+        title={`POSTE ${live.stationId}`}
+        sub={`Presse injection · ${live.product}`}
+        right={consult
+          ? <><Link to="/team-leader" className="chip" style={{ color: '#fff', fontWeight: 600 }}>← Ma cellule</Link><Clock iso={live.now} /></>
+          : <>{shiftChip}<Clock iso={live.now} /></>}
+      />
+
+      {consult && <ConsultBar stationId={live.stationId} alerts={stationAlerts} onAcknowledge={acknowledge} />}
 
       {envIssues.length > 0 && <ProblemBanner actions={actions} />}
 
@@ -65,10 +83,10 @@ export default function Operateur() {
                     <MiniStat value={deltaText(live.counters.good - live.objective.expectedNow, true)} tone={live.counters.good >= live.objective.expectedNow ? 'green' : 'red'} />
                     <MiniStat value={`${live.counters.ko} pièces KO`} tone={ko ? 'red' : 'grey'} />
                   </div>
-                  <span className="muted" style={{ fontSize: 14 }}>Trait noir : où vous devriez être maintenant ({live.objective.expectedNow})</span>
+                  <span className="muted" style={{ fontSize: 14 }}>Trait noir (anneau et barre) : où vous devriez être maintenant ({live.objective.expectedNow})</span>
                 </div>
               </div>
-              <HourlyGauges hours={live.hourly} perHour={live.objective.perHour} currentHour={hour} height={ko ? 48 : 56} />
+              <HourlyGauges hours={live.hourly} perHour={live.objective.perHour} currentHour={hour} expected={live.objective.expectedNow} height={ko ? 28 : 34} />
             </div>
           )}
 
@@ -78,10 +96,12 @@ export default function Operateur() {
             <StatusTile ok icon={ICONS.check} okTitle={ko ? 'Qualité' : 'Qualité OK'} okSub={`Taux KO ${live.checks.koRatePct.toLocaleString('fr-FR')} %`} koTitle="" koSub="" />
           </div>
 
-          <button onClick={report} className="cond" style={{ height: 88, border: 'none', borderRadius: 26, background: reported ? 'var(--navy)' : 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, fontWeight: 700, fontSize: 36, letterSpacing: '0.06em' }}>
-            <Icon d={ICONS.flag} size={40} color="#fff" />
-            {reported ? 'SUPERVISEUR PRÉVENU' : 'SIGNALER UN PROBLÈME'}
-          </button>
+          {!consult && (
+            <button onClick={report} className="cond btn-report" data-done={reported} style={{ height: 88, border: 'none', borderRadius: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, fontWeight: 700, fontSize: 36, letterSpacing: '0.06em' }}>
+              <Icon d={ICONS.flag} size={40} color="currentColor" stroke={2.4} />
+              {reported ? 'TEAM LEADER PRÉVENU' : 'SIGNALER UN PROBLÈME'}
+            </button>
+          )}
         </section>
       </main>
 
@@ -91,6 +111,27 @@ export default function Operateur() {
       </footer>
 
       {USE_MOCK && <ScenarioSwitcher value={scenario} onChange={(s) => setParams({ scenario: s })} />}
+    </div>
+  );
+}
+
+/** Bandeau du team leader qui consulte un poste : lecture seule + alertes du poste à acquitter. */
+function ConsultBar({ stationId, alerts, onAcknowledge }: { stationId: string; alerts: Alert[]; onAcknowledge: (id: string) => void }) {
+  return (
+    <div className="row" style={{ background: 'var(--navy-2)', color: '#fff', padding: '10px 28px', gap: 14, flexWrap: 'wrap' }}>
+      <Icon d={ICONS.monitor} size={24} color="#fff" />
+      <span style={{ fontWeight: 600 }}>Vous consultez l’écran du poste {stationId}</span>
+      <span style={{ color: 'var(--on-navy-muted)', fontSize: 14 }}>lecture seule · même vue que l’opérateur</span>
+      <span style={{ flex: 1 }} />
+      {alerts.map((a) => (
+        <span key={a.id} className="row" style={{ gap: 8, background: 'rgba(255,255,255,.08)', borderRadius: 12, padding: '4px 4px 4px 12px' }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>{a.title}</span>
+          {a.acknowledgedBy
+            ? <span className="pill pill-green">Pris en charge</span>
+            : <button className="btn-report" onClick={() => onAcknowledge(a.id)} style={{ border: 'none', borderRadius: 10, padding: '6px 12px', fontWeight: 700, fontSize: 14, boxShadow: 'none' }}>Je m’en occupe</button>}
+        </span>
+      ))}
+      <Link to={`/team-leader/poste/${encodeURIComponent(stationId)}/historique`} className="chip" style={{ color: '#fff', fontWeight: 600 }}>Historique du shift</Link>
     </div>
   );
 }

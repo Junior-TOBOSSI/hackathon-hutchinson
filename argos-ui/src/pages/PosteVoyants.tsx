@@ -1,15 +1,20 @@
-import { useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Scenario } from '../api/mock';
 import { HovisLogo } from '../components/brand';
 import { Clock, Icon, ICONS, Loading } from '../components/ui';
 import { useApi } from '../hooks/useApi';
 
-/** Écran mural de la cellule : 4 voyants lisibles de loin. Route : /cellule/:stationId */
-export default function Cellule() {
+/**
+ * Écran à 4 voyants AU POSTE, juste devant l'opérateur : sécurité et poste de travail,
+ * lisibles d'un coup d'œil. À ne pas confondre avec l'écran TV de la cellule (CelluleTV),
+ * qui ne montre que la performance de tous les postes. Route : /poste/:stationId/voyants
+ */
+export default function PosteVoyants() {
+  const { stationId = 'C3·P06' } = useParams();
   const [params] = useSearchParams();
   const scenario = (params.get('scenario') as Scenario) || 'multi';
-  const { data: live } = useApi(() => api.stationLive('A1·P06', scenario), [scenario], 2000);
+  const { data: live } = useApi(() => api.stationLive(stationId, scenario), [stationId, scenario], 2000);
   if (!live) return <Loading />;
 
   const has = (c: string) => live.issues.find((i) => i.category === c);

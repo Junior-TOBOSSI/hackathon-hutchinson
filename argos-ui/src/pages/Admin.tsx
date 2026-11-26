@@ -5,9 +5,9 @@ import { Icon, ICONS, Loading, TopBar } from '../components/ui';
 import { useApi } from '../hooks/useApi';
 
 /** Admin : gère les comptes, les rôles et les périmètres. Tout nouveau compte est opérateur par défaut. */
-const ROLE_LABEL: Record<Role, string> = { OPERATEUR: 'Opérateur', SUPERVISEUR: 'Superviseur', AI_LEADER: 'AI Leader', ADMIN: 'Admin' };
+const ROLE_LABEL: Record<Role, string> = { OPERATEUR: 'Opérateur', TEAM_LEADER: 'Team leader', AI_LEADER: 'AI Leader', ADMIN: 'Admin' };
 const PERM_LABEL: Record<Permission, string> = {
-  VOIR_POSTE: 'Voir l’écran du poste', SIGNALER: 'Signaler un problème', VOIR_COCKPIT: 'Voir l’atelier (lignes, cellules)',
+  VOIR_POSTE: 'Voir l’écran du poste', SIGNALER: 'Signaler un problème', VOIR_CELLULE: 'Voir les postes de sa cellule et l’écran d’un poste',
   TRAITER_ALERTES: 'Traiter les alertes', GERER_MODELES: 'Entraîner et déployer les modèles', GERER_ACCES: 'Gérer les comptes et les rôles',
 };
 type Tab = 'users' | 'roles' | 'audit';
@@ -40,7 +40,7 @@ export default function Admin() {
         {tab === 'users' && (
           <>
             <div className="grid-3" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
-              {(['OPERATEUR', 'SUPERVISEUR', 'AI_LEADER', 'ADMIN'] as Role[]).map((r) => (
+              {(['OPERATEUR', 'TEAM_LEADER', 'AI_LEADER', 'ADMIN'] as Role[]).map((r) => (
                 <div key={r} className="card"><div className="muted" style={{ fontSize: 14, fontWeight: 600 }}>{ROLE_LABEL[r]}s</div><div className="num" style={{ fontSize: 36 }}>{users.filter((u) => u.role === r && u.active).length}</div></div>
               ))}
             </div>
@@ -140,7 +140,7 @@ function NewUser({ onCancel, onCreated }: { onCancel: () => void; onCreated: (u:
           {Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </label>
-      <label className="col" style={{ gap: 6 }}>Périmètre<input required placeholder="Poste A1·P06, Ligne A…" value={f.scope} onChange={(e) => setF({ ...f, scope: e.target.value })} style={field} /></label>
+      <label className="col" style={{ gap: 6 }}>Périmètre<input required placeholder="Poste C3·P06, Cellule 3 · UAP 2…" value={f.scope} onChange={(e) => setF({ ...f, scope: e.target.value })} style={field} /></label>
       <div className="row"><button type="submit" className="btn btn-primary grow">Créer</button><button type="button" className="btn btn-ghost" onClick={onCancel}>Annuler</button></div>
     </form>
   );

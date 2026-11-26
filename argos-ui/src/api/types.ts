@@ -1,14 +1,19 @@
 // Contrat de données entre le backend et l'interface HOVIS.
 // Chaque type correspond à la réponse d'un endpoint décrit dans client.ts.
-// Règle RGPD : aucune image de personne n'est envoyée aux écrans superviseur et AI Leader.
+// Règle RGPD : aucune image de personne n'est envoyée aux écrans team leader et AI Leader,
+// sauf quand le team leader consulte l'écran d'un poste (même vue que l'opérateur, visage flouté).
+//
+// Organisation de l'usine : Usine > UAP > Cellule > Postes.
+// L'interface ne descend jamais au-dessus de la cellule : un team leader voit les postes de SA cellule.
 
-export type Role = 'OPERATEUR' | 'SUPERVISEUR' | 'AI_LEADER' | 'ADMIN';
+export type Role = 'OPERATEUR' | 'TEAM_LEADER' | 'AI_LEADER' | 'ADMIN';
 
 export interface User {
   id: string;
   name: string;
   role: Role; // déduit des droits du compte ; OPERATEUR par défaut
-  stationId?: string; // poste rattaché (opérateur)
+  stationId?: string; // poste rattaché (opérateur), ex. « C3·P06 »
+  cellId?: string; // cellule rattachée (team leader), ex. « C3 »
 }
 
 export type ShiftCode = 'A' | 'B' | 'C';
@@ -58,7 +63,7 @@ export interface HourlyCount {
 }
 
 export interface StationLive {
-  stationId: string; // « A1·P06 »
+  stationId: string; // « C3·P06 »
   product: string; // « raccord QC 702 »
   shift: Shift;
   now: string; // ISO, heure serveur
@@ -75,34 +80,31 @@ export interface StationLive {
 }
 
 /* ------------------------------------------------------------------ */
-/* Superviseur                                                         */
+/* Team leader : les postes de sa cellule                              */
 /* ------------------------------------------------------------------ */
 
 export type StationStatus = 'OK' | 'SECURITE' | 'QUALITE' | 'RYTHME' | 'CAMERA' | 'OBJET';
 
+/** Un poste de la cellule, vu par le team leader et par l'écran TV. */
 export interface StationSummary {
-  id: string; // « A1·P06 »
-  deltaVsExpected: number; // pièces d'avance (>0) ou de retard (<0)
+  id: string; // « C3·P06 »
+  product: string; // « raccord QC 702 »
+  good: number; // pièces bonnes du shift en cours
+  target: number; // objectif du shift pour ce poste
+  expectedNow: number; // pièces attendues à cette heure-ci
+  ko: number;
   status: StationStatus;
 }
 
-export interface CellSummary {
-  id: string; // « A1 »
-  good: number; // pièces bonnes du shift en cours
-  target: number; // objectif du shift
-  expectedNow: number;
-  ko: number;
-  stations: StationSummary[];
+/** GET /api/cells/{cellId}/overview */
+export interface CellOverview {
+  uap: { id: string; name: string }; // « UAP2 », « UAP 2 · Injection » (affichage seul)
+  cell: { id: string; name: string }; // « C3 », « Cellule 3 »
+  date: string; // « Jeudi 26 novembre »
+  currentShift: Shift;
+  stations: StationSummary[]; // tous les postes de la cellule (12 en général)
+  /** Production de la cellule heure par heure (somme des postes). */
   hourly: { hour: number; good: number | null; ko: number }[];
-}
-
-export interface LineSummary {
-  id: string; // « A »
-  name: string; // « Ligne A »
-  cells: CellSummary[];
-  /** Pièces bonnes des shifts terminés de la journée. */
-  finishedShifts: { code: ShiftCode; good: number; target: number }[];
-  cameras: { front: [number, number]; part: [number, number] }; // [actives, installées]
 }
 
 export type AlertCategory = 'SECURITE_EPI' | 'POSTE' | 'QUALITE' | 'RYTHME' | 'EQUIPEMENT';
@@ -110,7 +112,7 @@ export type AlertAction = 'NONE' | 'VALIDATE' | 'MAINTENANCE';
 
 export interface Alert {
   id: string;
-  lineId: string;
+  cellId: string;
   stationId: string;
   category: AlertCategory;
   title: string;
@@ -120,16 +122,8 @@ export interface Alert {
   priority: boolean;
   action: AlertAction; // NONE pour EPI et poste : information seule
   reportedByOperator?: boolean;
-}
-
-export interface WorkshopOverview {
-  date: string;
-  currentShift: Shift;
-  dayTarget: number;
-  lines: LineSummary[];
-  koDay: number;
-  koByShift: Partial<Record<ShiftCode, number>>;
-  problemsByLine: Record<string, Record<AlertCategory, number>>; // shift en cours
+  /** Renseigné quand le team leader a acquitté l'alerte (« je m'en occupe »). */
+  acknowledgedBy?: string;
 }
 
 export interface StationEvent {
@@ -165,7 +159,7 @@ export interface ModelInfo {
   id: string;
   name: string;
   useCase: 'Qualité' | 'EPI' | 'Comportement' | 'Poste';
-  scope: string; // « Ligne A », « Poste A1·P06 »
+  scope: string; // « UAP 2 », « Poste C3·P06 »
   version: string;
   healthPct: number; // part des verdicts confirmés par les opérateurs
   recallKoPct?: number;
@@ -208,8 +202,8 @@ export interface AiOverview {
 export type Permission =
   | 'VOIR_POSTE' // écran du poste
   | 'SIGNALER'
-  | 'VOIR_COCKPIT' // vue atelier, lignes, cellules
-  | 'TRAITER_ALERTES' // valider, rejeter, appeler la maintenance
+  | 'VOIR_CELLULE' // postes de sa cellule, écran d'un poste en consultation
+  | 'TRAITER_ALERTES' // acquitter, valider, rejeter, appeler la maintenance
   | 'GERER_MODELES' // entraîner, déployer, réentraîner
   | 'GERER_ACCES'; // utilisateurs et rôles
 
@@ -219,7 +213,7 @@ export interface AppUser {
   login: string; // identifiant ou e-mail
   badge?: string; // n° de badge pour la connexion au poste
   role: Role;
-  scope: string; // périmètre : « Poste A1·P06 », « Lignes A et B », « Usine »
+  scope: string; // périmètre : « Poste C3·P06 », « Cellule 3 · UAP 2 », « Usine »
   active: boolean;
   lastLogin?: string;
 }
@@ -234,5 +228,5 @@ export interface RoleDefinition {
 export interface AuditEntry {
   at: string; // « 26/11 16:02 »
   by: string;
-  action: string; // « a donné le rôle Superviseur à … »
+  action: string; // « a donné le rôle Team leader à … »
 }
