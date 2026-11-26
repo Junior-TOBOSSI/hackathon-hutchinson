@@ -14,6 +14,7 @@ Chaîne : **source → prétraitement → analyseurs → décision → stockage 
 - `visionhub/contracts.py` : **tous les schémas de données**.
 - `visionhub/store.py` (SQLite), `visionhub/pipeline.py`, `visionhub/api.py` (FastAPI), `dashboard/app.py` (Streamlit, ne parle qu'à l'API).
 - `usecases/{quality,workstation,safety}/` : un dossier par binôme. Détails dans `docs/architecture.md`.
+- ARGOS : contrats d'intégration dans `docs/integration-contracts.md`, périmètre de chaque groupe dans `docs/team-workstreams.md`.
 
 ## 3. Règles intouchables
 - **Ne jamais modifier** `visionhub/contracts.py`, `visionhub/decision.py`, `visionhub/registry.py` ni `visionhub/api.py` sans accord explicite de l'équipe. Si un changement semble nécessaire : le proposer et **s'arrêter**.

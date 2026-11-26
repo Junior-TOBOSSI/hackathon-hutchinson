@@ -1,0 +1,13 @@
+[
+  {
+    "correction_id": "3ea7d73f-633e-51d4-af35-00a71d412bff",
+    "part_id": "3a157ee8-9d9c-57bc-aa6a-a082bcedced7",
+    "sequence": 1,
+    "previous_verdict": "NOK",
+    "new_verdict": "OK",
+    "reason": "Pièce vérifiée conforme, faux rejet (reflet)",
+    "actor_role": "operator",
+    "physical_inspection": true,
+    "at": "2026-11-26T08:54:00Z"
+  }
+]

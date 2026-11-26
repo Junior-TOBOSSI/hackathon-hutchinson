@@ -1,0 +1,3286 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ARGOS integration contracts (schemas only)",
+    "version": "0.1.0",
+    "description": "Edge->Core events, Core read models, MLOps contracts. No paths: Core endpoints are specified in docs/integration-contracts.md."
+  },
+  "paths": {},
+  "components": {
+    "schemas": {
+      "AIPrediction": {
+        "additionalProperties": false,
+        "description": "Snapshot of the quality inference that produced a part verdict. Immutable.",
+        "properties": {
+          "verdict": {
+            "$ref": "#/components/schemas/PartVerdict"
+          },
+          "ai_decision": {
+            "$ref": "#/components/schemas/Decision"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "model_name": {
+            "title": "Model Name",
+            "type": "string"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "thresholds_used": {
+            "$ref": "#/components/schemas/Thresholds"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "latency_ms": {
+            "minimum": 0.0,
+            "title": "Latency Ms",
+            "type": "number"
+          }
+        },
+        "required": [
+          "verdict",
+          "ai_decision",
+          "score",
+          "model_name",
+          "model_version",
+          "thresholds_used",
+          "event_id",
+          "latency_ms"
+        ],
+        "title": "AIPrediction",
+        "type": "object"
+      },
+      "Alert": {
+        "additionalProperties": false,
+        "description": "One alert EPISODE (grouped detections), managed by the Alert Manager (ARGOS-02B).",
+        "properties": {
+          "alert_id": {
+            "title": "Alert Id",
+            "type": "string"
+          },
+          "station_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Station Id",
+            "type": "string"
+          },
+          "camera_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Camera Id"
+          },
+          "use_case": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UseCase"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "alert_type": {
+            "description": "e.g. ppe.helmet_missing, behavior.phone_use, part.nok",
+            "title": "Alert Type",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "acknowledged",
+              "validated",
+              "rejected",
+              "resolved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "first_seen_at": {
+            "format": "date-time",
+            "title": "First Seen At",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "occurrences": {
+            "minimum": 1,
+            "title": "Occurrences",
+            "type": "integer"
+          },
+          "max_score": {
+            "anyOf": [
+              {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Max Score"
+          },
+          "source_event_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Event Ids",
+            "type": "array"
+          },
+          "simulated": {
+            "default": false,
+            "title": "Simulated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "alert_id",
+          "station_id",
+          "alert_type",
+          "severity",
+          "status",
+          "title",
+          "first_seen_at",
+          "last_seen_at",
+          "occurrences"
+        ],
+        "title": "Alert",
+        "type": "object"
+      },
+      "AnomalyZone": {
+        "additionalProperties": false,
+        "properties": {
+          "bbox": {
+            "$ref": "#/components/schemas/BBox"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "bbox",
+          "score"
+        ],
+        "title": "AnomalyZone",
+        "type": "object"
+      },
+      "ArtifactRef": {
+        "additionalProperties": false,
+        "properties": {
+          "uri": {
+            "description": "MLflow artifact URI or file path inside the package",
+            "title": "Uri",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "minimum": 0,
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "format": {
+            "enum": [
+              "onnx",
+              "torchscript",
+              "pt",
+              "openvino",
+              "other"
+            ],
+            "title": "Format",
+            "type": "string"
+          }
+        },
+        "required": [
+          "uri",
+          "sha256",
+          "size_bytes",
+          "format"
+        ],
+        "title": "ArtifactRef",
+        "type": "object"
+      },
+      "BBox": {
+        "additionalProperties": false,
+        "description": "Normalized bounding box, coordinates in [0, 1].",
+        "properties": {
+          "x1": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "X1",
+            "type": "number"
+          },
+          "y1": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y1",
+            "type": "number"
+          },
+          "x2": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "X2",
+            "type": "number"
+          },
+          "y2": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y2",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x1",
+          "y1",
+          "x2",
+          "y2"
+        ],
+        "title": "BBox",
+        "type": "object"
+      },
+      "BehaviorFinding": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "phone_use",
+              "earphones",
+              "hand_in_danger_zone",
+              "person_in_danger_zone",
+              "running",
+              "fall",
+              "unsafe_posture",
+              "clutter",
+              "missing_object",
+              "misplaced_object",
+              "unexpected_object"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "person_index": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Frame index only",
+            "title": "Person Index"
+          },
+          "zone_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Zone Id"
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BBox"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "kind",
+          "confidence"
+        ],
+        "title": "BehaviorFinding",
+        "type": "object"
+      },
+      "BehaviorReport": {
+        "additionalProperties": false,
+        "properties": {
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/BehaviorFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "score"
+        ],
+        "title": "BehaviorReport",
+        "type": "object"
+      },
+      "Correction": {
+        "additionalProperties": false,
+        "properties": {
+          "correction_id": {
+            "title": "Correction Id",
+            "type": "string"
+          },
+          "part_id": {
+            "title": "Part Id",
+            "type": "string"
+          },
+          "sequence": {
+            "minimum": 1,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "previous_verdict": {
+            "$ref": "#/components/schemas/PartVerdict"
+          },
+          "new_verdict": {
+            "enum": [
+              "OK",
+              "NOK"
+            ],
+            "title": "New Verdict",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "actor_role": {
+            "enum": [
+              "operator",
+              "supervisor",
+              "quality"
+            ],
+            "title": "Actor Role",
+            "type": "string"
+          },
+          "physical_inspection": {
+            "title": "Physical Inspection",
+            "type": "boolean"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "correction_id",
+          "part_id",
+          "sequence",
+          "previous_verdict",
+          "new_verdict",
+          "reason",
+          "actor_role",
+          "physical_inspection",
+          "at"
+        ],
+        "title": "Correction",
+        "type": "object"
+      },
+      "DangerZone": {
+        "additionalProperties": false,
+        "description": "A polygon in normalized image coordinates, configured per camera.",
+        "properties": {
+          "zone_id": {
+            "title": "Zone Id",
+            "type": "string"
+          },
+          "polygon": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "minItems": 3,
+            "title": "Polygon",
+            "type": "array"
+          },
+          "kind": {
+            "default": "machine",
+            "enum": [
+              "machine",
+              "press",
+              "conveyor",
+              "forklift_lane",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "zone_id",
+          "polygon"
+        ],
+        "title": "DangerZone",
+        "type": "object"
+      },
+      "DatasetRef": {
+        "additionalProperties": false,
+        "description": "A versioned dataset (DVC tag/commit or manifest hash). Never the data itself.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "description": "DVC tag/commit, or sha256 of the manifest",
+            "title": "Version",
+            "type": "string"
+          },
+          "uri": {
+            "description": "DVC remote path or storage URI (no public URL)",
+            "title": "Uri",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Manifest Sha256"
+          },
+          "num_samples": {
+            "minimum": 0,
+            "title": "Num Samples",
+            "type": "integer"
+          },
+          "splits": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "split -> samples",
+            "title": "Splits",
+            "type": "object"
+          },
+          "split_strategy": {
+            "enum": [
+              "by_sequence",
+              "by_time",
+              "by_station",
+              "random"
+            ],
+            "title": "Split Strategy",
+            "type": "string"
+          },
+          "confidential": {
+            "default": true,
+            "title": "Confidential",
+            "type": "boolean"
+          },
+          "classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Classes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "uri",
+          "num_samples",
+          "split_strategy"
+        ],
+        "title": "DatasetRef",
+        "type": "object"
+      },
+      "Decision": {
+        "enum": [
+          "conforme",
+          "a_verifier",
+          "anomalie"
+        ],
+        "title": "Decision",
+        "type": "string"
+      },
+      "DetectedObject": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "bbox": {
+            "$ref": "#/components/schemas/BBox"
+          }
+        },
+        "required": [
+          "label",
+          "confidence",
+          "bbox"
+        ],
+        "title": "DetectedObject",
+        "type": "object"
+      },
+      "Disposition": {
+        "enum": [
+          "UNKNOWN",
+          "SHIPPED",
+          "QUARANTINED",
+          "REWORKED",
+          "SCRAPPED"
+        ],
+        "title": "Disposition",
+        "type": "string"
+      },
+      "DriftMeasure": {
+        "additionalProperties": false,
+        "properties": {
+          "feature": {
+            "description": "e.g. score, brightness, decision_rate",
+            "title": "Feature",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "psi",
+              "ks",
+              "chi2",
+              "mean_shift"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          },
+          "alert": {
+            "title": "Alert",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "feature",
+          "method",
+          "value",
+          "threshold",
+          "alert"
+        ],
+        "title": "DriftMeasure",
+        "type": "object"
+      },
+      "EdgeEvent": {
+        "additionalProperties": false,
+        "description": "Envelope of every Edge -> Core event. Header fields are copied from the payload\nso that Core can index and route events without parsing every payload kind.",
+        "properties": {
+          "schema_version": {
+            "const": "argos.edge-event/1",
+            "default": "argos.edge-event/1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "event_id": {
+            "description": "UUID, idempotency key",
+            "maxLength": 64,
+            "minLength": 8,
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "$ref": "#/components/schemas/EdgeEventType"
+          },
+          "station_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Station Id",
+            "type": "string"
+          },
+          "edge_sequence": {
+            "description": "Strictly increasing per station",
+            "minimum": 1,
+            "title": "Edge Sequence",
+            "type": "integer"
+          },
+          "occurred_at": {
+            "description": "UTC, timezone-aware",
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "simulated": {
+            "default": false,
+            "title": "Simulated",
+            "type": "boolean"
+          },
+          "camera_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Camera Id"
+          },
+          "cycle_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cycle Id"
+          },
+          "part_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Part Id"
+          },
+          "use_case": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UseCase"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Name"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Version"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Score"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Decision"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartVerdict"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "payload": {
+            "discriminator": {
+              "mapping": {
+                "equipment.status": "#/components/schemas/EquipmentStatusPayload",
+                "inference": "#/components/schemas/InferencePayload",
+                "model.status": "#/components/schemas/ModelStatusPayload",
+                "operator.report": "#/components/schemas/OperatorReportPayload",
+                "part.corrected": "#/components/schemas/PartCorrectedPayload",
+                "part.disposition": "#/components/schemas/PartDispositionPayload",
+                "part.recorded": "#/components/schemas/PartRecordedPayload",
+                "shift": "#/components/schemas/ShiftPayload"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InferencePayload"
+              },
+              {
+                "$ref": "#/components/schemas/PartRecordedPayload"
+              },
+              {
+                "$ref": "#/components/schemas/PartCorrectedPayload"
+              },
+              {
+                "$ref": "#/components/schemas/PartDispositionPayload"
+              },
+              {
+                "$ref": "#/components/schemas/ShiftPayload"
+              },
+              {
+                "$ref": "#/components/schemas/OperatorReportPayload"
+              },
+              {
+                "$ref": "#/components/schemas/EquipmentStatusPayload"
+              },
+              {
+                "$ref": "#/components/schemas/ModelStatusPayload"
+              }
+            ],
+            "title": "Payload"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_type",
+          "station_id",
+          "edge_sequence",
+          "occurred_at",
+          "payload"
+        ],
+        "title": "EdgeEvent",
+        "type": "object"
+      },
+      "EdgeEventBatch": {
+        "additionalProperties": false,
+        "description": "POST /ingest/v1/events body. Events are sorted by edge_sequence.",
+        "properties": {
+          "station_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Station Id",
+            "type": "string"
+          },
+          "sent_at": {
+            "format": "date-time",
+            "title": "Sent At",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EdgeEvent"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "station_id",
+          "sent_at",
+          "events"
+        ],
+        "title": "EdgeEventBatch",
+        "type": "object"
+      },
+      "EdgeEventType": {
+        "enum": [
+          "inference",
+          "part.recorded",
+          "part.corrected",
+          "part.disposition",
+          "shift.opened",
+          "shift.closed",
+          "operator.report",
+          "equipment.status",
+          "model.status"
+        ],
+        "title": "EdgeEventType",
+        "type": "string"
+      },
+      "EquipmentStatusPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "equipment.status",
+            "default": "equipment.status",
+            "title": "Kind",
+            "type": "string"
+          },
+          "equipment_id": {
+            "title": "Equipment Id",
+            "type": "string"
+          },
+          "equipment_type": {
+            "enum": [
+              "camera",
+              "plc",
+              "edge",
+              "model_runtime"
+            ],
+            "title": "Equipment Type",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "down",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
+          }
+        },
+        "required": [
+          "equipment_id",
+          "equipment_type",
+          "status"
+        ],
+        "title": "EquipmentStatusPayload",
+        "type": "object"
+      },
+      "ErrorCode": {
+        "enum": [
+          "ANALYZER_UNAVAILABLE",
+          "ANALYZER_FAILED",
+          "IMAGE_DECODE_FAILED",
+          "CAPTURE_FAILED"
+        ],
+        "title": "ErrorCode",
+        "type": "string"
+      },
+      "EvaluationMetrics": {
+        "additionalProperties": false,
+        "description": "Evaluation of one run on one dataset split (logged in MLflow, mirrored here).",
+        "properties": {
+          "mlflow_run_id": {
+            "title": "Mlflow Run Id",
+            "type": "string"
+          },
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetRef"
+          },
+          "split": {
+            "default": "test",
+            "title": "Split",
+            "type": "string"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "e.g. recall_nok, false_reject_rate, map50",
+            "title": "Metrics",
+            "type": "object"
+          },
+          "per_class": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "title": "Per Class",
+            "type": "object"
+          },
+          "confusion_matrix": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Confusion Matrix"
+          },
+          "class_order": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Class Order",
+            "type": "array"
+          },
+          "recommended_thresholds": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Thresholds"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "latency_ms_p50_cpu": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Latency Ms P50 Cpu"
+          },
+          "latency_ms_p95_cpu": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Latency Ms P95 Cpu"
+          }
+        },
+        "required": [
+          "mlflow_run_id",
+          "dataset",
+          "metrics"
+        ],
+        "title": "EvaluationMetrics",
+        "type": "object"
+      },
+      "Event": {
+        "additionalProperties": false,
+        "description": "An analysis result after the decision layer: this is what is stored and served.",
+        "properties": {
+          "use_case": {
+            "$ref": "#/components/schemas/UseCase"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "latency_ms": {
+            "default": 0.0,
+            "description": "Filled in by the pipeline",
+            "minimum": 0.0,
+            "title": "Latency Ms",
+            "type": "number"
+          },
+          "model_name": {
+            "title": "Model Name",
+            "type": "string"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "details": {
+            "discriminator": {
+              "mapping": {
+                "quality": "#/components/schemas/QualityDetails",
+                "safety": "#/components/schemas/SafetyDetails",
+                "workstation": "#/components/schemas/WorkstationDetails"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QualityDetails"
+              },
+              {
+                "$ref": "#/components/schemas/WorkstationDetails"
+              },
+              {
+                "$ref": "#/components/schemas/SafetyDetails"
+              }
+            ],
+            "title": "Details"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "frame": {
+            "$ref": "#/components/schemas/FrameMeta"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/Decision"
+          },
+          "thresholds_used": {
+            "$ref": "#/components/schemas/Thresholds"
+          },
+          "operator_feedback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperatorFeedback"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "use_case",
+          "score",
+          "model_name",
+          "model_version",
+          "details",
+          "event_id",
+          "frame",
+          "decision",
+          "thresholds_used"
+        ],
+        "title": "Event",
+        "type": "object"
+      },
+      "FrameMeta": {
+        "additionalProperties": false,
+        "description": "Metadata of one image coming from a source.",
+        "properties": {
+          "frame_id": {
+            "title": "Frame Id",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "workstation_id": {
+            "title": "Workstation Id",
+            "type": "string"
+          },
+          "camera_id": {
+            "title": "Camera Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "frame_id",
+          "workstation_id",
+          "camera_id"
+        ],
+        "title": "FrameMeta",
+        "type": "object"
+      },
+      "InferenceError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "maxLength": 500,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "InferenceError",
+        "type": "object"
+      },
+      "InferencePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "inference",
+            "default": "inference",
+            "title": "Kind",
+            "type": "string"
+          },
+          "event": {
+            "$ref": "#/components/schemas/Event"
+          }
+        },
+        "required": [
+          "event"
+        ],
+        "title": "InferencePayload",
+        "type": "object"
+      },
+      "IngestAck": {
+        "additionalProperties": false,
+        "description": "Core answer. The Edge marks ``accepted`` and ``duplicate`` events as delivered;\n``rejected`` events stay in the outbox flagged for investigation (never dropped).",
+        "properties": {
+          "station_id": {
+            "title": "Station Id",
+            "type": "string"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/IngestResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "highest_contiguous_sequence": {
+            "description": "Highest edge_sequence such that all previous ones are stored",
+            "minimum": 0,
+            "title": "Highest Contiguous Sequence",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "station_id",
+          "received_at",
+          "results",
+          "highest_contiguous_sequence"
+        ],
+        "title": "IngestAck",
+        "type": "object"
+      },
+      "IngestResult": {
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "accepted",
+              "duplicate",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          }
+        },
+        "required": [
+          "event_id",
+          "status"
+        ],
+        "title": "IngestResult",
+        "type": "object"
+      },
+      "ModelDeployment": {
+        "additionalProperties": false,
+        "description": "Request to run a model version on a station. Always approved by a human first.",
+        "properties": {
+          "deployment_id": {
+            "title": "Deployment Id",
+            "type": "string"
+          },
+          "station_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Station Id",
+            "type": "string"
+          },
+          "use_case": {
+            "$ref": "#/components/schemas/UseCase"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelRef"
+          },
+          "package_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Package Sha256",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending_approval",
+              "approved",
+              "deploying",
+              "active",
+              "failed",
+              "rolled_back"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Approved At"
+          },
+          "approved_by_role": {
+            "anyOf": [
+              {
+                "const": "ai_leader",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Approved By Role"
+          },
+          "previous_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Rollback target"
+          }
+        },
+        "required": [
+          "deployment_id",
+          "station_id",
+          "use_case",
+          "model",
+          "package_sha256",
+          "status",
+          "requested_at"
+        ],
+        "title": "ModelDeployment",
+        "type": "object"
+      },
+      "ModelPackage": {
+        "additionalProperties": false,
+        "description": "Everything an Edge needs to run a model, delivered by MLOps (``model-package.json``).\n\nThe Edge loads ``analyzer_class`` with ``params`` (merged with ``artifact`` path) and\nrefuses the package if the artifact sha256 does not match.",
+        "properties": {
+          "package_schema": {
+            "const": "argos.model-package/1",
+            "default": "argos.model-package/1",
+            "title": "Package Schema",
+            "type": "string"
+          },
+          "use_case": {
+            "$ref": "#/components/schemas/UseCase"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelRef"
+          },
+          "analyzer_class": {
+            "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_]\\w*$",
+            "title": "Analyzer Class",
+            "type": "string"
+          },
+          "runtime": {
+            "enum": [
+              "onnxruntime",
+              "ultralytics",
+              "torch",
+              "opencv"
+            ],
+            "title": "Runtime",
+            "type": "string"
+          },
+          "device": {
+            "default": "cpu",
+            "enum": [
+              "cpu",
+              "cuda"
+            ],
+            "title": "Device",
+            "type": "string"
+          },
+          "artifact": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "preprocessing": {
+            "$ref": "#/components/schemas/PreprocessingSpec"
+          },
+          "classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "thresholds": {
+            "$ref": "#/components/schemas/Thresholds"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetRef"
+          },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "use_case",
+          "model",
+          "analyzer_class",
+          "runtime",
+          "artifact",
+          "preprocessing",
+          "classes",
+          "thresholds",
+          "dataset",
+          "created_at"
+        ],
+        "title": "ModelPackage",
+        "type": "object"
+      },
+      "ModelRef": {
+        "additionalProperties": false,
+        "description": "Pointer to an MLflow registered model version.",
+        "properties": {
+          "registered_model": {
+            "description": "MLflow name, or catalog.schema.model (UC)",
+            "title": "Registered Model",
+            "type": "string"
+          },
+          "version": {
+            "description": "MLflow model version number",
+            "pattern": "^[0-9]+$",
+            "title": "Version",
+            "type": "string"
+          },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "e.g. champion, challenger",
+            "title": "Alias"
+          },
+          "mlflow_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mlflow Run Id"
+          }
+        },
+        "required": [
+          "registered_model",
+          "version"
+        ],
+        "title": "ModelRef",
+        "type": "object"
+      },
+      "ModelStatusPayload": {
+        "additionalProperties": false,
+        "description": "Which model version a station actually runs (reported after each (re)load).",
+        "properties": {
+          "kind": {
+            "const": "model.status",
+            "default": "model.status",
+            "title": "Kind",
+            "type": "string"
+          },
+          "use_case": {
+            "$ref": "#/components/schemas/UseCase"
+          },
+          "model_name": {
+            "title": "Model Name",
+            "type": "string"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "package_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Package Sha256"
+          },
+          "loaded": {
+            "title": "Loaded",
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          }
+        },
+        "required": [
+          "use_case",
+          "model_name",
+          "model_version",
+          "loaded"
+        ],
+        "title": "ModelStatusPayload",
+        "type": "object"
+      },
+      "MonitoringMetrics": {
+        "additionalProperties": false,
+        "properties": {
+          "station_id": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9_-]{1,32}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "None = all stations",
+            "title": "Station Id"
+          },
+          "use_case": {
+            "$ref": "#/components/schemas/UseCase"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelRef"
+          },
+          "window_start": {
+            "format": "date-time",
+            "title": "Window Start",
+            "type": "string"
+          },
+          "window_end": {
+            "format": "date-time",
+            "title": "Window End",
+            "type": "string"
+          },
+          "n_inferences": {
+            "minimum": 0,
+            "title": "N Inferences",
+            "type": "integer"
+          },
+          "decision_rates": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Decision Rates",
+            "type": "object"
+          },
+          "mean_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mean Score"
+          },
+          "latency_ms_p95": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Latency Ms P95"
+          },
+          "human_agreement_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Share of human-reviewed parts where human == AI",
+            "title": "Human Agreement Rate"
+          },
+          "drift": {
+            "items": {
+              "$ref": "#/components/schemas/DriftMeasure"
+            },
+            "title": "Drift",
+            "type": "array"
+          }
+        },
+        "required": [
+          "use_case",
+          "model",
+          "window_start",
+          "window_end",
+          "n_inferences"
+        ],
+        "title": "MonitoringMetrics",
+        "type": "object"
+      },
+      "OperatorFeedback": {
+        "additionalProperties": false,
+        "properties": {
+          "verdict": {
+            "enum": [
+              "conforme",
+              "defaut"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Comment"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verdict"
+        ],
+        "title": "OperatorFeedback",
+        "type": "object"
+      },
+      "OperatorReport": {
+        "additionalProperties": false,
+        "description": "An operator report as stored by Core (with its station and status).",
+        "properties": {
+          "kind": {
+            "const": "operator.report",
+            "default": "operator.report",
+            "title": "Kind",
+            "type": "string"
+          },
+          "report_id": {
+            "title": "Report Id",
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "quality",
+              "safety",
+              "workstation",
+              "equipment",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "actor_role": {
+            "default": "operator",
+            "enum": [
+              "operator",
+              "supervisor",
+              "quality"
+            ],
+            "title": "Actor Role",
+            "type": "string"
+          },
+          "related_part_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Related Part Id"
+          },
+          "related_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Related Event Id"
+          },
+          "station_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Station Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "status": {
+            "default": "open",
+            "enum": [
+              "open",
+              "acknowledged",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "report_id",
+          "category",
+          "severity",
+          "message",
+          "station_id",
+          "created_at"
+        ],
+        "title": "OperatorReport",
+        "type": "object"
+      },
+      "OperatorReportPayload": {
+        "additionalProperties": false,
+        "description": "A problem reported by the operator to the supervisor. Free text, no identity.",
+        "properties": {
+          "kind": {
+            "const": "operator.report",
+            "default": "operator.report",
+            "title": "Kind",
+            "type": "string"
+          },
+          "report_id": {
+            "title": "Report Id",
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "quality",
+              "safety",
+              "workstation",
+              "equipment",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "actor_role": {
+            "default": "operator",
+            "enum": [
+              "operator",
+              "supervisor",
+              "quality"
+            ],
+            "title": "Actor Role",
+            "type": "string"
+          },
+          "related_part_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Related Part Id"
+          },
+          "related_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Related Event Id"
+          }
+        },
+        "required": [
+          "report_id",
+          "category",
+          "severity",
+          "message"
+        ],
+        "title": "OperatorReportPayload",
+        "type": "object"
+      },
+      "PPEReport": {
+        "additionalProperties": false,
+        "properties": {
+          "persons": {
+            "items": {
+              "$ref": "#/components/schemas/PersonPPE"
+            },
+            "title": "Persons",
+            "type": "array"
+          },
+          "extensions": {
+            "items": {
+              "$ref": "#/components/schemas/PersonPPEExtension"
+            },
+            "title": "Extensions",
+            "type": "array"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "score"
+        ],
+        "title": "PPEReport",
+        "type": "object"
+      },
+      "PPEState": {
+        "enum": [
+          "present",
+          "absent",
+          "uncertain"
+        ],
+        "title": "PPEState",
+        "type": "string"
+      },
+      "Part": {
+        "additionalProperties": false,
+        "description": "One physical part presented by a PLC cycle.",
+        "properties": {
+          "part_id": {
+            "title": "Part Id",
+            "type": "string"
+          },
+          "station_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Station Id",
+            "type": "string"
+          },
+          "cycle_id": {
+            "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+            "title": "Cycle Id",
+            "type": "string"
+          },
+          "shift_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shift Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "trigger_source": {
+            "enum": [
+              "plc",
+              "plc_simulated"
+            ],
+            "title": "Trigger Source",
+            "type": "string"
+          },
+          "camera_id": {
+            "title": "Camera Id",
+            "type": "string"
+          },
+          "image_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Sha256"
+          },
+          "predicted_verdict": {
+            "$ref": "#/components/schemas/PartVerdict"
+          },
+          "prediction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AIPrediction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InferenceError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_verdict": {
+            "$ref": "#/components/schemas/PartVerdict"
+          },
+          "correction_count": {
+            "minimum": 0,
+            "title": "Correction Count",
+            "type": "integer"
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/Disposition",
+            "default": "UNKNOWN"
+          },
+          "disposition_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Disposition Note"
+          },
+          "disposition_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Disposition Updated At"
+          }
+        },
+        "required": [
+          "part_id",
+          "station_id",
+          "cycle_id",
+          "shift_id",
+          "created_at",
+          "trigger_source",
+          "camera_id",
+          "image_sha256",
+          "predicted_verdict",
+          "prediction",
+          "error",
+          "effective_verdict",
+          "correction_count"
+        ],
+        "title": "Part",
+        "type": "object"
+      },
+      "PartCorrectedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "part.corrected",
+            "default": "part.corrected",
+            "title": "Kind",
+            "type": "string"
+          },
+          "correction": {
+            "$ref": "#/components/schemas/Correction"
+          }
+        },
+        "required": [
+          "correction"
+        ],
+        "title": "PartCorrectedPayload",
+        "type": "object"
+      },
+      "PartDispositionPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "part.disposition",
+            "default": "part.disposition",
+            "title": "Kind",
+            "type": "string"
+          },
+          "part_id": {
+            "title": "Part Id",
+            "type": "string"
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/Disposition"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          }
+        },
+        "required": [
+          "part_id",
+          "disposition"
+        ],
+        "title": "PartDispositionPayload",
+        "type": "object"
+      },
+      "PartRecordedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "part.recorded",
+            "default": "part.recorded",
+            "title": "Kind",
+            "type": "string"
+          },
+          "part": {
+            "$ref": "#/components/schemas/Part"
+          }
+        },
+        "required": [
+          "part"
+        ],
+        "title": "PartRecordedPayload",
+        "type": "object"
+      },
+      "PartVerdict": {
+        "enum": [
+          "OK",
+          "NOK",
+          "HOLD",
+          "ERROR"
+        ],
+        "title": "PartVerdict",
+        "type": "string"
+      },
+      "PersonPPE": {
+        "additionalProperties": false,
+        "description": "One detected person. Position in the image only: NO identity, NO face data.",
+        "properties": {
+          "person_index": {
+            "description": "Index in this frame only, not a tracking id",
+            "minimum": 0,
+            "title": "Person Index",
+            "type": "integer"
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BBox"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "helmet": {
+            "$ref": "#/components/schemas/PPEState"
+          },
+          "vest": {
+            "$ref": "#/components/schemas/PPEState"
+          },
+          "glasses": {
+            "$ref": "#/components/schemas/PPEState"
+          },
+          "gloves": {
+            "$ref": "#/components/schemas/PPEState"
+          },
+          "phone": {
+            "title": "Phone",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "person_index",
+          "helmet",
+          "vest",
+          "glasses",
+          "gloves",
+          "phone"
+        ],
+        "title": "PersonPPE",
+        "type": "object"
+      },
+      "PersonPPEExtension": {
+        "additionalProperties": false,
+        "description": "Extra PPE items for one person (same person_index as PersonPPE).",
+        "properties": {
+          "person_index": {
+            "minimum": 0,
+            "title": "Person Index",
+            "type": "integer"
+          },
+          "safety_shoes": {
+            "$ref": "#/components/schemas/PPEState",
+            "default": "uncertain"
+          },
+          "earphones": {
+            "default": false,
+            "title": "Earphones",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "person_index"
+        ],
+        "title": "PersonPPEExtension",
+        "type": "object"
+      },
+      "PreprocessingSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "input_size": {
+            "description": "(width, height)",
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Input Size",
+            "type": "array"
+          },
+          "color": {
+            "default": "RGB",
+            "enum": [
+              "BGR",
+              "RGB"
+            ],
+            "title": "Color",
+            "type": "string"
+          },
+          "resize": {
+            "default": "letterbox",
+            "enum": [
+              "letterbox",
+              "stretch",
+              "center_crop"
+            ],
+            "title": "Resize",
+            "type": "string"
+          },
+          "normalize_mean": {
+            "anyOf": [
+              {
+                "maxItems": 3,
+                "minItems": 3,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Normalize Mean"
+          },
+          "normalize_std": {
+            "anyOf": [
+              {
+                "maxItems": 3,
+                "minItems": 3,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Normalize Std"
+          },
+          "roi": {
+            "anyOf": [
+              {
+                "maxItems": 4,
+                "minItems": 4,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "x, y, w, h px",
+            "title": "Roi"
+          }
+        },
+        "required": [
+          "input_size"
+        ],
+        "title": "PreprocessingSpec",
+        "type": "object"
+      },
+      "ProductionKPI": {
+        "additionalProperties": false,
+        "description": "Production indicators over a window. Rates are None when their denominator is 0.\n\nCounts use the EFFECTIVE verdict; ``predicted_*`` counts keep the AI view.\nHOLD and ERROR parts are never counted as OK nor as NOK.",
+        "properties": {
+          "window_start": {
+            "format": "date-time",
+            "title": "Window Start",
+            "type": "string"
+          },
+          "window_end": {
+            "format": "date-time",
+            "title": "Window End",
+            "type": "string"
+          },
+          "elapsed_s": {
+            "minimum": 0.0,
+            "title": "Elapsed S",
+            "type": "number"
+          },
+          "total_parts": {
+            "title": "Total Parts",
+            "type": "integer"
+          },
+          "ok_parts": {
+            "title": "Ok Parts",
+            "type": "integer"
+          },
+          "nok_parts": {
+            "title": "Nok Parts",
+            "type": "integer"
+          },
+          "hold_parts": {
+            "title": "Hold Parts",
+            "type": "integer"
+          },
+          "error_parts": {
+            "title": "Error Parts",
+            "type": "integer"
+          },
+          "predicted_ok_parts": {
+            "title": "Predicted Ok Parts",
+            "type": "integer"
+          },
+          "predicted_nok_parts": {
+            "title": "Predicted Nok Parts",
+            "type": "integer"
+          },
+          "predicted_hold_parts": {
+            "title": "Predicted Hold Parts",
+            "type": "integer"
+          },
+          "predicted_error_parts": {
+            "title": "Predicted Error Parts",
+            "type": "integer"
+          },
+          "corrected_parts": {
+            "title": "Corrected Parts",
+            "type": "integer"
+          },
+          "yield_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Rate"
+          },
+          "nok_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nok Rate"
+          },
+          "pending_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Rate"
+          },
+          "correction_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Rate"
+          },
+          "target_parts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Parts"
+          },
+          "target_progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Progress"
+          },
+          "actual_total_rate_per_hour": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Total Rate Per Hour"
+          },
+          "actual_ok_rate_per_hour": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Ok Rate Per Hour"
+          },
+          "expected_ok_rate_per_hour": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Ok Rate Per Hour"
+          },
+          "expected_ok_parts_by_now": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Ok Parts By Now"
+          },
+          "efficiency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Efficiency"
+          },
+          "mean_latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Latency Ms"
+          }
+        },
+        "required": [
+          "window_start",
+          "window_end",
+          "elapsed_s",
+          "total_parts",
+          "ok_parts",
+          "nok_parts",
+          "hold_parts",
+          "error_parts",
+          "predicted_ok_parts",
+          "predicted_nok_parts",
+          "predicted_hold_parts",
+          "predicted_error_parts",
+          "corrected_parts",
+          "yield_rate",
+          "nok_rate",
+          "pending_rate",
+          "correction_rate",
+          "target_parts",
+          "target_progress",
+          "actual_total_rate_per_hour",
+          "actual_ok_rate_per_hour",
+          "expected_ok_rate_per_hour",
+          "expected_ok_parts_by_now",
+          "efficiency",
+          "mean_latency_ms"
+        ],
+        "title": "ProductionKPI",
+        "type": "object"
+      },
+      "QualityDetails": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "quality",
+            "default": "quality",
+            "title": "Kind",
+            "type": "string"
+          },
+          "zones": {
+            "items": {
+              "$ref": "#/components/schemas/AnomalyZone"
+            },
+            "title": "Zones",
+            "type": "array"
+          },
+          "heatmap_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional reference (path/URL) to a heatmap. Never inline.",
+            "title": "Heatmap Ref"
+          }
+        },
+        "title": "QualityDetails",
+        "type": "object"
+      },
+      "RetrainingPolicy": {
+        "additionalProperties": false,
+        "description": "When to retrain automatically. Deployment ALWAYS needs a human approval.",
+        "properties": {
+          "use_case": {
+            "$ref": "#/components/schemas/UseCase"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "min_new_labels": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Min New Labels"
+          },
+          "max_drift_alerts": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Max Drift Alerts"
+          },
+          "min_human_agreement": {
+            "anyOf": [
+              {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Min Human Agreement"
+          },
+          "schedule_cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Schedule Cron"
+          },
+          "auto_train": {
+            "default": false,
+            "title": "Auto Train",
+            "type": "boolean"
+          },
+          "deployment_requires_approval": {
+            "const": true,
+            "default": true,
+            "title": "Deployment Requires Approval",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "use_case"
+        ],
+        "title": "RetrainingPolicy",
+        "type": "object"
+      },
+      "SafetyDetails": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "safety",
+            "default": "safety",
+            "title": "Kind",
+            "type": "string"
+          },
+          "person_count": {
+            "minimum": 0,
+            "title": "Person Count",
+            "type": "integer"
+          },
+          "persons": {
+            "items": {
+              "$ref": "#/components/schemas/PersonPPE"
+            },
+            "title": "Persons",
+            "type": "array"
+          }
+        },
+        "required": [
+          "person_count"
+        ],
+        "title": "SafetyDetails",
+        "type": "object"
+      },
+      "Shift": {
+        "additionalProperties": false,
+        "properties": {
+          "shift_id": {
+            "title": "Shift Id",
+            "type": "string"
+          },
+          "station_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Station Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "CLOSED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "planned_duration_min": {
+            "title": "Planned Duration Min",
+            "type": "integer"
+          },
+          "target_parts": {
+            "title": "Target Parts",
+            "type": "integer"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ended At"
+          },
+          "planned_end_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "title": "Planned End At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "shift_id",
+          "station_id",
+          "name",
+          "status",
+          "started_at",
+          "planned_duration_min",
+          "target_parts",
+          "planned_end_at"
+        ],
+        "title": "Shift",
+        "type": "object"
+      },
+      "ShiftPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "shift",
+            "default": "shift",
+            "title": "Kind",
+            "type": "string"
+          },
+          "shift": {
+            "$ref": "#/components/schemas/Shift"
+          }
+        },
+        "required": [
+          "shift"
+        ],
+        "title": "ShiftPayload",
+        "type": "object"
+      },
+      "ShiftReport": {
+        "additionalProperties": false,
+        "properties": {
+          "shift": {
+            "$ref": "#/components/schemas/Shift"
+          },
+          "kpi": {
+            "$ref": "#/components/schemas/ProductionKPI"
+          }
+        },
+        "required": [
+          "shift",
+          "kpi"
+        ],
+        "title": "ShiftReport",
+        "type": "object"
+      },
+      "StationDeploymentStatus": {
+        "additionalProperties": false,
+        "description": "What a station ACTUALLY runs (from the model.status edge events).",
+        "properties": {
+          "station_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Station Id",
+            "type": "string"
+          },
+          "use_case": {
+            "$ref": "#/components/schemas/UseCase"
+          },
+          "status": {
+            "enum": [
+              "loaded",
+              "loading",
+              "failed",
+              "absent"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "package_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Package Sha256"
+          },
+          "loaded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Loaded At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          }
+        },
+        "required": [
+          "station_id",
+          "use_case",
+          "status"
+        ],
+        "title": "StationDeploymentStatus",
+        "type": "object"
+      },
+      "StationSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "station_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Station Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "cell": {
+            "title": "Cell",
+            "type": "string"
+          },
+          "simulated": {
+            "description": "Simulated stations are shown as such in the UI",
+            "title": "Simulated",
+            "type": "boolean"
+          },
+          "online": {
+            "title": "Online",
+            "type": "boolean"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Seen At"
+          },
+          "current_shift": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShiftReport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "equipment": {
+            "items": {
+              "$ref": "#/components/schemas/EquipmentStatusPayload"
+            },
+            "title": "Equipment",
+            "type": "array"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/StationDeploymentStatus"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "open_alerts": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Open Alerts",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "station_id",
+          "name",
+          "cell",
+          "simulated",
+          "online"
+        ],
+        "title": "StationSummary",
+        "type": "object"
+      },
+      "Thresholds": {
+        "additionalProperties": false,
+        "description": "Two thresholds per use case: score < low -> conforme, score >= high -> anomalie.",
+        "properties": {
+          "low": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Low",
+            "type": "number"
+          },
+          "high": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "High",
+            "type": "number"
+          }
+        },
+        "required": [
+          "low",
+          "high"
+        ],
+        "title": "Thresholds",
+        "type": "object"
+      },
+      "TrainingConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "use_case": {
+            "$ref": "#/components/schemas/UseCase"
+          },
+          "task": {
+            "enum": [
+              "classification",
+              "detection",
+              "segmentation",
+              "pose",
+              "anomaly"
+            ],
+            "title": "Task",
+            "type": "string"
+          },
+          "architecture": {
+            "description": "e.g. yolo26n-cls, yoloe-s, rf-detr-base",
+            "title": "Architecture",
+            "type": "string"
+          },
+          "base_weights": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Base Weights"
+          },
+          "image_size": {
+            "description": "(width, height) fed to the model",
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Image Size",
+            "type": "array"
+          },
+          "epochs": {
+            "minimum": 1,
+            "title": "Epochs",
+            "type": "integer"
+          },
+          "batch_size": {
+            "minimum": 1,
+            "title": "Batch Size",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "hyperparameters": {
+            "additionalProperties": true,
+            "title": "Hyperparameters",
+            "type": "object"
+          },
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetRef"
+          }
+        },
+        "required": [
+          "use_case",
+          "task",
+          "architecture",
+          "image_size",
+          "epochs",
+          "batch_size",
+          "dataset"
+        ],
+        "title": "TrainingConfig",
+        "type": "object"
+      },
+      "TrainingJob": {
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "trigger": {
+            "enum": [
+              "manual",
+              "policy",
+              "schedule"
+            ],
+            "title": "Trigger",
+            "type": "string"
+          },
+          "config": {
+            "$ref": "#/components/schemas/TrainingConfig"
+          },
+          "mlflow_experiment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mlflow Experiment Id"
+          },
+          "mlflow_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mlflow Run Id"
+          },
+          "compute": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "e.g. a100-cluster, databricks-job",
+            "title": "Compute"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ended At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "trigger",
+          "config",
+          "created_at"
+        ],
+        "title": "TrainingJob",
+        "type": "object"
+      },
+      "UseCase": {
+        "enum": [
+          "quality",
+          "workstation",
+          "safety"
+        ],
+        "title": "UseCase",
+        "type": "string"
+      },
+      "WorkstationDetails": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "workstation",
+            "default": "workstation",
+            "title": "Kind",
+            "type": "string"
+          },
+          "expected": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Expected",
+            "type": "array"
+          },
+          "detected": {
+            "items": {
+              "$ref": "#/components/schemas/DetectedObject"
+            },
+            "title": "Detected",
+            "type": "array"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "misplaced": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Misplaced",
+            "type": "array"
+          }
+        },
+        "title": "WorkstationDetails",
+        "type": "object"
+      }
+    }
+  }
+}

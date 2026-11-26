@@ -1,0 +1,930 @@
+[
+  {
+    "station_id": "WS-01",
+    "name": "Poste 01",
+    "cell": "A",
+    "simulated": false,
+    "online": true,
+    "last_seen_at": "2026-11-26T09:00:00Z",
+    "current_shift": {
+      "shift": {
+        "shift_id": "290ad887-81f7-5d7f-90b2-c39d15164717",
+        "station_id": "WS-01",
+        "name": "matin",
+        "status": "OPEN",
+        "started_at": "2026-11-26T06:00:00Z",
+        "planned_duration_min": 480,
+        "target_parts": 400,
+        "ended_at": null,
+        "planned_end_at": "2026-11-26T14:00:00Z"
+      },
+      "kpi": {
+        "window_start": "2026-11-26T06:00:00Z",
+        "window_end": "2026-11-26T09:00:00Z",
+        "elapsed_s": 10800.0,
+        "total_parts": 131,
+        "ok_parts": 126,
+        "nok_parts": 0,
+        "hold_parts": 3,
+        "error_parts": 2,
+        "predicted_ok_parts": 125,
+        "predicted_nok_parts": 1,
+        "predicted_hold_parts": 3,
+        "predicted_error_parts": 2,
+        "corrected_parts": 1,
+        "yield_rate": 0.9618320610687023,
+        "nok_rate": 0.0,
+        "pending_rate": 0.03816793893129771,
+        "correction_rate": 0.007633587786259542,
+        "target_parts": 400,
+        "target_progress": 0.315,
+        "actual_total_rate_per_hour": 43.666666666666664,
+        "actual_ok_rate_per_hour": 42.0,
+        "expected_ok_rate_per_hour": 50.0,
+        "expected_ok_parts_by_now": 150.0,
+        "efficiency": 0.84,
+        "mean_latency_ms": 4.3
+      }
+    },
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-01-CAM-Q",
+        "equipment_type": "camera",
+        "status": "ok",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-01-PLC",
+        "equipment_type": "plc",
+        "status": "ok",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-01",
+        "use_case": "quality",
+        "status": "loaded",
+        "model": {
+          "registered_model": "argos-quality",
+          "version": "3",
+          "alias": "champion",
+          "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+        },
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": "2026-11-26T06:00:00Z",
+        "error": null
+      }
+    ],
+    "open_alerts": 1
+  },
+  {
+    "station_id": "WS-02",
+    "name": "Poste 02",
+    "cell": "A",
+    "simulated": true,
+    "online": true,
+    "last_seen_at": "2026-11-26T09:00:00Z",
+    "current_shift": {
+      "shift": {
+        "shift_id": "2f34806d-a377-5bcf-87d0-958829a743b6",
+        "station_id": "WS-02",
+        "name": "matin",
+        "status": "OPEN",
+        "started_at": "2026-11-26T06:00:00Z",
+        "planned_duration_min": 480,
+        "target_parts": 400,
+        "ended_at": null,
+        "planned_end_at": "2026-11-26T14:00:00Z"
+      },
+      "kpi": {
+        "window_start": "2026-11-26T06:00:00Z",
+        "window_end": "2026-11-26T09:00:00Z",
+        "elapsed_s": 10800.0,
+        "total_parts": 109,
+        "ok_parts": 102,
+        "nok_parts": 5,
+        "hold_parts": 0,
+        "error_parts": 2,
+        "predicted_ok_parts": 102,
+        "predicted_nok_parts": 5,
+        "predicted_hold_parts": 0,
+        "predicted_error_parts": 2,
+        "corrected_parts": 0,
+        "yield_rate": 0.9357798165137615,
+        "nok_rate": 0.045871559633027525,
+        "pending_rate": 0.01834862385321101,
+        "correction_rate": 0.0,
+        "target_parts": 400,
+        "target_progress": 0.255,
+        "actual_total_rate_per_hour": 36.333333333333336,
+        "actual_ok_rate_per_hour": 34.0,
+        "expected_ok_rate_per_hour": 50.0,
+        "expected_ok_parts_by_now": 150.0,
+        "efficiency": 0.68,
+        "mean_latency_ms": 4.3
+      }
+    },
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-02-CAM-Q",
+        "equipment_type": "camera",
+        "status": "ok",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-02-PLC",
+        "equipment_type": "plc",
+        "status": "ok",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-02",
+        "use_case": "quality",
+        "status": "loaded",
+        "model": {
+          "registered_model": "argos-quality",
+          "version": "3",
+          "alias": "champion",
+          "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+        },
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": "2026-11-26T06:00:00Z",
+        "error": null
+      }
+    ],
+    "open_alerts": 0
+  },
+  {
+    "station_id": "WS-03",
+    "name": "Poste 03",
+    "cell": "A",
+    "simulated": true,
+    "online": true,
+    "last_seen_at": "2026-11-26T09:00:00Z",
+    "current_shift": {
+      "shift": {
+        "shift_id": "c1e6bf60-c2f2-53c7-ae01-01b646cd51c5",
+        "station_id": "WS-03",
+        "name": "matin",
+        "status": "OPEN",
+        "started_at": "2026-11-26T06:00:00Z",
+        "planned_duration_min": 480,
+        "target_parts": 400,
+        "ended_at": null,
+        "planned_end_at": "2026-11-26T14:00:00Z"
+      },
+      "kpi": {
+        "window_start": "2026-11-26T06:00:00Z",
+        "window_end": "2026-11-26T09:00:00Z",
+        "elapsed_s": 10800.0,
+        "total_parts": 117,
+        "ok_parts": 101,
+        "nok_parts": 14,
+        "hold_parts": 1,
+        "error_parts": 1,
+        "predicted_ok_parts": 100,
+        "predicted_nok_parts": 15,
+        "predicted_hold_parts": 1,
+        "predicted_error_parts": 1,
+        "corrected_parts": 1,
+        "yield_rate": 0.8632478632478633,
+        "nok_rate": 0.11965811965811966,
+        "pending_rate": 0.017094017094017096,
+        "correction_rate": 0.008547008547008548,
+        "target_parts": 400,
+        "target_progress": 0.2525,
+        "actual_total_rate_per_hour": 39.0,
+        "actual_ok_rate_per_hour": 33.666666666666664,
+        "expected_ok_rate_per_hour": 50.0,
+        "expected_ok_parts_by_now": 150.0,
+        "efficiency": 0.6733333333333333,
+        "mean_latency_ms": 4.3
+      }
+    },
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-03-CAM-Q",
+        "equipment_type": "camera",
+        "status": "ok",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-03-PLC",
+        "equipment_type": "plc",
+        "status": "ok",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-03",
+        "use_case": "quality",
+        "status": "loaded",
+        "model": {
+          "registered_model": "argos-quality",
+          "version": "3",
+          "alias": "champion",
+          "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+        },
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": "2026-11-26T06:00:00Z",
+        "error": null
+      }
+    ],
+    "open_alerts": 1
+  },
+  {
+    "station_id": "WS-04",
+    "name": "Poste 04",
+    "cell": "A",
+    "simulated": true,
+    "online": true,
+    "last_seen_at": "2026-11-26T09:00:00Z",
+    "current_shift": {
+      "shift": {
+        "shift_id": "9ba96bb3-61b4-5522-a171-00af30f63ce4",
+        "station_id": "WS-04",
+        "name": "matin",
+        "status": "OPEN",
+        "started_at": "2026-11-26T06:00:00Z",
+        "planned_duration_min": 480,
+        "target_parts": 400,
+        "ended_at": null,
+        "planned_end_at": "2026-11-26T14:00:00Z"
+      },
+      "kpi": {
+        "window_start": "2026-11-26T06:00:00Z",
+        "window_end": "2026-11-26T09:00:00Z",
+        "elapsed_s": 10800.0,
+        "total_parts": 114,
+        "ok_parts": 103,
+        "nok_parts": 7,
+        "hold_parts": 3,
+        "error_parts": 1,
+        "predicted_ok_parts": 100,
+        "predicted_nok_parts": 10,
+        "predicted_hold_parts": 3,
+        "predicted_error_parts": 1,
+        "corrected_parts": 3,
+        "yield_rate": 0.9035087719298246,
+        "nok_rate": 0.06140350877192982,
+        "pending_rate": 0.03508771929824561,
+        "correction_rate": 0.02631578947368421,
+        "target_parts": 400,
+        "target_progress": 0.2575,
+        "actual_total_rate_per_hour": 38.0,
+        "actual_ok_rate_per_hour": 34.333333333333336,
+        "expected_ok_rate_per_hour": 50.0,
+        "expected_ok_parts_by_now": 150.0,
+        "efficiency": 0.6866666666666666,
+        "mean_latency_ms": 4.3
+      }
+    },
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-04-CAM-Q",
+        "equipment_type": "camera",
+        "status": "ok",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-04-PLC",
+        "equipment_type": "plc",
+        "status": "ok",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-04",
+        "use_case": "quality",
+        "status": "loaded",
+        "model": {
+          "registered_model": "argos-quality",
+          "version": "3",
+          "alias": "champion",
+          "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+        },
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": "2026-11-26T06:00:00Z",
+        "error": null
+      }
+    ],
+    "open_alerts": 0
+  },
+  {
+    "station_id": "WS-05",
+    "name": "Poste 05",
+    "cell": "B",
+    "simulated": true,
+    "online": true,
+    "last_seen_at": "2026-11-26T09:00:00Z",
+    "current_shift": {
+      "shift": {
+        "shift_id": "a1f92bb6-d2f8-58bc-aea1-351c259037e9",
+        "station_id": "WS-05",
+        "name": "matin",
+        "status": "OPEN",
+        "started_at": "2026-11-26T06:00:00Z",
+        "planned_duration_min": 480,
+        "target_parts": 400,
+        "ended_at": null,
+        "planned_end_at": "2026-11-26T14:00:00Z"
+      },
+      "kpi": {
+        "window_start": "2026-11-26T06:00:00Z",
+        "window_end": "2026-11-26T09:00:00Z",
+        "elapsed_s": 10800.0,
+        "total_parts": 137,
+        "ok_parts": 119,
+        "nok_parts": 15,
+        "hold_parts": 2,
+        "error_parts": 1,
+        "predicted_ok_parts": 117,
+        "predicted_nok_parts": 17,
+        "predicted_hold_parts": 2,
+        "predicted_error_parts": 1,
+        "corrected_parts": 2,
+        "yield_rate": 0.8686131386861314,
+        "nok_rate": 0.10948905109489052,
+        "pending_rate": 0.021897810218978103,
+        "correction_rate": 0.014598540145985401,
+        "target_parts": 400,
+        "target_progress": 0.2975,
+        "actual_total_rate_per_hour": 45.666666666666664,
+        "actual_ok_rate_per_hour": 39.666666666666664,
+        "expected_ok_rate_per_hour": 50.0,
+        "expected_ok_parts_by_now": 150.0,
+        "efficiency": 0.7933333333333333,
+        "mean_latency_ms": 4.3
+      }
+    },
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-05-CAM-Q",
+        "equipment_type": "camera",
+        "status": "ok",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-05-PLC",
+        "equipment_type": "plc",
+        "status": "ok",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-05",
+        "use_case": "quality",
+        "status": "loaded",
+        "model": {
+          "registered_model": "argos-quality",
+          "version": "3",
+          "alias": "champion",
+          "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+        },
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": "2026-11-26T06:00:00Z",
+        "error": null
+      }
+    ],
+    "open_alerts": 1
+  },
+  {
+    "station_id": "WS-06",
+    "name": "Poste 06",
+    "cell": "B",
+    "simulated": true,
+    "online": true,
+    "last_seen_at": "2026-11-26T09:00:00Z",
+    "current_shift": {
+      "shift": {
+        "shift_id": "b4b05f7c-eee1-582a-b8d5-a34c75bc5f0b",
+        "station_id": "WS-06",
+        "name": "matin",
+        "status": "OPEN",
+        "started_at": "2026-11-26T06:00:00Z",
+        "planned_duration_min": 480,
+        "target_parts": 400,
+        "ended_at": null,
+        "planned_end_at": "2026-11-26T14:00:00Z"
+      },
+      "kpi": {
+        "window_start": "2026-11-26T06:00:00Z",
+        "window_end": "2026-11-26T09:00:00Z",
+        "elapsed_s": 10800.0,
+        "total_parts": 116,
+        "ok_parts": 110,
+        "nok_parts": 0,
+        "hold_parts": 4,
+        "error_parts": 2,
+        "predicted_ok_parts": 108,
+        "predicted_nok_parts": 2,
+        "predicted_hold_parts": 4,
+        "predicted_error_parts": 2,
+        "corrected_parts": 2,
+        "yield_rate": 0.9482758620689655,
+        "nok_rate": 0.0,
+        "pending_rate": 0.05172413793103448,
+        "correction_rate": 0.017241379310344827,
+        "target_parts": 400,
+        "target_progress": 0.275,
+        "actual_total_rate_per_hour": 38.666666666666664,
+        "actual_ok_rate_per_hour": 36.666666666666664,
+        "expected_ok_rate_per_hour": 50.0,
+        "expected_ok_parts_by_now": 150.0,
+        "efficiency": 0.7333333333333333,
+        "mean_latency_ms": 4.3
+      }
+    },
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-06-CAM-Q",
+        "equipment_type": "camera",
+        "status": "ok",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-06-PLC",
+        "equipment_type": "plc",
+        "status": "ok",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-06",
+        "use_case": "quality",
+        "status": "loaded",
+        "model": {
+          "registered_model": "argos-quality",
+          "version": "3",
+          "alias": "champion",
+          "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+        },
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": "2026-11-26T06:00:00Z",
+        "error": null
+      }
+    ],
+    "open_alerts": 0
+  },
+  {
+    "station_id": "WS-07",
+    "name": "Poste 07",
+    "cell": "B",
+    "simulated": true,
+    "online": true,
+    "last_seen_at": "2026-11-26T09:00:00Z",
+    "current_shift": {
+      "shift": {
+        "shift_id": "38eb3da3-8a8a-5f98-8feb-c4b06feaf636",
+        "station_id": "WS-07",
+        "name": "matin",
+        "status": "OPEN",
+        "started_at": "2026-11-26T06:00:00Z",
+        "planned_duration_min": 480,
+        "target_parts": 400,
+        "ended_at": null,
+        "planned_end_at": "2026-11-26T14:00:00Z"
+      },
+      "kpi": {
+        "window_start": "2026-11-26T06:00:00Z",
+        "window_end": "2026-11-26T09:00:00Z",
+        "elapsed_s": 10800.0,
+        "total_parts": 125,
+        "ok_parts": 119,
+        "nok_parts": 2,
+        "hold_parts": 2,
+        "error_parts": 2,
+        "predicted_ok_parts": 118,
+        "predicted_nok_parts": 3,
+        "predicted_hold_parts": 2,
+        "predicted_error_parts": 2,
+        "corrected_parts": 1,
+        "yield_rate": 0.952,
+        "nok_rate": 0.016,
+        "pending_rate": 0.032,
+        "correction_rate": 0.008,
+        "target_parts": 400,
+        "target_progress": 0.2975,
+        "actual_total_rate_per_hour": 41.666666666666664,
+        "actual_ok_rate_per_hour": 39.666666666666664,
+        "expected_ok_rate_per_hour": 50.0,
+        "expected_ok_parts_by_now": 150.0,
+        "efficiency": 0.7933333333333333,
+        "mean_latency_ms": 4.3
+      }
+    },
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-07-CAM-Q",
+        "equipment_type": "camera",
+        "status": "degraded",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-07-PLC",
+        "equipment_type": "plc",
+        "status": "ok",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-07",
+        "use_case": "quality",
+        "status": "loaded",
+        "model": {
+          "registered_model": "argos-quality",
+          "version": "3",
+          "alias": "champion",
+          "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+        },
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": "2026-11-26T06:00:00Z",
+        "error": null
+      }
+    ],
+    "open_alerts": 1
+  },
+  {
+    "station_id": "WS-08",
+    "name": "Poste 08",
+    "cell": "B",
+    "simulated": true,
+    "online": true,
+    "last_seen_at": "2026-11-26T09:00:00Z",
+    "current_shift": {
+      "shift": {
+        "shift_id": "060232dc-a215-5dce-895c-11ae2c831d16",
+        "station_id": "WS-08",
+        "name": "matin",
+        "status": "OPEN",
+        "started_at": "2026-11-26T06:00:00Z",
+        "planned_duration_min": 480,
+        "target_parts": 400,
+        "ended_at": null,
+        "planned_end_at": "2026-11-26T14:00:00Z"
+      },
+      "kpi": {
+        "window_start": "2026-11-26T06:00:00Z",
+        "window_end": "2026-11-26T09:00:00Z",
+        "elapsed_s": 10800.0,
+        "total_parts": 157,
+        "ok_parts": 144,
+        "nok_parts": 12,
+        "hold_parts": 1,
+        "error_parts": 0,
+        "predicted_ok_parts": 144,
+        "predicted_nok_parts": 12,
+        "predicted_hold_parts": 1,
+        "predicted_error_parts": 0,
+        "corrected_parts": 0,
+        "yield_rate": 0.9171974522292994,
+        "nok_rate": 0.07643312101910828,
+        "pending_rate": 0.006369426751592357,
+        "correction_rate": 0.0,
+        "target_parts": 400,
+        "target_progress": 0.36,
+        "actual_total_rate_per_hour": 52.333333333333336,
+        "actual_ok_rate_per_hour": 48.0,
+        "expected_ok_rate_per_hour": 50.0,
+        "expected_ok_parts_by_now": 150.0,
+        "efficiency": 0.96,
+        "mean_latency_ms": 4.3
+      }
+    },
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-08-CAM-Q",
+        "equipment_type": "camera",
+        "status": "ok",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-08-PLC",
+        "equipment_type": "plc",
+        "status": "ok",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-08",
+        "use_case": "quality",
+        "status": "loaded",
+        "model": {
+          "registered_model": "argos-quality",
+          "version": "3",
+          "alias": "champion",
+          "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+        },
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": "2026-11-26T06:00:00Z",
+        "error": null
+      }
+    ],
+    "open_alerts": 0
+  },
+  {
+    "station_id": "WS-09",
+    "name": "Poste 09",
+    "cell": "C",
+    "simulated": true,
+    "online": false,
+    "last_seen_at": "2026-11-26T07:35:00Z",
+    "current_shift": null,
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-09-CAM-Q",
+        "equipment_type": "camera",
+        "status": "down",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-09-PLC",
+        "equipment_type": "plc",
+        "status": "unknown",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-09",
+        "use_case": "quality",
+        "status": "absent",
+        "model": null,
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": null,
+        "error": null
+      }
+    ],
+    "open_alerts": 0
+  },
+  {
+    "station_id": "WS-10",
+    "name": "Poste 10",
+    "cell": "C",
+    "simulated": true,
+    "online": true,
+    "last_seen_at": "2026-11-26T09:00:00Z",
+    "current_shift": {
+      "shift": {
+        "shift_id": "6ab516d9-e5ea-5244-a153-29429e3cafaf",
+        "station_id": "WS-10",
+        "name": "matin",
+        "status": "OPEN",
+        "started_at": "2026-11-26T06:00:00Z",
+        "planned_duration_min": 480,
+        "target_parts": 400,
+        "ended_at": null,
+        "planned_end_at": "2026-11-26T14:00:00Z"
+      },
+      "kpi": {
+        "window_start": "2026-11-26T06:00:00Z",
+        "window_end": "2026-11-26T09:00:00Z",
+        "elapsed_s": 10800.0,
+        "total_parts": 126,
+        "ok_parts": 117,
+        "nok_parts": 7,
+        "hold_parts": 1,
+        "error_parts": 1,
+        "predicted_ok_parts": 114,
+        "predicted_nok_parts": 10,
+        "predicted_hold_parts": 1,
+        "predicted_error_parts": 1,
+        "corrected_parts": 3,
+        "yield_rate": 0.9285714285714286,
+        "nok_rate": 0.05555555555555555,
+        "pending_rate": 0.015873015873015872,
+        "correction_rate": 0.023809523809523808,
+        "target_parts": 400,
+        "target_progress": 0.2925,
+        "actual_total_rate_per_hour": 42.0,
+        "actual_ok_rate_per_hour": 39.0,
+        "expected_ok_rate_per_hour": 50.0,
+        "expected_ok_parts_by_now": 150.0,
+        "efficiency": 0.78,
+        "mean_latency_ms": 4.3
+      }
+    },
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-10-CAM-Q",
+        "equipment_type": "camera",
+        "status": "ok",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-10-PLC",
+        "equipment_type": "plc",
+        "status": "ok",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-10",
+        "use_case": "quality",
+        "status": "loaded",
+        "model": {
+          "registered_model": "argos-quality",
+          "version": "3",
+          "alias": "champion",
+          "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+        },
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": "2026-11-26T06:00:00Z",
+        "error": null
+      }
+    ],
+    "open_alerts": 0
+  },
+  {
+    "station_id": "WS-11",
+    "name": "Poste 11",
+    "cell": "C",
+    "simulated": true,
+    "online": true,
+    "last_seen_at": "2026-11-26T09:00:00Z",
+    "current_shift": {
+      "shift": {
+        "shift_id": "28ee8685-3653-59c2-bb69-a430a03da2c2",
+        "station_id": "WS-11",
+        "name": "matin",
+        "status": "OPEN",
+        "started_at": "2026-11-26T06:00:00Z",
+        "planned_duration_min": 480,
+        "target_parts": 400,
+        "ended_at": null,
+        "planned_end_at": "2026-11-26T14:00:00Z"
+      },
+      "kpi": {
+        "window_start": "2026-11-26T06:00:00Z",
+        "window_end": "2026-11-26T09:00:00Z",
+        "elapsed_s": 10800.0,
+        "total_parts": 155,
+        "ok_parts": 140,
+        "nok_parts": 14,
+        "hold_parts": 0,
+        "error_parts": 1,
+        "predicted_ok_parts": 138,
+        "predicted_nok_parts": 16,
+        "predicted_hold_parts": 0,
+        "predicted_error_parts": 1,
+        "corrected_parts": 2,
+        "yield_rate": 0.9032258064516129,
+        "nok_rate": 0.09032258064516129,
+        "pending_rate": 0.0064516129032258064,
+        "correction_rate": 0.012903225806451613,
+        "target_parts": 400,
+        "target_progress": 0.35,
+        "actual_total_rate_per_hour": 51.666666666666664,
+        "actual_ok_rate_per_hour": 46.666666666666664,
+        "expected_ok_rate_per_hour": 50.0,
+        "expected_ok_parts_by_now": 150.0,
+        "efficiency": 0.9333333333333333,
+        "mean_latency_ms": 4.3
+      }
+    },
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-11-CAM-Q",
+        "equipment_type": "camera",
+        "status": "ok",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-11-PLC",
+        "equipment_type": "plc",
+        "status": "ok",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-11",
+        "use_case": "quality",
+        "status": "loaded",
+        "model": {
+          "registered_model": "argos-quality",
+          "version": "3",
+          "alias": "champion",
+          "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+        },
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": "2026-11-26T06:00:00Z",
+        "error": null
+      }
+    ],
+    "open_alerts": 0
+  },
+  {
+    "station_id": "WS-12",
+    "name": "Poste 12",
+    "cell": "C",
+    "simulated": true,
+    "online": true,
+    "last_seen_at": "2026-11-26T09:00:00Z",
+    "current_shift": {
+      "shift": {
+        "shift_id": "54f6f653-6c88-521f-a3ea-66a190abfe44",
+        "station_id": "WS-12",
+        "name": "matin",
+        "status": "OPEN",
+        "started_at": "2026-11-26T06:00:00Z",
+        "planned_duration_min": 480,
+        "target_parts": 400,
+        "ended_at": null,
+        "planned_end_at": "2026-11-26T14:00:00Z"
+      },
+      "kpi": {
+        "window_start": "2026-11-26T06:00:00Z",
+        "window_end": "2026-11-26T09:00:00Z",
+        "elapsed_s": 10800.0,
+        "total_parts": 130,
+        "ok_parts": 116,
+        "nok_parts": 10,
+        "hold_parts": 4,
+        "error_parts": 0,
+        "predicted_ok_parts": 114,
+        "predicted_nok_parts": 12,
+        "predicted_hold_parts": 4,
+        "predicted_error_parts": 0,
+        "corrected_parts": 2,
+        "yield_rate": 0.8923076923076924,
+        "nok_rate": 0.07692307692307693,
+        "pending_rate": 0.03076923076923077,
+        "correction_rate": 0.015384615384615385,
+        "target_parts": 400,
+        "target_progress": 0.29,
+        "actual_total_rate_per_hour": 43.333333333333336,
+        "actual_ok_rate_per_hour": 38.666666666666664,
+        "expected_ok_rate_per_hour": 50.0,
+        "expected_ok_parts_by_now": 150.0,
+        "efficiency": 0.7733333333333333,
+        "mean_latency_ms": 4.3
+      }
+    },
+    "equipment": [
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-12-CAM-Q",
+        "equipment_type": "camera",
+        "status": "ok",
+        "detail": null
+      },
+      {
+        "kind": "equipment.status",
+        "equipment_id": "WS-12-PLC",
+        "equipment_type": "plc",
+        "status": "ok",
+        "detail": null
+      }
+    ],
+    "models": [
+      {
+        "station_id": "WS-12",
+        "use_case": "quality",
+        "status": "loaded",
+        "model": {
+          "registered_model": "argos-quality",
+          "version": "3",
+          "alias": "champion",
+          "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+        },
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded_at": "2026-11-26T06:00:00Z",
+        "error": null
+      }
+    ],
+    "open_alerts": 0
+  }
+]

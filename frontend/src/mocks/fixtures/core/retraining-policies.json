@@ -1,0 +1,22 @@
+[
+  {
+    "use_case": "quality",
+    "enabled": true,
+    "min_new_labels": 200,
+    "max_drift_alerts": 3,
+    "min_human_agreement": 0.9,
+    "schedule_cron": null,
+    "auto_train": true,
+    "deployment_requires_approval": true
+  },
+  {
+    "use_case": "safety",
+    "enabled": false,
+    "min_new_labels": null,
+    "max_drift_alerts": null,
+    "min_human_agreement": null,
+    "schedule_cron": null,
+    "auto_train": false,
+    "deployment_requires_approval": true
+  }
+]

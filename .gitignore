@@ -35,6 +35,22 @@ dist/
 .ruff_cache/
 .ipynb_checkpoints/
 
+# --- Confidential material kept outside the repository ---
+data_train/
+*.zip
+
+# --- Frontend ---
+node_modules/
+frontend/dist/
+.env.local
+.env.*.local
+
+# --- MLOps local stores (DVC cache, MLflow local tracking) ---
+mlruns/
+mlartifacts/
+.dvc/cache/
+.dvc/tmp/
+
 # --- Environment / IDE ---
 .env
 .vscode/

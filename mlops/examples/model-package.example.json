@@ -1,0 +1,108 @@
+{
+  "package_schema": "argos.model-package/1",
+  "use_case": "quality",
+  "model": {
+    "registered_model": "argos-quality",
+    "version": "3",
+    "alias": "champion",
+    "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073"
+  },
+  "analyzer_class": "usecases.quality.analyzer:OnnxAnalyzer",
+  "runtime": "onnxruntime",
+  "device": "cpu",
+  "artifact": {
+    "uri": "model.onnx",
+    "sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+    "size_bytes": 6291456,
+    "format": "onnx"
+  },
+  "preprocessing": {
+    "input_size": [
+      224,
+      224
+    ],
+    "color": "RGB",
+    "resize": "letterbox",
+    "normalize_mean": null,
+    "normalize_std": null,
+    "roi": null
+  },
+  "classes": [
+    "OK",
+    "NOK"
+  ],
+  "thresholds": {
+    "low": 0.3,
+    "high": 0.6
+  },
+  "params": {
+    "top_k": 1
+  },
+  "dataset": {
+    "name": "ref-part-a",
+    "version": "v1.0",
+    "uri": "dvc://argos/datasets/ref-part-a",
+    "manifest_sha256": "3ccdaa3b5434a13dc7da324db5485ed6dee0afb8c49e8275ac676e7358713234",
+    "num_samples": 1000,
+    "splits": {
+      "train": 700,
+      "val": 150,
+      "test": 150
+    },
+    "split_strategy": "by_sequence",
+    "confidential": true,
+    "classes": [
+      "OK",
+      "NOK"
+    ]
+  },
+  "evaluation": {
+    "mlflow_run_id": "e5e36cca-43ed-5c9a-84cb-3992e073",
+    "dataset": {
+      "name": "ref-part-a",
+      "version": "v1.0",
+      "uri": "dvc://argos/datasets/ref-part-a",
+      "manifest_sha256": "3ccdaa3b5434a13dc7da324db5485ed6dee0afb8c49e8275ac676e7358713234",
+      "num_samples": 1000,
+      "splits": {
+        "train": 700,
+        "val": 150,
+        "test": 150
+      },
+      "split_strategy": "by_sequence",
+      "confidential": true,
+      "classes": [
+        "OK",
+        "NOK"
+      ]
+    },
+    "split": "test",
+    "metrics": {
+      "recall_nok": 0.991,
+      "false_reject_rate": 0.043,
+      "accuracy": 0.968
+    },
+    "per_class": {},
+    "confusion_matrix": [
+      [
+        118,
+        5
+      ],
+      [
+        1,
+        102
+      ]
+    ],
+    "class_order": [
+      "OK",
+      "NOK"
+    ],
+    "recommended_thresholds": {
+      "low": 0.3,
+      "high": 0.6
+    },
+    "latency_ms_p50_cpu": 3.8,
+    "latency_ms_p95_cpu": 6.1
+  },
+  "created_at": "2026-11-25T06:00:00Z"
+}

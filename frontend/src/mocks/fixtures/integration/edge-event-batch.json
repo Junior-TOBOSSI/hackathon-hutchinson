@@ -1,0 +1,257 @@
+{
+  "station_id": "WS-01",
+  "sent_at": "2026-11-26T09:00:00Z",
+  "events": [
+    {
+      "schema_version": "argos.edge-event/1",
+      "event_id": "f6849afd-1078-56d1-91df-fee450ba50bc",
+      "event_type": "shift.opened",
+      "station_id": "WS-01",
+      "edge_sequence": 101,
+      "occurred_at": "2026-11-26T06:00:00Z",
+      "simulated": false,
+      "camera_id": null,
+      "cycle_id": null,
+      "part_id": null,
+      "use_case": null,
+      "model_name": null,
+      "model_version": null,
+      "score": null,
+      "decision": null,
+      "verdict": null,
+      "payload": {
+        "kind": "shift",
+        "shift": {
+          "shift_id": "cfd15730-1e70-5493-8ed9-3569642baa6d",
+          "station_id": "WS-01",
+          "name": "matin",
+          "status": "OPEN",
+          "started_at": "2026-11-26T06:00:00Z",
+          "planned_duration_min": 480,
+          "target_parts": 400,
+          "ended_at": null,
+          "planned_end_at": "2026-11-26T14:00:00Z"
+        }
+      }
+    },
+    {
+      "schema_version": "argos.edge-event/1",
+      "event_id": "2f8f969b-5e97-561e-ad41-9e54b2551414",
+      "event_type": "inference",
+      "station_id": "WS-01",
+      "edge_sequence": 102,
+      "occurred_at": "2026-11-26T08:52:00Z",
+      "simulated": false,
+      "camera_id": "CAM-Q",
+      "cycle_id": "C-20261126-000412",
+      "part_id": null,
+      "use_case": "quality",
+      "model_name": "argos-quality",
+      "model_version": "3",
+      "score": 0.82,
+      "decision": "anomalie",
+      "verdict": null,
+      "payload": {
+        "kind": "inference",
+        "event": {
+          "use_case": "quality",
+          "score": 0.82,
+          "latency_ms": 4.1,
+          "model_name": "argos-quality",
+          "model_version": "3",
+          "details": {
+            "kind": "quality",
+            "zones": [
+              {
+                "bbox": {
+                  "x1": 0.21,
+                  "y1": 0.3,
+                  "x2": 0.42,
+                  "y2": 0.55
+                },
+                "score": 0.82
+              }
+            ],
+            "heatmap_ref": null
+          },
+          "event_id": "460ca35f-37d2-5284-929b-cf90a55ed504",
+          "frame": {
+            "frame_id": "cycle:WS-01:C-20261126-000412",
+            "timestamp": "2026-11-26T08:52:00Z",
+            "workstation_id": "WS-01",
+            "camera_id": "CAM-Q"
+          },
+          "decision": "anomalie",
+          "thresholds_used": {
+            "low": 0.4,
+            "high": 0.7
+          },
+          "operator_feedback": null
+        }
+      }
+    },
+    {
+      "schema_version": "argos.edge-event/1",
+      "event_id": "b60fab1b-9c77-5bec-99ab-8d81e0ece703",
+      "event_type": "part.recorded",
+      "station_id": "WS-01",
+      "edge_sequence": 103,
+      "occurred_at": "2026-11-26T08:52:00Z",
+      "simulated": false,
+      "camera_id": "CAM-Q",
+      "cycle_id": "C-20261126-000412",
+      "part_id": "3a157ee8-9d9c-57bc-aa6a-a082bcedced7",
+      "use_case": "quality",
+      "model_name": null,
+      "model_version": null,
+      "score": null,
+      "decision": null,
+      "verdict": "NOK",
+      "payload": {
+        "kind": "part.recorded",
+        "part": {
+          "part_id": "3a157ee8-9d9c-57bc-aa6a-a082bcedced7",
+          "station_id": "WS-01",
+          "cycle_id": "C-20261126-000412",
+          "shift_id": "cfd15730-1e70-5493-8ed9-3569642baa6d",
+          "created_at": "2026-11-26T08:52:00Z",
+          "trigger_source": "plc",
+          "camera_id": "CAM-Q",
+          "image_sha256": "15e336bfd131a5d9ad7beb9b1619bb4fd73d992cc9be9445d2706d1f49cc4c05",
+          "predicted_verdict": "NOK",
+          "prediction": {
+            "verdict": "NOK",
+            "ai_decision": "anomalie",
+            "score": 0.82,
+            "model_name": "argos-quality",
+            "model_version": "3",
+            "thresholds_used": {
+              "low": 0.4,
+              "high": 0.7
+            },
+            "event_id": "460ca35f-37d2-5284-929b-cf90a55ed504",
+            "latency_ms": 4.2
+          },
+          "error": null,
+          "effective_verdict": "NOK",
+          "correction_count": 0,
+          "disposition": "UNKNOWN",
+          "disposition_note": null,
+          "disposition_updated_at": null
+        }
+      }
+    },
+    {
+      "schema_version": "argos.edge-event/1",
+      "event_id": "4f5507ee-e31a-561b-a0a8-510d699f7b8a",
+      "event_type": "part.corrected",
+      "station_id": "WS-01",
+      "edge_sequence": 104,
+      "occurred_at": "2026-11-26T08:54:00Z",
+      "simulated": false,
+      "camera_id": null,
+      "cycle_id": "C-20261126-000412",
+      "part_id": "3a157ee8-9d9c-57bc-aa6a-a082bcedced7",
+      "use_case": null,
+      "model_name": null,
+      "model_version": null,
+      "score": null,
+      "decision": null,
+      "verdict": "OK",
+      "payload": {
+        "kind": "part.corrected",
+        "correction": {
+          "correction_id": "3ea7d73f-633e-51d4-af35-00a71d412bff",
+          "part_id": "3a157ee8-9d9c-57bc-aa6a-a082bcedced7",
+          "sequence": 1,
+          "previous_verdict": "NOK",
+          "new_verdict": "OK",
+          "reason": "Pièce vérifiée conforme, faux rejet (reflet)",
+          "actor_role": "operator",
+          "physical_inspection": true,
+          "at": "2026-11-26T08:54:00Z"
+        }
+      }
+    },
+    {
+      "schema_version": "argos.edge-event/1",
+      "event_id": "937f43c1-3bc8-5adc-bf66-662bc76424d1",
+      "event_type": "operator.report",
+      "station_id": "WS-01",
+      "edge_sequence": 105,
+      "occurred_at": "2026-11-26T08:45:00Z",
+      "simulated": false,
+      "camera_id": null,
+      "cycle_id": null,
+      "part_id": null,
+      "use_case": null,
+      "model_name": null,
+      "model_version": null,
+      "score": null,
+      "decision": null,
+      "verdict": null,
+      "payload": {
+        "kind": "operator.report",
+        "report_id": "e94a1a72-3ad0-5c78-a4b7-244c19eed855",
+        "category": "quality",
+        "severity": "warning",
+        "message": "Beaucoup de rejets sur la pièce de référence depuis 7 h",
+        "actor_role": "operator",
+        "related_part_id": "3a157ee8-9d9c-57bc-aa6a-a082bcedced7",
+        "related_event_id": null
+      }
+    },
+    {
+      "schema_version": "argos.edge-event/1",
+      "event_id": "f48f360e-8e4a-53c1-b8d8-514b2467afb1",
+      "event_type": "equipment.status",
+      "station_id": "WS-01",
+      "edge_sequence": 106,
+      "occurred_at": "2026-11-26T08:46:00Z",
+      "simulated": false,
+      "camera_id": "CAM-Q",
+      "cycle_id": null,
+      "part_id": null,
+      "use_case": null,
+      "model_name": null,
+      "model_version": null,
+      "score": null,
+      "decision": null,
+      "verdict": null,
+      "payload": {
+        "kind": "equipment.status",
+        "equipment_id": "WS-01-CAM-Q",
+        "equipment_type": "camera",
+        "status": "ok",
+        "detail": null
+      }
+    },
+    {
+      "schema_version": "argos.edge-event/1",
+      "event_id": "eb76378b-b651-5114-a25e-3667137d11bb",
+      "event_type": "model.status",
+      "station_id": "WS-01",
+      "edge_sequence": 107,
+      "occurred_at": "2026-11-26T06:01:00Z",
+      "simulated": false,
+      "camera_id": null,
+      "cycle_id": null,
+      "part_id": null,
+      "use_case": "quality",
+      "model_name": "argos-quality",
+      "model_version": "3",
+      "score": null,
+      "decision": null,
+      "verdict": null,
+      "payload": {
+        "kind": "model.status",
+        "use_case": "quality",
+        "model_name": "argos-quality",
+        "model_version": "3",
+        "package_sha256": "abdf7a0c7cf1edb79434722f2d1df660695231efee9e9329ffa4c79b3dc6370b",
+        "loaded": true,
+        "error": null
+      }
+    }
+  ]
+}

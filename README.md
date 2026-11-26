@@ -60,6 +60,11 @@ ruff check . && ruff format .   # lint et formatage
 ```
 visionhub/            socle commun : contrats, décision, registre, chaîne d'analyse, API
   contracts.py        ← les schémas de données (cœur du dépôt)
+  production/         ARGOS Production Engine : cycles PLC, pièces, shifts, corrections, KPI
+  argos_app.py        point d'entrée TEMPORAIRE : API historique + /production
+  integration/        contrats ARGOS partagés : Edge→Core, Core, MLOps, PPE/Behavior, fixtures
+frontend/             ARGOS Frontend (React) : espaces Opérateur, Superviseur, AI Leader
+mlops/                ARGOS MLOps (DVC, MLflow) : périmètre et contrats
 usecases/
   quality/            ← binôme qualité
   workstation/        ← binôme poste de travail
@@ -74,6 +79,9 @@ dashboard/app.py      tableau de bord Streamlit (aucune logique métier)
 tests/                tests du socle, dont test_contract.py
 data/                 données locales, jamais versionnées (voir data/README.md)
 docs/architecture.md  architecture en une page
+docs/production-engine.md  ARGOS Production Engine (cycles, verdicts, KPI, endpoints)
+docs/integration-contracts.md  contrats d'intégration des cinq groupes et catalogue des endpoints
+docs/team-workstreams.md   répartition des groupes : branches, périmètres, livrables, tests
 ```
 
 Les paramètres se règlent par variables d'environnement (`.env`), toutes documentées dans [.env.example](.env.example). Pour changer de source d'images, par exemple : `SOURCE=folder` et `SOURCE_PATH=data/test/quality`.
