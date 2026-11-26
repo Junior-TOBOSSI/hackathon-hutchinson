@@ -108,6 +108,22 @@ def arm(img: np.ndarray, tip_x: float, tip_y: float) -> None:
     cv2.circle(img, _px(tip_x, tip_y), 45, skin, -1)
 
 
+def camera_jitter(
+    image: np.ndarray, rng: np.random.Generator, strength: float = 0.02
+) -> np.ndarray:
+    """Another shot of the same camera: small perspective change, light, noise, JPEG."""
+    h, w = image.shape[:2]
+    corners = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
+    moved = (corners + rng.uniform(-strength, strength, (4, 2)) * [w, h]).astype(np.float32)
+    shot = cv2.warpPerspective(
+        image, cv2.getPerspectiveTransform(corners, moved), (w, h), borderMode=cv2.BORDER_REFLECT
+    )
+    shot = cv2.convertScaleAbs(shot, alpha=rng.uniform(0.85, 1.15), beta=rng.uniform(-15, 15))
+    shot = np.clip(shot + rng.normal(0, rng.uniform(1, 4), shot.shape), 0, 255).astype(np.uint8)
+    ok, jpg = cv2.imencode(".jpg", shot, [cv2.IMWRITE_JPEG_QUALITY, int(rng.integers(70, 95))])
+    return cv2.imdecode(jpg, cv2.IMREAD_COLOR)
+
+
 def noise(img: np.ndarray, seed: int) -> np.ndarray:
     rng = np.random.default_rng(seed)
     return np.clip(img.astype(np.int16) + rng.normal(0, 3, img.shape), 0, 255).astype(np.uint8)

@@ -91,6 +91,8 @@ def change_mask(
     reference: np.ndarray,
     diff_threshold: float,
     valid: np.ndarray | None = None,
+    spread: np.ndarray | None = None,
+    k: float = 4.0,
 ) -> np.ndarray:
     """Boolean mask (H, W) of the pixels that differ from the reference image.
 
@@ -102,6 +104,10 @@ def change_mask(
 
     Why colour and not grayscale: an orange box on a grey bench can have the SAME
     brightness as the bench; in grayscale it would be invisible.
+
+    With a learned normal model (normal.py), ``reference`` is the MEAN of the conforming
+    photos (float32, already smoothed) and ``spread`` their per-pixel standard deviation:
+    the threshold becomes max(diff_threshold, k * spread), so normal variation is ignored.
     """
     h, w = image.shape[:2]
     if reference.shape[:2] != (h, w):
@@ -109,12 +115,18 @@ def change_mask(
     if valid is None:
         valid = np.ones((h, w), dtype=bool)
 
-    current, ref = _smooth(image), _smooth(reference)
+    current = _smooth(image)
+    ref = reference if reference.dtype == np.float32 else _smooth(reference)
     # If the whole scene got brighter or darker (light switched on, cloud), scale each
     # channel back to the reference level, so that only LOCAL changes remain.
     current *= ref[valid].mean(axis=0) / np.maximum(current[valid].mean(axis=0), 1.0)
 
-    changed = (np.abs(current - ref).max(axis=2) > diff_threshold) & valid
+    threshold: float | np.ndarray = diff_threshold
+    if spread is not None:
+        if spread.shape != (h, w):
+            spread = cv2.resize(spread, (w, h), interpolation=cv2.INTER_LINEAR)
+        threshold = np.maximum(diff_threshold, k * spread)
+    changed = (np.abs(current - ref).max(axis=2) > threshold) & valid
 
     # Opening removes isolated pixels, closing fills small holes inside an object.
     kernel = np.ones((5, 5), np.uint8)

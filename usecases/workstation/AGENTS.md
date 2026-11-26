@@ -15,34 +15,31 @@ Vérifier que le poste est configuré comme la référence : objets attendus pr�
   ```
 
 ## État actuel
-Chaîne « une photo contre la référence client » en place : alignement, emplacements d'éléments, zones sans objet ni personne (`model.py:ZoneWorkstationAnalyzer` v0.2.0), plus génération de variantes et évaluation sur les deux images disponibles (`stations/poste1.yaml`, `stations/poste2.yaml`). Détails et résultats dans [README.md](README.md). Le faux analyseur (`analyzer.py`) reste disponible.
+**Jeu de référence : `dataset_5S_80_496x325`** (depuis le 2026-11-26). Les essais précédents sur deux images isolées (poste1, poste2) ont été supprimés. Analyseur `model.py:ZoneWorkstationAnalyzer` v0.3.0 : alignement sur la meilleure vue, normalité apprise sur les photos conformes, zones `zone_interdite` et `plan_de_travail`, emplacements des outils. Mesure en validation croisée : 50/50 anomalies détectées, 1/29 fausse alerte. Détails dans [README.md](README.md).
 
 ## Décisions prises
 <!-- Une ligne par décision : AAAA-MM-JJ HH:MM — décision — raison. -->
-- 2026-11-26 — Deux couches : détection sur toute l'image (nomme l'objet) + différence avec la référence (attrape **n'importe quel** objet, même inconnu du modèle).
-- 2026-11-26 — Zones et emplacements en polygones **normalisés**, un fichier par poste dans `stations/` : indépendants de la résolution, aucune image versionnée.
-- 2026-11-26 — Objet « dans la zone » si **15 % de sa boîte** la recouvre (et non le centre de la boîte).
-- 2026-11-26 — Différence en **couleur**, pas en niveaux de gris (une boîte orange sur un établi gris passait inaperçue) ; compensation globale de la luminosité.
-- 2026-11-26 — Écarts écrits `"<label>@<zone>"` dans `misplaced`, objet inconnu `unknown_object` dans `detected` : **aucune modification du contrat**.
-- 2026-11-26 — Inférence à blanc au chargement (première inférence YOLO sur CPU ≈ 2,6 s > limite du test de contrat) ; `sync=False` ; poids dans `data/models/workstation/`.
-- 2026-11-26 — Précision client : **une photo** au début de la prise de poste, comparée à **la référence fournie par le client** ; persistance ramenée à 1 ; la main n'est pas un sujet.
-- 2026-11-26 — **Alignement** SIFT + RANSAC avant toute comparaison (la référence ne vient pas de notre caméra) ; échec → `alignment_failed` en `a_verifier`, jamais un verdict deviné.
-- 2026-11-26 — **Emplacements d'éléments** sur la référence : « pas à sa place » = l'emplacement a changé à plus de 25 %. Aucun modèle requis.
-- 2026-11-26 — Zones d'intérêt : **ni objet ni personne** (`ignore_labels` vide par défaut).
-- 2026-11-26 — Score d'un objet dans une zone = la plus forte des deux preuves (détecteur, taille du changement), au moins 0,45 (`a_verifier`) : un détecteur hésitant (personne à 0,38) masquait un changement net.
-- 2026-11-26 — Jeu de test **généré** depuis les deux seules images disponibles (variantes avec vérité terrain), pas d'images aspirées du web ; les photos du mini poste serviront de jeu réel.
+- 2026-11-26 — Une **photo** au début de la prise de poste, comparée à la référence ; persistance 1.
+- 2026-11-26 — `dataset_5S_80_496x325` fait foi ; l'ancien travail (poste1/poste2, nettoyage de capture, variantes générées) est supprimé.
+- 2026-11-26 — **Deux vues** (cadrages A et B) : une photo B ne s'aligne pas sur la référence A (19 correspondances, homographie fausse). La référence B est `good_017.png`, exclue de la mesure.
+- 2026-11-26 — **Normalité apprise** (moyenne + dispersion par pixel) au lieu d'une image unique : avec une seule référence, 29/29 photos conformes étaient en fausse alerte (panneau, hachures, bacs qui varient d'une photo à l'autre).
+- 2026-11-26 — Réglage `normal_k` = 4, `diff_threshold` = 25 : milieu de la plage stable (k = 3 à 4 donnent le même résultat), pour ne pas coller au petit jeu.
+- 2026-11-26 — Mesure en **validation croisée en 5 groupes** sur les photos conformes.
+- 2026-11-26 — Le détecteur ne fait que **nommer** un changement, il ne déclenche jamais d'alerte seul : COCO voyait l'établi comme un « refrigerator » et ajoutait 5 fausses alertes. Détecteur `none` par défaut sur ce poste.
+- 2026-11-26 — Tout changement dans une zone vaut au moins 0,45 (`a_verifier`) : « aucun élément » veut dire aucun.
+- 2026-11-26 — Différence en **couleur**, luminosité compensée ; alignement SIFT + RANSAC ; aucune modification du contrat (`"<label>@<zone>"` dans `misplaced`).
 
 ## Questions ouvertes
 <!-- Questions sur le besoin métier ou les données, à poser à l'équipe ou à Hutchinson. -->
-- « Ce qui n'est pas à sa place » : seulement les éléments listés (emplacements), ou **tout changement** sur le poste (objet inconnu posé hors zone) ? Aujourd'hui : seulement les emplacements et les zones.
-- Zones `operator_spot` (l'opérateur **doit** y être, comme dans l'ancien système du client) : à prévoir ?
-- Les zones et emplacements de `stations/` ont été placés à l'œil : à valider ou redessiner avec `draw_zones.py`.
-- Contrat : un champ `foreign: list[str]` serait plus clair que `misplaced` pour les objets dans une zone interdite (modification de `contracts.py`, à décider en équipe).
-- Racine du dépôt : extra `workstation` à passer à `ultralytics>=8.4` (YOLO26) ; ajouter `*.ts` au `.gitignore` (encodeur de texte YOLOE).
+- `good_029` (bac bleu nettement décalé, étiqueté conforme) : est-ce un écart 5S pour le client ?
+- Les étiquettes du jeu sont « indicatives, non validées » : à faire confirmer avant de citer les chiffres.
+- En production : une référence **et quelques photos conformes** par caméra (pour apprendre la normalité). Combien le client peut-il en fournir ?
+- Contrat : un champ `foreign: list[str]` serait plus clair que `misplaced` (modification de `contracts.py`, à décider en équipe).
+- Racine du dépôt : extra `workstation` à passer à `ultralytics>=8.4` ; ajouter `*.ts` au `.gitignore`.
 
 ## Résultats
-Variantes générées (seed 0, `--n 10`), CPU du PC de dev, seuils 0,4 / 0,7 :
-- poste1 : 24/24 alertes levées pour la bonne raison, 0/20 fausse alerte (sans détecteur comme avec COCO).
-- poste2 : 25/26, 0/20 ; le raté est un petit objet gris sur sol gris.
-- Latence : ≈ 0,4 s sans détecteur, ≈ 0,8 s avec YOLO26n COCO (alignement SIFT compris).
-- À refaire sur les photos réelles du mini poste (jeu mis de côté dans `data/test/workstation`).
+`dataset_5S_80_496x325`, validation croisée en 5 groupes, sans détecteur, seuils 0,4 / 0,7, CPU :
+- anomalies : 50/50 alertes (38/38 désordres, 12/12 violations de zone), toutes pour la bonne raison ;
+- photos conformes : 1/29 fausse alerte (`good_029`) ;
+- alignement : 0 échec sur 79 photos (vue A : 32, vue B : 47) ;
+- latence : ≈ 0,25 s par photo.

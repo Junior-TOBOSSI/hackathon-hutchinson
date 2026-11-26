@@ -1,30 +1,32 @@
-"""Workstation analyzer: compare ONE photo of the station with the reference image.
+"""Workstation analyzer (5S): compare ONE photo of the station with its reference.
 
-Business need (client, 2026-11-26): at the start of the shift, one photo of the station is
-taken and compared with the reference image provided by the client, to find
-(a) what is NOT IN ITS PLACE and (b) any object OR PERSON in a zone that must stay empty.
+Business need: at the start of the shift, one photo of the station is compared with the
+reference, to find (a) what is NOT IN ITS PLACE and (b) any object OR PERSON in a zone
+that must stay empty. The station (views, boxes, conforming photos) is described in
+``stations/<name>.yaml`` (station.py); config.yaml points to it.
 
 For every photo:
 
-0. ALIGN (``align: true``): the photo is warped onto the reference (align.py). If the
-   alignment fails, the answer is "alignment_failed" with a medium score (a_verifier):
-   a human looks, the system does not guess.
-1. IDENTIFY: an object detector runs on the whole (aligned) image; every detection goes to
-   ``details.detected``. Expected labels that are not seen go to ``details.missing``.
-2. CHANGES: one mask of the pixels that differ from the reference (zones.change_mask).
-3. ELEMENT SLOTS (``element_slots``): each element has its place drawn on the reference.
-   If a large share of the slot changed, the element is not in its place: it goes to
-   ``missing`` (or ``misplaced`` if the detector sees it elsewhere).
-4. EMPTY ZONES (``empty_zones``): a detected object or person overlapping the zone, or a
-   changed region no detection explains (``unknown_object``), is a violation, written
-   ``"<label>@<zone>"`` in ``details.misplaced``.
-5. PERSISTENCE (``persistence_frames``): 1 for a single photo; >1 only for a video stream.
-6. SCORE (in [0, 1], higher = worse): the score of the worst problem.
+0. ALIGN: the photo is warped onto each reference VIEW (one per camera framing, align.py)
+   and the view with the most consistent matches is used. If none aligns, the answer is
+   "alignment_failed" with a medium score (a_verifier): a human looks, nothing is guessed.
+1. CHANGES: one mask of the pixels that differ from what is NORMAL for that view. Normal
+   is learned from several conforming photos (normal.py: per-pixel mean and spread), so
+   the normal variation between conforming photos is not an alert. Without conforming
+   photos, the single reference image is used.
+2. ELEMENT SLOTS (``element_slots``): if a large share of an element's slot changed, the
+   element is not in its place: ``details.missing`` (``misplaced`` if seen elsewhere).
+3. ZONES (``empty_zones``): any change in a zone is a violation, written
+   ``"<label>@<zone>"`` in ``details.misplaced``; ``unknown_object`` when no detection
+   names it. The optional detector only NAMES changes, it never raises an alert alone.
+4. SCORE (in [0, 1], higher = worse): the score of the worst problem; the common
+   decision layer turns it into conforme / a_verifier / anomalie.
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +35,8 @@ import numpy as np
 
 from usecases.workstation.align import align_to_reference
 from usecases.workstation.detector import REPO_ROOT, Detection, build_detector
+from usecases.workstation.normal import NormalModel, normal_from_aligned
+from usecases.workstation.station import analyzer_params, load_station
 from usecases.workstation.zones import (
     Box,
     Polygon,
@@ -61,20 +65,41 @@ ALIGNMENT_FAILED = "alignment_failed"
 Problems = dict[str, tuple[float, DetectedObject | None]]
 
 
+@dataclass
+class View:
+    """One reference image of the station and the regions drawn on it.
+
+    A station can have SEVERAL views (e.g. one per camera framing): the photo is compared
+    with the view it aligns best with. Zone and slot names are shared across views, so
+    the output does not depend on which view was used.
+    """
+
+    name: str
+    image: np.ndarray | None
+    zones: dict[str, Polygon] = field(default_factory=dict)
+    slots: dict[str, Polygon] = field(default_factory=dict)
+    normal: NormalModel | None = None  # learned from conforming photos (normal.py)
+
+
 class ZoneWorkstationAnalyzer(Analyzer):
     use_case = UseCase.WORKSTATION
     name = "zone-workstation"
-    version = "0.2.0"
+    version = "0.3.0"
 
     # ------------------------------------------------------------------ loading
 
     def load(self, config: dict[str, Any]) -> None:
+        # A station file (stations/<name>.yaml) describes the views and the normal photos.
+        if config.get("station"):
+            root = Path(config.get("data_root") or "data").expanduser()
+            station = load_station(
+                config["station"], root if root.is_absolute() else REPO_ROOT / root
+            )
+            config = {**analyzer_params(station), **config}
         self.detector = build_detector(config)
         self.expected: list[str] = list(config.get("expected_objects") or [])
         # Labels never judged in zones. Empty by default: a person IS a violation.
         self.ignore_labels: set[str] = set(config.get("ignore_labels") or [])
-        self.zones: dict[str, Polygon] = _polygons(config.get("empty_zones"))
-        self.slots: dict[str, Polygon] = _polygons(config.get("element_slots"))
         self.min_overlap = float(config.get("min_overlap", 0.15))
         self.diff_threshold = float(config.get("diff_threshold", 35))
         self.min_blob_area = float(config.get("min_blob_area", 0.01))
@@ -87,9 +112,29 @@ class ZoneWorkstationAnalyzer(Analyzer):
         self.align = bool(config.get("align", False))
         self.min_inliers = int(config.get("min_inliers", 25))
         self.alignment_failed_score = float(config.get("alignment_failed_score", 0.5))
+        self.normal_k = float(config.get("normal_k", 4.0))
+        self.min_box_fill = float(config.get("min_box_fill", 0.05))
 
-        self.reference = self._load_reference(config.get("reference_image"))
-        self._masks: dict[tuple[int, int], dict[str, np.ndarray]] = {}
+        # One view (top-level keys) or several (``views:`` list, one per camera framing).
+        raw_views = config.get("views") or [
+            {
+                "name": "main",
+                "reference_image": config.get("reference_image"),
+                "empty_zones": config.get("empty_zones"),
+                "element_slots": config.get("element_slots"),
+            }
+        ]
+        self.views = [
+            View(
+                name=str(v.get("name", f"view{i}")),
+                image=self._load_reference(v.get("reference_image")),
+                zones=_polygons(v.get("empty_zones")),
+                slots=_polygons(v.get("element_slots")),
+            )
+            for i, v in enumerate(raw_views)
+        ]
+        self._masks: dict[tuple[str, int, int], dict[str, np.ndarray]] = {}
+        self.learn_normal(list(config.get("normal_images") or []))
         self._streak: dict[str, int] = {}  # problem key -> consecutive frames seen
 
     def _load_reference(self, path: str | None) -> np.ndarray | None:
@@ -104,10 +149,45 @@ class ZoneWorkstationAnalyzer(Analyzer):
             log.warning("Reference image %s not found: the first frame will be used", full)
         return image
 
+    def learn_normal(self, paths: list[str]) -> None:
+        """Learn each view's normal variability from conforming photos (normal.py).
+
+        Each photo goes to the view it aligns best with; photos aligning nowhere are
+        skipped. Without photos, a view compares with its single reference image."""
+        groups: dict[str, tuple[list, list]] = {v.name: ([], []) for v in self.views}
+        for path in paths:
+            image = cv2.imread(str(Path(path).expanduser()))
+            picked = self._pick_view(image) if image is not None else None
+            if picked is not None:
+                view, alignment = picked
+                groups[view.name][0].append(alignment.aligned)
+                groups[view.name][1].append(alignment.valid)
+        for view in self.views:
+            aligned, valid = groups[view.name]
+            if view.image is not None and aligned:
+                view.normal = normal_from_aligned(view.image, aligned, valid)
+                log.info("View %s: normal model from %d photos", view.name, len(aligned))
+
+    @property
+    def reference(self) -> np.ndarray | None:
+        """Reference image of the first view."""
+        return self.views[0].image
+
     def reset_reference(self, image: np.ndarray) -> None:
-        """Take a new reference (e.g. after the station was rearranged on purpose)."""
-        self.reference = image.copy()
+        """Take a new reference for the first view (e.g. station rearranged on purpose)."""
+        self.views[0].image = image.copy()
         self._streak.clear()
+
+    def _pick_view(self, image: np.ndarray):
+        """Align the photo on every view; keep the one with the most consistent matches."""
+        best = None
+        for view in self.views:
+            if view.image is None:
+                continue
+            alignment = align_to_reference(image, view.image, min_inliers=self.min_inliers)
+            if alignment.ok and (best is None or alignment.inliers > best[1].inliers):
+                best = (view, alignment)
+        return best
 
     # ------------------------------------------------------------------ analysis
 
@@ -115,13 +195,15 @@ class ZoneWorkstationAnalyzer(Analyzer):
         if self.reference is None:
             self.reset_reference(image)
 
-        valid = None
+        view, valid = self.views[0], None
         if self.align:
-            alignment = align_to_reference(image, self.reference, min_inliers=self.min_inliers)
-            if not alignment.ok:
-                log.warning("Frame %s: alignment failed (%s)", meta.frame_id, alignment.reason)
+            picked = self._pick_view(image)
+            if picked is None:
+                log.warning("Frame %s: alignment failed on every view", meta.frame_id)
                 return self._result(self.alignment_failed_score, [], [], [ALIGNMENT_FAILED])
+            view, alignment = picked
             image, valid = alignment.aligned, alignment.valid
+        self.last_view = view.name
 
         h, w = image.shape[:2]
         detections = self.detector(image)
@@ -133,19 +215,23 @@ class ZoneWorkstationAnalyzer(Analyzer):
             if label not in labels:
                 candidates[f"missing:{label}"] = (self.missing_score, None)
 
-        changed = change_mask(image, self.reference, self.diff_threshold, valid)
-        masks = self._region_masks((h, w))
+        if view.normal is not None:
+            base, spread = view.normal.mean, view.normal.spread
+        else:
+            base, spread = view.image, None
+        changed = change_mask(image, base, self.diff_threshold, valid, spread, self.normal_k)
+        masks = self._region_masks(view, (h, w))
         ignored = [d for d in detections if d.label in self.ignore_labels]
         if ignored:
             changed &= ~boxes_mask([d.box for d in ignored], (h, w))
         objects = [d for d in detections if d.label not in self.ignore_labels]
         usable = valid if valid is not None else np.ones((h, w), dtype=bool)
 
-        for slot in self.slots:
+        for slot in view.slots:
             candidates.update(
                 self._slot_problems(slot, masks[f"slot:{slot}"], changed, usable, objects)
             )
-        for zone in self.zones:
+        for zone in view.zones:
             candidates.update(
                 self._zone_problems(zone, masks[f"zone:{zone}"], changed, objects, w, h)
             )
@@ -167,20 +253,21 @@ class ZoneWorkstationAnalyzer(Analyzer):
             model_name=f"{self.name}+{self.detector.name}",
             model_version=self.version,
             details=WorkstationDetails(
-                expected=sorted(set(self.expected) | set(self.slots)),
+                expected=sorted(set(self.expected).union(*(v.slots for v in self.views))),
                 detected=detected,
                 missing=missing,
                 misplaced=misplaced,
             ),
         )
 
-    def _region_masks(self, shape: tuple[int, int]) -> dict[str, np.ndarray]:
-        """Masks of zones and slots for this image size, computed once and cached."""
-        if shape not in self._masks:
-            masks = {f"zone:{n}": polygon_mask(p, shape) for n, p in self.zones.items()}
-            masks |= {f"slot:{n}": polygon_mask(p, shape) for n, p in self.slots.items()}
-            self._masks[shape] = masks
-        return self._masks[shape]
+    def _region_masks(self, view: View, shape: tuple[int, int]) -> dict[str, np.ndarray]:
+        """Masks of the zones and slots of a view for this image size, cached."""
+        key = (view.name, *shape)
+        if key not in self._masks:
+            masks = {f"zone:{n}": polygon_mask(p, shape) for n, p in view.zones.items()}
+            masks |= {f"slot:{n}": polygon_mask(p, shape) for n, p in view.slots.items()}
+            self._masks[key] = masks
+        return self._masks[key]
 
     def _slot_problems(
         self,
@@ -222,12 +309,22 @@ class ZoneWorkstationAnalyzer(Analyzer):
             growth = min(1.0, area / (self.full_blob_area * zone_area))
             return self.unknown_min_score + (1.0 - self.unknown_min_score) * growth
 
-        # 1. Detected objects or persons whose box overlaps the zone: they get a NAME.
+        # 1. Detected objects or persons whose box overlaps the zone AND covers a change:
+        #    the detector only NAMES what changed, it never raises an alert on its own
+        #    (an object that is normally there, or the whole bench seen as a
+        #    "refrigerator" around a small change, must not count).
         #    Score = the stronger of the two evidences (detector confidence, size of the
-        #    change), so that a hesitant detector never LOWERS a clear change.
-        inside = [d for d in objects if box_overlap(d.box, mask) >= self.min_overlap]
-        for d in inside:
+        #    change): a hesitant detector never LOWERS a change.
+        inside = []
+        for d in objects:
+            if box_overlap(d.box, mask) < self.min_overlap:
+                continue
+            if _box_fill(d.box, changed & mask) < self.min_box_fill:
+                continue  # the change is a speck in a huge box: the box is the scene, not it
             explained = [change_score(b.area) for b in blobs if _contains(d.box, b.center)]
+            if not explained:
+                continue
+            inside.append(d)
             score = max([d.confidence, *explained])
             key = f"{d.label}@{zone}"
             problems[key] = (max(score, problems.get(key, (0.0, None))[0]), None)
@@ -249,6 +346,13 @@ class ZoneWorkstationAnalyzer(Analyzer):
 
 def _polygons(raw: object) -> dict[str, Polygon]:
     return {name: validate_polygon(name, pts) for name, pts in (raw or {}).items()}  # type: ignore[union-attr]
+
+
+def _box_fill(box: Box, changed: np.ndarray) -> float:
+    """Share of the box covered by changed pixels."""
+    x1, y1, x2, y2 = (max(0, v) for v in box)
+    area = max(1, (x2 - x1) * (y2 - y1))
+    return float(changed[y1:y2, x1:x2].sum()) / area
 
 
 def _contains(box: Box, point: tuple[float, float]) -> bool:
