@@ -60,6 +60,8 @@ ruff check . && ruff format .   # lint et formatage
 ```
 visionhub/            socle commun : contrats, décision, registre, chaîne d'analyse, API
   contracts.py        ← les schémas de données (cœur du dépôt)
+  production/         ARGOS Production Engine : cycles PLC, pièces, shifts, corrections, KPI
+  argos_app.py        point d'entrée TEMPORAIRE : API historique + /production
 usecases/
   quality/            ← binôme qualité
   workstation/        ← binôme poste de travail
@@ -74,6 +76,7 @@ dashboard/app.py      tableau de bord Streamlit (aucune logique métier)
 tests/                tests du socle, dont test_contract.py
 data/                 données locales, jamais versionnées (voir data/README.md)
 docs/architecture.md  architecture en une page
+docs/production-engine.md  ARGOS Production Engine (cycles, verdicts, KPI, endpoints)
 ```
 
 Les paramètres se règlent par variables d'environnement (`.env`), toutes documentées dans [.env.example](.env.example). Pour changer de source d'images, par exemple : `SOURCE=folder` et `SOURCE_PATH=data/test/quality`.
