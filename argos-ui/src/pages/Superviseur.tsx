@@ -5,6 +5,8 @@ import type { Alert, AlertCategory, CellSummary, LineSummary, StationStatus, Wor
 import { Donut, HourlyBars, StackedHistogram, type Category } from '../components/charts';
 import { Clock, CountBadge, DeltaPill, deltaText, fmt, Icon, ICONS, Kpi, Loading, TopBar } from '../components/ui';
 import { useApi } from '../hooks/useApi';
+import { LIVE_INDUSTRIAL } from '../api/industrial';
+import { LiveSupervisor } from './industrial/LiveScreens';
 
 /**
  * Cockpit du superviseur (manager) : PC, tablette ou téléphone.
@@ -25,6 +27,10 @@ const lineExpected = (l: LineSummary) => l.cells.reduce((s, c) => s + c.expected
 const lineShiftTarget = (l: LineSummary) => l.cells.reduce((s, c) => s + c.target, 0);
 
 export default function Superviseur() {
+  return LIVE_INDUSTRIAL ? <LiveSupervisor /> : <DemoSuperviseur />;
+}
+
+function DemoSuperviseur() {
   const { data: ov } = useApi(() => api.overview(), [], 15000);
   const { data: alerts, setData: setAlerts } = useApi(() => api.alerts(), [], 5000);
   const [tab, setTab] = useState<Tab>('overview');

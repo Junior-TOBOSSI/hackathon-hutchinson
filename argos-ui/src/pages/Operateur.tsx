@@ -8,6 +8,8 @@ import { HourlyGauges, ProgressRing } from '../components/charts';
 import { operatorActions, type OperatorAction } from '../components/priority';
 import { Clock, deltaText, fmt, Icon, ICONS, Loading, TopBar } from '../components/ui';
 import { useApi } from '../hooks/useApi';
+import { LIVE_INDUSTRIAL } from '../api/industrial';
+import { LiveOperator } from './industrial/LiveScreens';
 
 /**
  * Écran du poste. Un seul écran qui s'adapte à l'état reçu :
@@ -15,6 +17,10 @@ import { useApi } from '../hooks/useApi';
  * En démo : ?scenario=ok|ko|epi|multi
  */
 export default function Operateur() {
+  return LIVE_INDUSTRIAL ? <LiveOperator /> : <DemoOperateur />;
+}
+
+function DemoOperateur() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const scenario = (params.get('scenario') as Scenario) || 'ok';

@@ -2,9 +2,15 @@ import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { Kpi, Loading, TopBar, deltaText } from '../components/ui';
 import { useApi } from '../hooks/useApi';
+import { LIVE_INDUSTRIAL } from '../api/industrial';
+import { LivePosteDetail } from './industrial/LiveScreens';
 
 /** Détail d'un poste pour le superviseur : indicateurs du poste, jamais de la personne. Aucune image. */
 export default function PosteDetail() {
+  return LIVE_INDUSTRIAL ? <LivePosteDetail /> : <DemoPosteDetail />;
+}
+
+function DemoPosteDetail() {
   const { id = 'A1·P06' } = useParams();
   const { data: d } = useApi(() => api.stationDetail(id), [id], 15000);
   if (!d) return <Loading />;

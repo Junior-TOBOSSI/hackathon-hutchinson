@@ -4,9 +4,15 @@ import type { Scenario } from '../api/mock';
 import { HovisLogo } from '../components/brand';
 import { Clock, Icon, ICONS, Loading } from '../components/ui';
 import { useApi } from '../hooks/useApi';
+import { LIVE_INDUSTRIAL } from '../api/industrial';
+import { LiveCellule } from './industrial/LiveScreens';
 
 /** Écran mural de la cellule : 4 voyants lisibles de loin. Route : /cellule/:stationId */
 export default function Cellule() {
+  return LIVE_INDUSTRIAL ? <LiveCellule /> : <DemoCellule />;
+}
+
+function DemoCellule() {
   const [params] = useSearchParams();
   const scenario = (params.get('scenario') as Scenario) || 'multi';
   const { data: live } = useApi(() => api.stationLive('A1·P06', scenario), [scenario], 2000);

@@ -6,7 +6,7 @@ export function useApi<T>(load: () => Promise<T>, deps: unknown[] = [], refreshM
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(() => {
-    load().then(setData).catch((e: Error) => setError(e.message));
+    load().then((value) => { setData(value); setError(null); }).catch((e: Error) => setError(e.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
