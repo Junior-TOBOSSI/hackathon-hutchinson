@@ -97,7 +97,7 @@ def main() -> None:
     st.sidebar.caption(f"Photo {state.index + 1} / {len(playlist)}")
     st.sidebar.markdown(
         "**Légende** : vert = en place / zone vide, rouge = écart, "
-        "orange = objet inconnu, violet = personne."
+        "orange = objet inconnu (unknown object), violet = personne (person)."
     )
 
     name = playlist[state.index]

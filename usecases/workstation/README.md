@@ -20,9 +20,9 @@ Classe `usecases.workstation.model:ZoneWorkstationAnalyzer`. [config.yaml](confi
 
 1. **Alignement sur la bonne vue** ([align.py](align.py)) : `reference.png` (vue « pilote ») ne correspond qu'à `good_001`, qui est la même image recadrée. **Toutes les autres photos**, y compris les anomalies du lot pilote, ont le cadrage « planche », dont la référence est `good/good_002.png` (**exclue de la mesure**). La photo est comparée à la vue qui s'aligne le mieux : les faux alignements obtiennent 47 à 80 correspondances, les bons 97 et plus. Échec partout : `alignment_failed`, donc `a_verifier`.
 2. **Normalité apprise** ([normal.py](normal.py)) : moyenne et dispersion par pixel des photos conformes alignées, **référence comprise**. Un pixel n'a changé que s'il s'écarte de plus de `normal_k` (4) dispersions, et d'au moins `diff_threshold` (25 niveaux). Il faut au moins 2 photos par vue ; sinon la vue se compare à sa seule référence.
-3. **Zones** : `zone_rouge` (ni objet ni personne) et `etabli` (rien de nouveau). L'arrière-plan de l'atelier, qui bouge d'une photo à l'autre, n'est **jamais** jugé.
-4. **Emplacements** : `bacs_bleus`, `tournevis`, `pinces`, `poubelles`, `presse`, `coffret_commande`. S'il a changé à plus de 25 %, l'élément n'est pas à sa place et va dans `missing`. L'étau n'a pas d'emplacement : il est sur l'établi, déjà surveillé par la zone `etabli` (sinon un objet posé à côté le ferait signaler « absent »).
-5. **Détecteur YOLO26 COCO** (activé par défaut) : il **nomme** les personnes (`person@zone_rouge`), mais ne déclenche jamais d'alerte seul.
+3. **Zones** : `red_zone` (ni objet ni personne) et `workbench` (rien de nouveau). L'arrière-plan de l'atelier, qui bouge d'une photo à l'autre, n'est **jamais** jugé.
+4. **Emplacements** : `blue_bins`, `screwdrivers`, `pliers`, `waste_bins`, `press`, `control_cabinet`. S'il a changé à plus de 25 %, l'élément n'est pas à sa place et va dans `missing`. L'étau n'a pas d'emplacement : il est sur l'établi, déjà surveillé par la zone `workbench` (sinon un objet posé à côté le ferait signaler « absent »).
+5. **Détecteur YOLO26 COCO** (activé par défaut) : il **nomme** les personnes (`person@red_zone`), mais ne déclenche jamais d'alerte seul.
 
 | Fichier | Rôle |
 |---|---|

@@ -15,7 +15,7 @@ analyzer learned on all conforming photos (they are never used to learn).
 Printed results (the figures for the jury):
 - DETECTION: anomalies raising an alert (a_verifier or anomalie), and for the RIGHT
   reason (station ``anomaly_types``: zone_object / zone_person -> something in
-  zone_rouge; disorder -> something on the bench or a tool not in its place);
+  red_zone; disorder -> something on the bench or a tool not in its place);
 - FALSE ALARMS: conforming photos raising an alert;
 - per anomaly type and per view, alignment failures, mean latency.
 

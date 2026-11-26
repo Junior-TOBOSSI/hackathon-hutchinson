@@ -176,7 +176,7 @@ def test_station_file_is_valid_without_the_data(tmp_path):
     station = load_station("presse_5s", tmp_path)  # empty data root
     assert [v["name"] for v in station["views"]] == ["planche", "pilote"]
     for view in station["views"]:
-        assert {"zone_rouge", "etabli"} <= set(view["empty_zones"])
+        assert {"red_zone", "workbench"} <= set(view["empty_zones"])
     params = analyzer_params(station)
     assert params["normal_images"] == []  # no dataset here: no normal photos
     a = ZoneWorkstationAnalyzer()

@@ -15,7 +15,7 @@ Vérifier que le poste est configuré comme la référence : objets attendus pr�
   ```
 
 ## État actuel
-**Jeu de référence : `presse_5S_20`** (depuis le 2026-11-26 au soir). Les jeux précédents (`dataset_5S`, `poste1` / `poste2`) sont supprimés. Analyseur `model.py:ZoneWorkstationAnalyzer` v0.3.0 : alignement sur la meilleure vue (planche / pilote), normalité apprise sur les photos conformes et la référence, zones `zone_rouge` et `etabli`, emplacements des outils, YOLO26 pour nommer les personnes. Résultat : 15/15 anomalies, 0/4 fausse alerte (démonstration, pas un chiffre de performance). Détails dans [README.md](README.md).
+**Jeu de référence : `presse_5S_20`** (depuis le 2026-11-26 au soir). Les jeux précédents (`dataset_5S`, `poste1` / `poste2`) sont supprimés. Analyseur `model.py:ZoneWorkstationAnalyzer` v0.3.0 : alignement sur la meilleure vue (planche / pilote), normalité apprise sur les photos conformes et la référence, zones `red_zone` et `workbench`, emplacements des outils, YOLO26 pour nommer les personnes. Résultat : 15/15 anomalies, 0/4 fausse alerte (démonstration, pas un chiffre de performance). Détails dans [README.md](README.md).
 
 ## Décisions prises
 <!-- Une ligne par décision : AAAA-MM-JJ HH:MM — décision — raison. -->

@@ -8,7 +8,7 @@ Drawn:
 - zones (``empty_zones``): green outline if empty, RED if something is in it;
 - element slots (``element_slots``): green box if the element is in its place, RED if not;
 - found objects: ORANGE box for an unknown object, MAGENTA for a person, with its label;
-- a banner with the verdict only (OK / A VERIFIER / NOK), no score.
+- a banner with the verdict only (OK / CHECK / NOK), no score.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from visionhub.contracts import AnalysisResult, Decision
 GREEN, RED, ORANGE, MAGENTA = (60, 170, 60), (40, 40, 220), (0, 150, 255), (200, 60, 200)
 VERDICT = {
     Decision.CONFORME: ("OK", (60, 160, 60)),
-    Decision.A_VERIFIER: ("A VERIFIER", (0, 150, 240)),
+    Decision.A_VERIFIER: ("CHECK", (0, 150, 240)),
     Decision.ANOMALIE: ("NOK", (40, 40, 210)),
 }
 
@@ -52,13 +52,13 @@ def render(
             _outline(out, to_photo(polygon), colour, 3 if name in busy else 2, name)
         for name, polygon in view.slots.items():
             missing = name in result.details.missing or name in result.details.misplaced
-            label = f"{name}: absent / deplace" if missing else name
+            label = f"{name}: missing / moved" if missing else name
             _outline(out, to_photo(polygon), RED if missing else GREEN, 2, label)
         for obj in result.details.detected:
             b = obj.bbox
             quad = to_photo([(b.x1, b.y1), (b.x2, b.y1), (b.x2, b.y2), (b.x1, b.y2)])
             colour = MAGENTA if obj.label == "person" else ORANGE
-            name = "objet inconnu" if obj.label == "unknown_object" else obj.label
+            name = "unknown object" if obj.label == "unknown_object" else obj.label
             _outline(out, quad, colour, 3, f"{name} {obj.confidence:.2f}")
     return _banner(out, result, decision)
 
@@ -75,7 +75,7 @@ def _outline(img: np.ndarray, points: np.ndarray, colour, thickness: int, label:
 
 
 def _banner(img: np.ndarray, result: AnalysisResult, decision: Decision) -> np.ndarray:
-    """Verdict only (OK / A VERIFIER / NOK): the operator does not need the score."""
+    """Verdict only (OK / CHECK / NOK): the operator does not need the score."""
     text, colour = VERDICT[decision]
     bar = np.full((48, img.shape[1], 3), colour, np.uint8)
     cv2.putText(
