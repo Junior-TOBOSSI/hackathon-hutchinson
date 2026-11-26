@@ -16,10 +16,11 @@ export interface Shift {
   started_at: string; ended_at: string | null; planned_end_at: string;
   planned_duration_min: number; target_parts: number;
 }
+export interface ShiftReport { shift: Shift; kpi: Kpi }
 export interface Station {
   station_id: string; cell: string; simulated: boolean; online: boolean;
   last_seen_at: string | null; open_alerts: number;
-  current_shift: { shift: Shift; kpi: Kpi } | null;
+  current_shift: ShiftReport | null;
   equipment: { equipment_id: string; equipment_type: string; status: string; detail: string | null }[];
 }
 export interface Part {
@@ -83,6 +84,9 @@ export const industrial = {
     request<EdgeEvent[]>(`${core}/events?station_id=${id(stationId)}&limit=${limit}`),
   edgeParts: (stationId: string) =>
     request<Part[]>(`${edge}/parts?station_id=${id(stationId)}&limit=1`),
+  edgeShifts: (stationId: string) =>
+    request<Shift[]>(`${edge}/shifts?station_id=${id(stationId)}&limit=1`),
+  edgeShiftReport: (shiftId: string) => request<ShiftReport>(`${edge}/shifts/${id(shiftId)}`),
   correct: (part: Part, newVerdict: 'OK' | 'NOK', reason: string, physicalInspection: boolean) =>
     request<Part>(`${edge}/parts/${id(part.part_id)}/corrections`, {
       method: 'POST',

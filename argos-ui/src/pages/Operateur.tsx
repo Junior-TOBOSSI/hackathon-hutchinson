@@ -4,12 +4,32 @@ import { api, USE_MOCK } from '../api/client';
 import type { Scenario } from '../api/mock';
 import type { StationLive } from '../api/types';
 import { useAuth } from '../auth';
-import { HourlyGauges, ProgressRing } from '../components/charts';
+import { HourlyGauges, ProgressRing, type ShiftGaugeInput } from '../components/charts';
 import { operatorActions, type OperatorAction } from '../components/priority';
 import { Clock, deltaText, fmt, Icon, ICONS, Loading, TopBar } from '../components/ui';
 import { useApi } from '../hooks/useApi';
 import { industrial, LIVE_INDUSTRIAL, type Station } from '../api/industrial';
 import { operatorView, type OperatorView } from '../api/industrial-view';
+
+function shiftTimeline(view: OperatorView): ShiftGaugeInput | null {
+  if (view.shiftWindow) return {
+    startedAt: view.shiftWindow.startedAt, plannedEndAt: view.shiftWindow.plannedEndAt,
+    endedAt: view.shiftWindow.endedAt, status: view.shiftWindow.status,
+    target: view.shiftWindow.target, actualGood: view.shiftWindow.actualGood, now: view.now,
+  };
+  if (!view.shift) return null;
+  const at = (time: string) => {
+    const date = new Date(view.now);
+    const [hour, minute] = time.split(':').map(Number);
+    date.setHours(hour, minute, 0, 0);
+    return date;
+  };
+  const start = at(view.shift.start);
+  const end = at(view.shift.end);
+  if (end <= start) end.setDate(end.getDate() + 1);
+  return { startedAt: start.toISOString(), plannedEndAt: end.toISOString(), now: view.now,
+    status: 'OPEN', target: view.objective.shiftTarget, actualGood: view.counters.good };
+}
 
 /**
  * Écran du poste. Un seul écran qui s'adapte à l'état reçu :
@@ -46,7 +66,6 @@ export default function Operateur() {
   const ko = live.part?.verdict === 'KO';
   const multi = ko && envIssues.length > 0;
   if (LIVE_INDUSTRIAL && ko) actions.push({ key: 'piece', title: 'Pièce KO · verdict effectif', subtitle: 'Disposition physique non renseignée', strong: true });
-  const hour = new Date(live.now).getHours();
 
   const report = async () => { if (!LIVE_INDUSTRIAL) { await api.reportProblem(stationId!); setReported(true); setTimeout(() => setReported(false), 4000); } };
   const correct = async (event: FormEvent) => {
@@ -100,8 +119,7 @@ export default function Operateur() {
                   <span className="muted" style={{ fontSize: 14 }}>{live.objective.expectedNow == null ? 'Objectif du shift non renseigné' : `Trait noir : où vous devriez être maintenant (${Math.round(live.objective.expectedNow)})`}</span>
                 </div>
               </div>
-              <HourlyGauges hours={live.hourly ?? []} perHour={live.objective.perHour} currentHour={hour} height={ko ? 48 : 56} />
-              {live.hourly === null && <span className="muted">Historique horaire indisponible : liste de pièces limitée.</span>}
+              <HourlyGauges timeline={shiftTimeline(live)} height={ko ? 48 : 56} />
             </div>
           )}
 

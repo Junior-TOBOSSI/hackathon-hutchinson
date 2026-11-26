@@ -28,7 +28,13 @@ historique exhaustif. Le KPI standard porte sur les huit dernières heures ; seu
 un shift actif fournit un objectif. Image, nombre de joints, signalement
 opérateur transactionnel et notification maintenance restent indisponibles.
 Les emplacements correspondants restent visibles avec « indisponible » ou
-« inconnu ». Les graphiques horaires sont construits depuis les pièces Core
+« inconnu ». La jauge continue « Heure par heure » d'Operator utilise le
+rapport du shift actif transmis au Core, ou le dernier rapport de shift de
+l'Edge lorsqu'il est clos. Sa graduation du bas répartit l'objectif total
+selon la durée planifiée ; le remplissage suit les pièces **bonnes** et le
+trait fin montre le temps écoulé. Un retard jusqu'à 10 % de l'attendu est
+orange, au-delà il est rouge. Un shift clos conserve sa valeur finale.
+Les graphiques horaires de Supervisor sont construits depuis les pièces Core
 uniquement lorsque la liste plafonnée à 500 éléments est complète. Si cette
 limite est atteinte, ils restent affichés avec un état indisponible. Le Core
 ne fournit pas de ligne industrielle : l'atelier affiche « Ligne non
