@@ -58,6 +58,8 @@ export interface RunSummary {
   metrics: Record<string, number>; tags: Record<string, string>;
 }
 
+export interface SchemaInfo { catalog: string; name: string; full_name: string; comment: string | null }
+
 export interface ExperimentInfo { experiment_id: string; name: string; lifecycle_stage: string }
 
 export interface JobRunInfo {
@@ -111,6 +113,8 @@ const q = encodeURIComponent;
 
 export const mlops = {
   health: () => call<ConnectionStatus>('/mlops/health'),
+  catalogs: () => call<string[]>('/mlops/catalogs'),
+  schemas: (catalog: string) => call<SchemaInfo[]>(`/mlops/catalogs/${q(catalog)}/schemas`),
   overview: () => call<LiveOverview>('/models/overview'),
   models: () => call<ManagedModel[]>('/mlops/models'),
   status: (id: string) => call<ModelStatus>(`/mlops/models/${q(id)}/status`),
@@ -120,6 +124,7 @@ export const mlops = {
   runs: (experimentId: string) => call<RunSummary[]>(`/mlops/experiments/${q(experimentId)}/runs?limit=10`),
   jobs: () => call<JobInfo[]>('/mlops/jobs'),
   jobRun: (runId: number) => call<JobRunInfo>(`/mlops/job-runs/${runId}`),
+  jobRuns: (jobId: number, limit = 10) => call<JobRunInfo[]>(`/mlops/jobs/${jobId}/runs?limit=${limit}`),
   endpoints: () => call<EndpointInfo[]>('/mlops/endpoints'),
   monitoring: (id: string, refresh = false) => call<MonitoringReport>(`/mlops/models/${q(id)}/monitoring${refresh ? '?refresh=true' : ''}`),
   approve: (id: string, version: string) => call<VersionStatus>(`/mlops/models/${q(id)}/versions/${q(version)}/approve`, { method: 'POST' }),
