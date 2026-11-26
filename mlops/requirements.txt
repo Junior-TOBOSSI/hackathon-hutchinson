@@ -1,0 +1,15 @@
+# ARGOS MLOps environment — DIRECT dependencies (Python 3.11.9).
+# Installed in the isolated venv <ARGOS_MLOPS_HOME>\.venv, NEVER in the main ARGOS venv.
+# Full transitive pin list: requirements-lock.txt
+#
+#   <ARGOS_MLOPS_HOME>\.venv\Scripts\python.exe -m pip install -r mlops\requirements.txt
+#   <ARGOS_MLOPS_HOME>\.venv\Scripts\python.exe -m pip install -e .     # ARGOS contracts (visionhub)
+
+mlflow==3.18.0          # tracking server, client, registry, sklearn flavor
+scikit-learn==1.9.1     # foundation demo models and metrics
+numpy==2.4.6
+pandas==3.1.1           # dataset inputs, signatures
+matplotlib==3.11.2      # confusion matrix figure
+requests==2.34.2        # connector health check
+pydantic==2.14.4        # connector read models (same version as ARGOS)
+pytest==9.2.0           # unit and integration tests
