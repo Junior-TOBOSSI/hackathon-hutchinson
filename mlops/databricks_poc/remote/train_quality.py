@@ -18,6 +18,32 @@ import tempfile
 import time
 from datetime import UTC, datetime
 
+VERSION_PATTERN = r"^[a-z0-9][a-z0-9-]{1,40}$"
+
+
+def delta_write_options(table_exists: bool, dataset_version: str) -> dict[str, str]:
+    """DBX-04 (option B): Delta writes targeted at ONE dataset version.
+
+    Re-running a training on the same version replaces only that version's rows
+    (idempotent, no duplicates); rows of every other version are kept. The first write
+    creates the table. The version name is validated because it goes into a predicate.
+    """
+    import re
+
+    if not re.match(VERSION_PATTERN, dataset_version):
+        raise ValueError(f"invalid dataset version {dataset_version!r}")
+    if not table_exists:
+        return {}
+    return {"replaceWhere": f"dataset_version = '{dataset_version}'"}
+
+
+def write_version_rows(spark, frame, table: str, dataset_version: str) -> None:
+    options = delta_write_options(spark.catalog.tableExists(table), dataset_version)
+    writer = spark.createDataFrame(frame).write.mode("overwrite")
+    for key, value in options.items():
+        writer = writer.option(key, value)
+    writer.saveAsTable(table)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -118,17 +144,18 @@ def main() -> None:
                 "label": i["label"],
                 "split": i["split"],
                 "sha256": i["sha256"],
-                "brightness": i["brightness"],
-                "noise": i["noise"],
-                "defect": i["defect"] or "",
+                "brightness": i.get("brightness"),
+                "noise": i.get("noise"),
+                "defect": i.get("defect") or "",
                 "dataset_version": manifest["dataset_version"],
             }
             for i in items
         ]
     )
-    spark.createDataFrame(annotations).write.mode("overwrite").option(
-        "overwriteSchema", "true"
-    ).saveAsTable(f"{args.schema}.annotations")
+    # One dataset version per write: the other versions' rows are kept (DBX-04 option B).
+    write_version_rows(
+        spark, annotations, f"{args.schema}.annotations", manifest["dataset_version"]
+    )
     versions = pd.DataFrame(
         [
             {
@@ -138,14 +165,14 @@ def main() -> None:
                 "n_images": len(items),
                 "seed": manifest["seed"],
                 "counts_json": json.dumps(manifest["counts"]),
-                "synthetic": True,
+                "synthetic": bool(manifest.get("synthetic", True)),
                 "registered_at": datetime.now(UTC).isoformat(),
             }
         ]
     )
-    spark.createDataFrame(versions).write.mode("overwrite").option(
-        "overwriteSchema", "true"
-    ).saveAsTable(f"{args.schema}.dataset_versions")
+    write_version_rows(
+        spark, versions, f"{args.schema}.dataset_versions", manifest["dataset_version"]
+    )
     print(
         f"Delta tables written: {args.schema}.annotations ({len(annotations)} rows), "
         f"{args.schema}.dataset_versions"

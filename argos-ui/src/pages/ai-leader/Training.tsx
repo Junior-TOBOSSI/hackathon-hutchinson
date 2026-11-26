@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { mlops, type JobRunInfo } from '../../api/mlops';
 import { Badge, grid, KV, LinkButton, Loading, Panel, Technical, Unavailable, useNav } from './common';
-import { errText, useExperiments, useJobRuns, useJobs, useRuns, useStore } from './data';
+import { errText, useExperiments, useJobRuns, useJobs, useRuns, useStore, useTrainingDataset } from './data';
 import { dateTime, duration } from './metrics';
 import { MetricsBlock } from './Registry';
 import { useSelection } from './selection';
@@ -25,6 +26,10 @@ export default function Training({ onMessage }: { onMessage: (m: string) => void
   const job = jobs.data?.find((j) => j.name === model?.training_job) ?? null;
   const history = useJobRuns(job?.job_id ?? null);
   const [active, setActive] = useState<JobRunInfo | null>(null);
+  const [params] = useSearchParams();
+  const selectedDataset = params.get('dataset');
+  const jobDataset = useTrainingDataset(model?.id ?? null);
+  const configured = jobDataset.data?.dataset_version ?? null;
 
   useEffect(() => {
     if (!active || active.life_cycle_state === 'TERMINATED' || active.life_cycle_state === 'INTERNAL_ERROR') return;
@@ -46,7 +51,8 @@ export default function Training({ onMessage }: { onMessage: (m: string) => void
 
   const trigger = () => {
     if (!model.training_job) return;
-    if (!window.confirm(`Relancer l'entraînement de « ${model.display_name} » ?\n\nExécute le job Databricks existant « ${model.training_job} » (calcul serverless facturé, une seule exécution à la fois). Aucun déploiement n'en découle.`)) return;
+    const data = configured ? `\nDataset utilisé : ${configured} (configuration actuelle du job).` : '';
+    if (!window.confirm(`Relancer l'entraînement de « ${model.display_name} » ?\n\nExécute le job Databricks existant « ${model.training_job} » (calcul serverless facturé, une seule exécution à la fois). Aucun déploiement n'en découle.${data}`)) return;
     mlops.retrain(model.id)
       .then((r) => { setActive(r); onMessage(`Job ${model.training_job} démarré (exécution ${r.run_id}).`); })
       .catch((e) => onMessage(`Entraînement refusé : ${errText(e)}`));
@@ -54,6 +60,23 @@ export default function Training({ onMessage }: { onMessage: (m: string) => void
 
   return (
     <>
+      <Panel title="Dataset d'entraînement" sub="Lu dans la définition du job Databricks (paramètre --dataset-dir)">
+        {jobDataset.loading && <Loading />}
+        {jobDataset.error && <Unavailable tone="red">Configuration du job indisponible : {jobDataset.error}</Unavailable>}
+        {jobDataset.data && (
+          <span style={{ fontSize: 15 }}>
+            {configured ? <>Le job utilise actuellement <b>{configured}</b>.</> : <span className="muted">Dataset du job non déterminé ({jobDataset.data.source}).</span>}{' '}
+            <LinkButton onClick={() => go('datasets', model.id)}>Voir les datasets</LinkButton>
+          </span>
+        )}
+        {selectedDataset && configured && selectedDataset !== configured && (
+          <Unavailable>
+            Dataset sélectionné : <b>{selectedDataset}</b>. Le job actuel utilise encore <b>{configured}</b> : un entraînement lancé maintenant porterait sur {configured}, pas sur {selectedDataset}.
+            Le choix du dataset d'entraînement sera raccordé avec DBX-05.
+          </Unavailable>
+        )}
+        {selectedDataset && selectedDataset === configured && <span className="muted" style={{ fontSize: 14 }}>Le dataset sélectionné ({selectedDataset}) est celui du job.</span>}
+      </Panel>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 18, alignItems: 'start' }}>
         <Panel title="Job d'entraînement" sub={model.training_job ? `Lakeflow Job « ${model.training_job} » · serverless CPU · déclenchement manuel` : undefined}>
           {!model.training_job && <Unavailable tone="grey">Aucun job d'entraînement déclaré pour ce modèle.</Unavailable>}
@@ -91,7 +114,7 @@ export default function Training({ onMessage }: { onMessage: (m: string) => void
         <Panel title="Configuration d'entraînement">
           <Unavailable tone="grey">
             La configuration est définie par le code du job (paramètres visibles dans chaque run MLflow ci-dessous).
-            L'édition d'une configuration depuis ARGOS n'est pas encore raccordée.
+            L'édition d'une configuration depuis HOVIS n'est pas encore raccordée (DBX-05).
           </Unavailable>
           <span className="muted" style={{ fontSize: 14 }}>Expérience MLflow : {experiment ? experiment.name : experiments.error ? 'indisponible' : '…'}</span>
         </Panel>

@@ -34,7 +34,7 @@ async function call<T>(path: string, init?: RequestInit, opts: ReadOpts = {}): P
   } catch {
     if (opts.signal?.aborted) throw new ApiError(0, 'Requête annulée');
     if (controller.signal.aborted) throw new ApiError(0, `Délai dépassé (${Math.round(timeoutMs / 1000)} s)`);
-    throw new ApiError(0, 'Backend ARGOS injoignable');
+    throw new ApiError(0, 'Backend HOVIS injoignable');
   } finally {
     clearTimeout(timer);
     opts.signal?.removeEventListener('abort', onAbort);
@@ -46,7 +46,7 @@ async function call<T>(path: string, init?: RequestInit, opts: ReadOpts = {}): P
       detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail ?? body);
     } catch {
       // Corps vide ou non JSON : en dev, c'est le proxy Vite qui ne joint pas le backend.
-      if (res.status >= 500) detail = 'Backend ARGOS injoignable ou en erreur (aucune donnée affichée)';
+      if (res.status >= 500) detail = 'Backend HOVIS injoignable ou en erreur (aucune donnée affichée)';
     }
     throw new ApiError(res.status, detail);
   }
@@ -164,4 +164,88 @@ export const mlops = {
   promote: (id: string, version: string) => call<ModelStatus>(`/models/${q(id)}/promote`, { method: 'POST', body: JSON.stringify({ version }) }),
   retrain: (id: string) => call<JobRunInfo>(`/models/${q(id)}/retrain`, { method: 'POST' }),
   setRetrainMode: (mode: 'MANUEL' | 'AUTO') => call<void>('/models/retrain-mode', { method: 'PUT', body: JSON.stringify({ mode }) }),
+
+  // ---------------------------------------------------------------- datasets (DBX-04)
+  datasets: (id: string, o?: ReadOpts) => call<DatasetIndex>(`/mlops/models/${q(id)}/datasets`, undefined, o),
+  datasetItems: (id: string, version: string, f: ItemFilters, o?: ReadOpts) => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) if (v !== undefined && v !== null && v !== '') p.set(k, String(v));
+    return call<ItemPage>(`/mlops/models/${q(id)}/datasets/${q(version)}/items?${p}`, undefined, o);
+  },
+  datasetTables: (id: string, o?: ReadOpts) => call<TableInfo[]>(`/mlops/models/${q(id)}/dataset-tables`, undefined, o),
+  trainingDataset: (id: string, o?: ReadOpts) => call<TrainingDataset>(`/mlops/models/${q(id)}/training-dataset`, undefined, o),
+  createDraft: (id: string, parentVersion: string) =>
+    call<Draft>(`/mlops/models/${q(id)}/dataset-drafts`, { method: 'POST', body: JSON.stringify({ parent_version: parentVersion }) }),
+  draft: (id: string, draftId: string, o?: ReadOpts) => call<Draft>(`/mlops/models/${q(id)}/dataset-drafts/${q(draftId)}`, undefined, o),
+  deleteDraft: (id: string, draftId: string) => call<void>(`/mlops/models/${q(id)}/dataset-drafts/${q(draftId)}`, { method: 'DELETE' }),
+  updateDraftItems: (id: string, draftId: string, changes: DraftChange[]) =>
+    call<Draft>(`/mlops/models/${q(id)}/dataset-drafts/${q(draftId)}/items`, { method: 'PATCH', body: JSON.stringify({ changes }) }),
+  /** One multipart request; the caller sends small batches to show real progress. */
+  importFiles: (id: string, draftId: string, files: File[], label: string, split: string, attested: boolean) => {
+    const form = new FormData();
+    files.forEach((f) => form.append('files', f, f.name));
+    form.append('label', label);
+    form.append('split', split);
+    form.append('synthetic_attested', String(attested));
+    return call<ImportResult[]>(`/mlops/models/${q(id)}/dataset-drafts/${q(draftId)}/import`, { method: 'POST', body: form, headers: {} }, { timeoutMs: 120_000 });
+  },
+  removeImport: (id: string, draftId: string, sha: string) =>
+    call<Draft>(`/mlops/models/${q(id)}/dataset-drafts/${q(draftId)}/imports/${q(sha)}`, { method: 'DELETE' }),
+  publish: (id: string, draftId: string, version: string) =>
+    call<PublishJob>(`/mlops/models/${q(id)}/dataset-drafts/${q(draftId)}/publish`, { method: 'POST', body: JSON.stringify({ version }) }),
+  datasetJob: (jobId: string) => call<PublishJob>(`/mlops/dataset-jobs/${q(jobId)}`),
 };
+
+/** Image URLs (served by the backend from the manifest whitelist; no credential in the browser). */
+export const datasetImageUrl = (id: string, version: string, file: string) =>
+  `${BASE}/mlops/models/${q(id)}/datasets/${q(version)}/images/${file.split('/').map(q).join('/')}`;
+export const draftImageUrl = (id: string, draftId: string, sha: string) =>
+  `${BASE}/mlops/models/${q(id)}/dataset-drafts/${q(draftId)}/images/${q(sha)}`;
+
+/* ------------------------------------------------------------------ datasets (types) */
+
+export interface DatasetRef {
+  name: string; version: string; uri: string; manifest_sha256: string | null; num_samples: number;
+  splits: Record<string, number>; split_strategy: string; confidential: boolean; classes: string[];
+}
+export interface DatasetVersion {
+  version: string; ref: DatasetRef; uri: string; schema_version: number;
+  parent_version: string | null; parent_manifest_sha256: string | null; created_at: string | null; created_by: string | null;
+  use_case: string | null; annotation_format: string; classes: string[]; counts: Record<string, Record<string, number>>;
+  split_strategy: string; split_fingerprints: Record<string, string>; synthetic: boolean; description: string | null;
+  provenance: Record<string, unknown>; changes: Record<string, number> | null; evaluation_reference_changed: boolean | null;
+  evaluation_changes: { file: string; split: string; change: string }[]; excluded_items: { file: string; sha256: string; label: string; split: string }[];
+  used_by: { model_version: string; run_id: string | null }[]; locked: boolean;
+}
+export interface DraftSummary {
+  draft_id: string; parent_version: string; status: string; created_at: string; updated_at: string;
+  n_changes: number; n_imports: number; target_version: string | null; published_version: string | null;
+}
+export interface DatasetIndex {
+  model_id: string; root: string; name: string | null; versions: DatasetVersion[];
+  incomplete: { version: string; state: 'publishing' | 'interrupted'; draft_id: string | null }[]; drafts: DraftSummary[];
+}
+export interface DatasetItem {
+  file: string; label: string; split: string; sha256: string; review?: string; previous_label?: string;
+  origin?: Record<string, unknown>; label_history?: { version: string; label: string; review?: string; note?: string }[];
+  [key: string]: unknown;
+}
+export interface ItemFilters { split?: string; label?: string; review?: string; q?: string; offset?: number; limit?: number }
+export interface ItemPage { total: number; offset: number; limit: number; facets: Record<string, Record<string, number>>; items: DatasetItem[] }
+export interface DraftChange { file: string; action: 'validate' | 'relabel' | 'exclude' | 'reset'; label?: string; note?: string }
+export interface DraftImport {
+  stored: string; sha256: string; ext: string; format: string; width: number; height: number; size: number;
+  label: string; split: string; original_name: string; imported_at: string;
+}
+export interface Draft {
+  draft_id: string; model_id: string; parent_version: string; parent_manifest_sha256: string; status: 'open' | 'publishing' | 'published';
+  created_at: string; updated_at: string; changes: Record<string, { action: string; label?: string; note?: string | null }>;
+  imports: DraftImport[]; target_version?: string; published_version?: string; published_manifest_sha256?: string;
+}
+export interface ImportResult { name: string; accepted: boolean; reason: string | null; sha256: string | null }
+export interface PublishJob {
+  job_id: string; model_id: string; draft_id: string; version: string; state: 'running' | 'succeeded' | 'failed';
+  phase: string; done: number; total: number; error: string | null; manifest_sha256: string | null; resumed: boolean;
+}
+export interface TableInfo { name: string; columns: { name: string; type: string }[]; num_rows: number | null; last_commit: string | null; note: string }
+export interface TrainingDataset { job_name: string | null; dataset_dir: string | null; dataset_version: string | null; source: string }

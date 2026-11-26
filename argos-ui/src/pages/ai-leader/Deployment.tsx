@@ -13,7 +13,7 @@ export default function Deployment() {
   return (
     <>
       <Panel title="Deployment Center" sub="Endpoints Model Serving personnalisés (les endpoints de modèles de fondation Databricks ne sont pas listés)">
-        <Unavailable tone="grey">Changement de version servie et rollback : non disponibles dans ARGOS à ce stade (chantier suivant). Aucune action de déploiement n'est proposée ici.</Unavailable>
+        <Unavailable tone="grey">Changement de version servie et rollback : non disponibles dans HOVIS à ce stade (chantier suivant). Aucune action de déploiement n'est proposée ici.</Unavailable>
       </Panel>
       {endpoints.error && <Unavailable tone="red">Serving indisponible : {endpoints.error}</Unavailable>}
       {endpoints.loading && <Loading />}

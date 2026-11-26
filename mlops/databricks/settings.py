@@ -40,6 +40,11 @@ class ManagedModel(BaseModel):
     endpoint: str | None = Field(default=None, description="Serving endpoint, if served")
     training_job: str | None = Field(default=None, description="Existing Lakeflow job name")
     synthetic: bool = False
+    # DBX-04: where the model's dataset versions live (Unity Catalog Volume folder, one
+    # immutable sub-folder per version with its manifest.json) and their Delta mirrors.
+    dataset_root: str | None = Field(default=None, description="/Volumes/<cat>/<schema>/<vol>")
+    dataset_name: str | None = None
+    dataset_tables: list[str] = Field(default_factory=list)
 
 
 DEFAULT_MODELS = [
@@ -53,6 +58,9 @@ DEFAULT_MODELS = [
         endpoint="argos-quality-poc",
         training_job="argos-poc-quality-training",
         synthetic=True,
+        dataset_root="/Volumes/workspace/argos_poc/images",
+        dataset_name="quality-synthetic",
+        dataset_tables=["workspace.argos_poc.annotations", "workspace.argos_poc.dataset_versions"],
     )
 ]
 

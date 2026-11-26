@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { ApiError, metaOf, mlops, type ModelStatus, type ReadOpts, type RunSummary } from '../../api/mlops';
+import { ApiError, metaOf, mlops, type ItemFilters, type ModelStatus, type ReadOpts, type RunSummary } from '../../api/mlops';
+import { translate } from './messages';
 import { combineMeta, ResourceStore, type CacheKind, type Loader } from './store';
 
 /* Une seule source de données pour tout l'espace AI Leader (voir store.ts) :
    chaque ressource est chargée UNE fois, à la demande de la section qui l'affiche,
    et partagée. Aucune donnée de repli : une erreur reste une erreur. */
 
-export const errText = (e: unknown) => (e instanceof ApiError ? `${e.status || 'réseau'} · ${e.message}` : String(e));
+export const errText = (e: unknown) => (e instanceof ApiError ? `${e.status || 'réseau'} · ${translate(e.message)}` : translate(String(e)));
 
 const Ctx = createContext<ResourceStore | null>(null);
 
@@ -128,3 +129,19 @@ export function useFreshness() {
   useStoreVersion(store);
   return store.summary();
 }
+
+/* ------------------------------------------------------------------ datasets (DBX-04) */
+
+export const useDatasets = (modelId: string | null) =>
+  useResource(modelId ? `datasets:${modelId}` : null, read((o) => mlops.datasets(modelId as string, o)));
+export const useDatasetItems = (modelId: string | null, version: string | null, f: ItemFilters) =>
+  useResource(
+    modelId && version ? `dsitems:${modelId}:${version}:${JSON.stringify(f)}` : null,
+    read((o) => mlops.datasetItems(modelId as string, version as string, f, o)),
+  );
+export const useDatasetTables = (modelId: string | null) =>
+  useResource(modelId ? `dstables:${modelId}` : null, read((o) => mlops.datasetTables(modelId as string, o)));
+export const useTrainingDataset = (modelId: string | null) =>
+  useResource(modelId ? `trainingdataset:${modelId}` : null, read((o) => mlops.trainingDataset(modelId as string, o)));
+export const useDraft = (modelId: string | null, draftId: string | null) =>
+  useResource(modelId && draftId ? `draft:${modelId}:${draftId}` : null, read((o) => mlops.draft(modelId as string, draftId as string, o)));

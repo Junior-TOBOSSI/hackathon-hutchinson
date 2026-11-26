@@ -19,7 +19,7 @@ import threading
 from collections.abc import Callable
 from typing import Annotated, Any, Literal, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel
 
 from mlops.connectors.mlflow_client import ExperimentInfo, MetricPoint, ModelVersionInfo, RunSummary
@@ -34,6 +34,16 @@ from mlops.databricks.connector import (
     MonitoringReport,
     SchemaInfo,
     VersionStatus,
+)
+from mlops.databricks.datasets import (
+    DatasetIndex,
+    DatasetVersionSummary,
+    ImportResult,
+    ItemPage,
+    PublishJob,
+    TableInfo,
+    TrainingDataset,
+    dataset_store,
 )
 from mlops.databricks.read_cache import BudgetExceeded, read_scope
 from mlops.databricks.training import DatabricksJobBackend
@@ -53,6 +63,28 @@ class AliasBody(BaseModel):
 
 class RetrainModeBody(BaseModel):
     mode: Literal["MANUEL", "AUTO"]
+
+
+class DraftBody(BaseModel):
+    parent_version: str
+
+
+class ItemChange(BaseModel):
+    file: str
+    action: Literal["validate", "relabel", "exclude", "reset"]
+    label: str | None = None
+    note: str | None = None
+
+
+class ItemChanges(BaseModel):
+    changes: list[ItemChange]
+
+
+class PublishBody(BaseModel):
+    version: str
+
+
+IMMUTABLE_IMAGE = {"Cache-Control": "private, max-age=31536000, immutable"}
 
 
 def translate(fn: Callable) -> Callable:
@@ -269,6 +301,121 @@ def create_mlops_router(
     @translate
     def endpoint(name: str, c: Connector, response: Response, fresh: Fresh = False) -> EndpointInfo:
         return served(c, response, fresh, lambda: c.get_endpoint(name))
+
+    # ------------------------------------------------------------------ datasets (DBX-04)
+    # Files API + Unity Catalog metadata only (no SQL warehouse). Published versions are
+    # immutable folders; drafts are separate; a publication never triggers a training.
+
+    @router.get("/mlops/models/{model_id}/datasets")
+    @translate
+    def datasets(
+        model_id: str, c: Connector, response: Response, fresh: Fresh = False
+    ) -> DatasetIndex:
+        return served(c, response, fresh, lambda: dataset_store(c).index(model_id))
+
+    @router.get("/mlops/models/{model_id}/datasets/{version}")
+    @translate
+    def dataset_version(
+        model_id: str, version: str, c: Connector, response: Response, fresh: Fresh = False
+    ) -> DatasetVersionSummary:
+        return served(c, response, fresh, lambda: dataset_store(c).version(model_id, version))
+
+    @router.get("/mlops/models/{model_id}/datasets/{version}/items")
+    @translate
+    def dataset_items(
+        model_id: str,
+        version: str,
+        c: Connector,
+        split: str | None = None,
+        label: str | None = None,
+        review: str | None = None,
+        q: str | None = Query(None, max_length=100),
+        offset: int = Query(0, ge=0),
+        limit: int = Query(24, ge=1, le=48),
+    ) -> ItemPage:
+        return dataset_store(c).items(model_id, version, split, label, review, q, offset, limit)
+
+    @router.get("/mlops/models/{model_id}/datasets/{version}/images/{file:path}")
+    @translate
+    def dataset_image(model_id: str, version: str, file: str, c: Connector) -> Response:
+        data, media = dataset_store(c).image(model_id, version, file)
+        return Response(data, media_type=media, headers=IMMUTABLE_IMAGE)
+
+    @router.get("/mlops/models/{model_id}/dataset-tables")
+    @translate
+    def dataset_tables(
+        model_id: str, c: Connector, response: Response, fresh: Fresh = False
+    ) -> list[TableInfo]:
+        return served(c, response, fresh, lambda: dataset_store(c).tables(model_id))
+
+    @router.get("/mlops/models/{model_id}/training-dataset")
+    @translate
+    def training_dataset(
+        model_id: str, c: Connector, response: Response, fresh: Fresh = False
+    ) -> TrainingDataset:
+        return served(c, response, fresh, lambda: dataset_store(c).training_dataset(model_id))
+
+    @router.post("/mlops/models/{model_id}/dataset-drafts", status_code=201)
+    @translate
+    def create_draft(model_id: str, body: DraftBody, c: Connector) -> dict[str, Any]:
+        return dataset_store(c).create_draft(model_id, body.parent_version)
+
+    @router.get("/mlops/models/{model_id}/dataset-drafts/{draft_id}")
+    @translate
+    def get_draft(model_id: str, draft_id: str, c: Connector) -> dict[str, Any]:
+        return dataset_store(c).get_draft(model_id, draft_id)
+
+    @router.delete("/mlops/models/{model_id}/dataset-drafts/{draft_id}", status_code=204)
+    @translate
+    def delete_draft(model_id: str, draft_id: str, c: Connector) -> None:
+        dataset_store(c).delete_draft(model_id, draft_id)
+
+    @router.patch("/mlops/models/{model_id}/dataset-drafts/{draft_id}/items")
+    @translate
+    def update_draft_items(
+        model_id: str, draft_id: str, body: ItemChanges, c: Connector
+    ) -> dict[str, Any]:
+        changes = [ch.model_dump() for ch in body.changes]
+        return dataset_store(c).update_items(model_id, draft_id, changes)
+
+    @router.post("/mlops/models/{model_id}/dataset-drafts/{draft_id}/import")
+    @translate
+    def import_into_draft(
+        model_id: str,
+        draft_id: str,
+        c: Connector,
+        files: Annotated[list[UploadFile], File()],
+        label: Annotated[str, Form()],
+        split: Annotated[str, Form()],
+        synthetic_attested: Annotated[bool, Form()] = False,
+    ) -> list[ImportResult]:
+        stream = ((f.filename or "image", f.file) for f in files)
+        return dataset_store(c).import_files(
+            model_id, draft_id, stream, label, split, synthetic_attested
+        )
+
+    @router.delete("/mlops/models/{model_id}/dataset-drafts/{draft_id}/imports/{sha}")
+    @translate
+    def remove_import(model_id: str, draft_id: str, sha: str, c: Connector) -> dict[str, Any]:
+        return dataset_store(c).remove_import(model_id, draft_id, sha)
+
+    @router.get("/mlops/models/{model_id}/dataset-drafts/{draft_id}/images/{sha}")
+    @translate
+    def draft_image(model_id: str, draft_id: str, sha: str, c: Connector) -> Response:
+        data, media = dataset_store(c).draft_image(model_id, draft_id, sha)
+        return Response(data, media_type=media, headers=IMMUTABLE_IMAGE)
+
+    @router.post("/mlops/models/{model_id}/dataset-drafts/{draft_id}/publish", status_code=202)
+    @translate
+    def publish_draft(model_id: str, draft_id: str, body: PublishBody, c: Connector) -> PublishJob:
+        """Starts the publication in the background; follow it with /mlops/dataset-jobs/{id}.
+        Never triggers a training job."""
+        return dataset_store(c).start_publish(model_id, draft_id, body.version).model_copy()
+
+    @router.get("/mlops/dataset-jobs/{job_id}")
+    @translate
+    def dataset_job(job_id: str, c: Connector) -> PublishJob:
+        return dataset_store(c).job(job_id).model_copy()
 
     return router
 

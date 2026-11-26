@@ -3,6 +3,7 @@ import { mlops, type MonitoringReport } from '../../api/mlops';
 import { DriftBars, GroupedBars } from './charts';
 import { Badge, grid, KV, LinkButton, Loading, Panel, Stat, Technical, Unavailable, useNav } from './common';
 import { errText, useMonitoring, useStore } from './data';
+import { translate } from './messages';
 import { dateTime, pct } from './metrics';
 import { useSelection } from './selection';
 
@@ -29,7 +30,7 @@ export default function Monitoring() {
     setBusy(true);
     try {
       const r = await mlops.monitoring(model.id, true);
-      setNote(r.available ? 'Lecture en direct réussie.' : `Lecture en direct impossible : ${r.reason}`);
+      setNote(r.available ? 'Lecture en direct réussie.' : `Lecture en direct impossible : ${translate(r.reason ?? '')}`);
       store.invalidate(`monitoring:${model.id}`, 'overview');
     } catch (e) {
       setNote(`Échec : ${errText(e)}`);
@@ -51,7 +52,7 @@ export default function Monitoring() {
         {monitoring.error && <Unavailable tone="red">Monitoring indisponible : {monitoring.error}</Unavailable>}
         {report && !report.available && (
           <Unavailable>
-            Lecture en direct indisponible : {report.reason}. Le SQL warehouse n'est jamais démarré automatiquement (maîtrise des crédits).
+            Lecture en direct indisponible : {translate(report.reason ?? '')}. Le SQL warehouse n'est jamais démarré automatiquement (maîtrise des crédits).
             {shown ? ' Les valeurs ci-dessous proviennent du dernier instantané enregistré.' : ' Aucun instantané antérieur.'}
           </Unavailable>
         )}

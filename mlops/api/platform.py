@@ -22,6 +22,7 @@ import time
 from fastapi import APIRouter, FastAPI
 
 from mlops.api.routes import build_overview, create_mlops_router, default_connector
+from mlops.databricks.datasets import dataset_store
 from mlops.databricks.read_cache import read_scope
 from visionhub.core.app import create_app
 
@@ -68,6 +69,10 @@ def warm_up() -> None:
             connector.list_endpoints()
             connector.list_jobs()
             connector.list_experiments()
+            # Dataset index (manifests only, never images) for the models that have one.
+            for managed in connector.settings.models:
+                if managed.dataset_root:
+                    dataset_store(connector).index(managed.id)
         log.warning("MLOps warm-up done in %.1f s", time.perf_counter() - started)
     except Exception as exc:  # noqa: BLE001 - warm-up is best effort only
         log.warning("MLOps warm-up skipped: %s", type(exc).__name__)

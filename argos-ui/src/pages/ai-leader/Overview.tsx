@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { EndpointInfo, JobInfo, LiveOverview, ModelStatus } from '../../api/mlops';
 import { Badge, grid, LinkButton, Loading, Panel, Stat, Unavailable, useNav, type Section } from './common';
 import { useEndpoints, useExperiments, useHealth, useJobs, useOverview, useRuns, useStatuses } from './data';
+import { translate } from './messages';
 import { dateTime, duration } from './metrics';
 import { PENDING_SLOTS, useSelection, versionRoles } from './selection';
 
@@ -16,7 +17,7 @@ function computeAlerts(overview: LiveOverview | null, statuses: ModelStatus[] | 
   for (const s of statuses ?? []) {
     const { served, champion, championApproved } = versionRoles(s);
     if (champion && served && champion !== served) {
-      alerts.push({ level: 'amber', title: `Champion v${champion} non servi`, detail: `L'endpoint sert encore v${served}. Le déploiement d'une version n'est pas encore disponible dans ARGOS.`, section: 'deployment', model: s.model_id });
+      alerts.push({ level: 'amber', title: `Champion v${champion} non servi`, detail: `L'endpoint sert encore v${served}. Le déploiement d'une version n'est pas encore disponible dans HOVIS.`, section: 'deployment', model: s.model_id });
     }
     if (champion && championApproved === false) {
       alerts.push({ level: 'amber', title: `Champion v${champion} non approuvé`, detail: "L'alias champion désigne une version sans approbation humaine.", section: 'registry', model: s.model_id });
@@ -31,7 +32,7 @@ function computeAlerts(overview: LiveOverview | null, statuses: ModelStatus[] | 
     }
   }
   for (const u of overview?.dataStatus.unavailable ?? []) {
-    if (u.startsWith('monitoring')) alerts.push({ level: 'blue', title: 'Monitoring en direct indisponible', detail: u.replace(/^monitoring [^:]+: /, ''), section: 'monitoring' });
+    if (u.startsWith('monitoring')) alerts.push({ level: 'blue', title: 'Monitoring en direct indisponible', detail: translate(u.replace(/^monitoring [^:]+: /, '')), section: 'monitoring' });
   }
   return alerts;
 }
@@ -83,7 +84,7 @@ export default function Overview() {
           ))}
         </Panel>
 
-        <Panel title="Parc de modèles" sub="Modèles gérés par ARGOS et livraisons attendues">
+        <Panel title="Parc de modèles" sub="Modèles gérés par HOVIS et livraisons attendues">
           {statuses.error && <Unavailable tone="red">Registre indisponible : {statuses.error}</Unavailable>}
           {models.map((m) => {
             const s = statuses.data?.find((x) => x.model_id === m.id) ?? null;

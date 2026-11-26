@@ -55,7 +55,7 @@ function Workspace() {
           </button>
         </div>
       </nav>
-      <main className="col" style={{ padding: '20px 24px 40px', gap: 18, width: '100%', maxWidth: 1360, margin: '0 auto', boxSizing: 'border-box' }}>
+      <main className="col" style={{ padding: '20px 24px 40px', gap: 18, width: '100%', maxWidth: 1760, margin: '0 auto', boxSizing: 'border-box' }}>
         {message && <div className="row between"><span className="muted" style={{ fontWeight: 600 }}>{message}</span><button className="btn" style={{ background: 'none', height: 'auto', padding: 0 }} onClick={() => setMessage('')}>×</button></div>}
         {section === 'overview' && <Overview />}
         {section === 'datasets' && <Datasets />}

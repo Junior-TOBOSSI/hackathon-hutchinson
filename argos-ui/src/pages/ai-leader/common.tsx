@@ -52,7 +52,7 @@ export function Stat({ label, value, hint, tone, onClick }: { label: string; val
   const body = (
     <>
       <span className="muted" style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
-      <span className="num" style={{ fontSize: 34, color }}>{value}</span>
+      <span className="num" style={{ fontSize: 'clamp(22px, 2.1vw, 34px)', lineHeight: 1.15, color, overflowWrap: 'anywhere', minWidth: 0 }}>{value}</span>
       {hint && <span className="muted" style={{ fontSize: 13 }}>{hint}</span>}
     </>
   );
