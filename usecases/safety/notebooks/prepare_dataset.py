@@ -1,15 +1,21 @@
-"""Build the training dataset: SH17 with our 9 classes, hands and gloves merged into 'hand'.
+"""Build a training dataset from SH17, with one of three class sets (--mode).
 
 Usage (from the repository root, ON THE MACHINE THAT TRAINS):
-    python usecases/safety/notebooks/prepare_dataset.py
-    python usecases/safety/notebooks/prepare_dataset.py --src data/raw/safety/sh17 \
-        --out data/processed/safety/sh17_hand
+    python usecases/safety/notebooks/prepare_dataset.py --mode all   # A: 17 SH17 classes
+    python usecases/safety/notebooks/prepare_dataset.py --mode ours  # B: our 9 classes
+    python usecases/safety/notebooks/prepare_dataset.py --mode hand  # C: B, hands+gloves merged
 
-Why merge hands + gloves: in SH17 a gloved hand is labelled ONLY 'gloves' and a bare hand
-ONLY 'hands'. The model finds 84% of bare hands but misses 55% of gloves (5.6x fewer
-examples). One 'hand' class lets every glove benefit from the 15,000 hand examples; a small
-classifier then tells gloved from bare on the hand crop (separate step).
+Modes:
+- all  : every SH17 class, unchanged (reference experiment).
+- ours : only what the safety use case needs; 'hands' (bare hand) and 'gloves' (gloved hand)
+         stay SEPARATE. A vs B changes only the class set: a fair comparison.
+- hand : like 'ours' but hands + gloves merged into one 'hand' class. In SH17 a gloved hand
+         is labelled ONLY 'gloves', a bare hand ONLY 'hands'; gloves have 5.6x fewer examples
+         and are missed 55% of the time. Merging lets gloves benefit from the hand examples;
+         a classifier on the hand crop would then tell gloved from bare (separate step).
 
+Every mode applies the same corrections (boxes clipped to the image, invalid lines dropped)
+and keeps the SH17 train/val split. Output: data/processed/safety/sh17_<mode>/.
 The source is never modified: images are RELATIVE symlinks, labels are new files.
 Run this script on the training machine itself (copying symlinks to a USB key breaks them).
 """
@@ -25,20 +31,26 @@ from pathlib import Path
 import yaml
 from explore_sh17 import SH17_DEFAULT_NAMES, Box, parse_label_file, read_splits  # same folder
 
-# New class list. ORDER MATTERS: it defines the class ids of the trained model.
-NEW_NAMES = ["person", "head", "face", "helmet", "vest", "glasses", "hand", "shoes", "foot"]
-# SH17 name -> new name. SH17 classes not listed here are dropped (ears, masks, tools, suits).
-SH17_TO_NEW = {
+# For each mode: SH17 name -> new name. ORDER MATTERS: the order of first appearance of the
+# new names defines the class ids of the trained model. SH17 classes not listed are dropped.
+# Our PPE (helmet, glasses, gloves, shoes) + what the system needs around them:
+# person (one result per person, contract), face (to hide faces), and head / hands / foot as
+# EVIDENCE of absence: "bare hand visible" -> gloves absent; no hand visible -> uncertain.
+OURS = {
     "person": "person",
-    "head": "head",
-    "face": "face",  # kept: needed to hide faces
+    "face": "face",
     "helmet": "helmet",
-    "safety-vest": "vest",
     "glasses": "glasses",
-    "hands": "hand",
-    "gloves": "hand",
+    "gloves": "gloves",
     "shoes": "shoes",
+    "head": "head",
+    "hands": "hands",
     "foot": "foot",
+}
+MODES = {
+    "all": {name: name for name in SH17_DEFAULT_NAMES},
+    "ours": OURS,
+    "hand": {**OURS, "gloves": "hand", "hands": "hand"},
 }
 SAME_OBJECT_IOU = 0.7  # after merging, a hand labelled twice (hands + gloves) is kept once
 
@@ -51,18 +63,21 @@ def iou(a: Box, b: Box) -> float:
     return inter / union if union > 0 else 0.0
 
 
-def remap(boxes: list[Box], old_to_new: dict[int, int]) -> tuple[list[Box], int]:
-    """Keep our classes with their new ids; drop duplicates created by the merge."""
-    hand = NEW_NAMES.index("hand")
+def remap(
+    boxes: list[Box], old_to_new: dict[int, int], merged: int | None
+) -> tuple[list[Box], int]:
+    """Keep the mode's classes with their new ids; drop duplicates created by a merge."""
     kept: list[Box] = []
     merged_duplicates = 0
     for box in boxes:
         if box.cls not in old_to_new:
             continue
         new = Box(old_to_new[box.cls], box.cx, box.cy, box.w, box.h)
-        # Only the merged class can hold the same object twice (once 'hands', once 'gloves').
+        # Only a merged class can hold the same object twice (once 'hands', once 'gloves').
         # Two persons standing close together are two real objects: never removed.
-        if new.cls == hand and any(k.cls == hand and iou(k, new) >= SAME_OBJECT_IOU for k in kept):
+        if new.cls == merged and any(
+            k.cls == merged and iou(k, new) >= SAME_OBJECT_IOU for k in kept
+        ):
             merged_duplicates += 1
             continue
         kept.append(new)
@@ -71,20 +86,23 @@ def remap(boxes: list[Box], old_to_new: dict[int, int]) -> tuple[list[Box], int]
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--mode", choices=sorted(MODES), default="ours")
     parser.add_argument("--src", type=Path, default=Path("data/raw/safety/sh17"))
-    parser.add_argument("--out", type=Path, default=Path("data/processed/safety/sh17_hand"))
+    parser.add_argument("--out", type=Path, default=None, help="default: .../sh17_<mode>")
     args = parser.parse_args(argv)
+    out = args.out or Path(f"data/processed/safety/sh17_{args.mode}")
 
     # SH17 has no YAML: class ids follow the official weights (checked against voc_labels).
-    old_to_new = {
-        SH17_DEFAULT_NAMES.index(old): NEW_NAMES.index(new) for old, new in SH17_TO_NEW.items()
-    }
+    mapping = MODES[args.mode]
+    new_names = list(dict.fromkeys(mapping.values()))
+    old_to_new = {SH17_DEFAULT_NAMES.index(o): new_names.index(n) for o, n in mapping.items()}
+    merged = new_names.index("hand") if "hand" in new_names else None
+
     splits = read_splits(args.src)
     images = {p.stem: p for p in (args.src / "images").iterdir()}
-
-    shutil.rmtree(args.out, ignore_errors=True)
-    (args.out / "images").mkdir(parents=True)
-    (args.out / "labels").mkdir()
+    shutil.rmtree(out, ignore_errors=True)
+    (out / "images").mkdir(parents=True)
+    (out / "labels").mkdir()
     counts: dict[str, Counter] = {s: Counter() for s in splits}
     stats = Counter()
     for split, stems in splits.items():
@@ -96,30 +114,29 @@ def main(argv: list[str] | None = None) -> None:
                 continue
             boxes, issues = parse_label_file(label, len(SH17_DEFAULT_NAMES))
             stats.update(issues)
-            boxes, duplicates = remap(boxes, old_to_new)
+            boxes, duplicates = remap(boxes, old_to_new, merged)
             stats["merged_duplicates"] += duplicates
-            # An image with none of our classes stays: it teaches "nothing to detect here".
+            # An image with none of the classes stays: it teaches "nothing to detect here".
             image = images[stem]
-            link = args.out / "images" / image.name
+            link = out / "images" / image.name
             link.symlink_to(os.path.relpath(image.resolve(), link.parent.resolve()))
-            (args.out / "labels" / f"{stem}.txt").write_text(
-                "".join(b.to_line() + "\n" for b in boxes)
-            )
-            counts[split].update(NEW_NAMES[b.cls] for b in boxes)
+            (out / "labels" / f"{stem}.txt").write_text("".join(b.to_line() + "\n" for b in boxes))
+            counts[split].update(new_names[b.cls] for b in boxes)
             lines.append(f"./images/{image.name}")
-        (args.out / f"{split}.txt").write_text("\n".join(lines) + "\n")
+        (out / f"{split}.txt").write_text("\n".join(lines) + "\n")
         print(f"{split}: {len(lines)} images")
 
     # 'path' is rewritten to an absolute path by train_detector.py on the training machine.
-    data = {"path": str(args.out.resolve()), "train": "train.txt", "val": "val.txt"}
-    data["names"] = dict(enumerate(NEW_NAMES))
-    (args.out / "data.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    data = {"path": str(out.resolve()), "train": "train.txt", "val": "val.txt"}
+    data["names"] = dict(enumerate(new_names))
+    (out / "data.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
 
-    print(f"\n{'class':<8}" + "".join(f"{s:>8}" for s in counts))
-    for name in NEW_NAMES:
-        print(f"{name:<8}" + "".join(f"{counts[s][name]:>8}" for s in counts))
+    print(f"\nmode '{args.mode}': {len(new_names)} classes")
+    print(f"{'class':<18}" + "".join(f"{s:>8}" for s in counts))
+    for name in new_names:
+        print(f"{name:<18}" + "".join(f"{counts[s][name]:>8}" for s in counts))
     print(f"\ncorrections: {dict(stats)}")
-    print(f"dataset written to {args.out}")
+    print(f"dataset written to {out}")
 
 
 if __name__ == "__main__":

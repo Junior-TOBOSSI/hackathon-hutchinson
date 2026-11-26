@@ -1,10 +1,12 @@
 """Train the PPE detector from generic COCO weights on the prepared SH17 dataset (GPU).
 
 Usage (from the repository root, after prepare_dataset.py, on the GPU machine):
-    python usecases/safety/notebooks/train_detector.py
-    python usecases/safety/notebooks/train_detector.py --imgsz 960 --name hand_s_960
+    D=data/processed/safety
     # quick check that everything runs (1 epoch on 2% of the images):
-    python usecases/safety/notebooks/train_detector.py --smoke
+    python usecases/safety/notebooks/train_detector.py --data $D/sh17_ours/data.yaml --smoke
+    # A (17 classes) and B (our classes): SAME settings, only the dataset changes
+    python usecases/safety/notebooks/train_detector.py --data $D/sh17_all/data.yaml
+    python usecases/safety/notebooks/train_detector.py --data $D/sh17_ours/data.yaml
 
 Choices (to defend):
 - start from COCO (generic objects, never saw SH17): no risk of re-learning the same images
@@ -42,7 +44,7 @@ def absolute_data_yaml(data: Path) -> Path:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
-        "--data", type=Path, default=Path("data/processed/safety/sh17_hand/data.yaml")
+        "--data", type=Path, default=Path("data/processed/safety/sh17_ours/data.yaml")
     )
     parser.add_argument("--weights", default="data/models/yolov8s_coco.pt", help="COCO start")
     parser.add_argument("--imgsz", type=int, default=640)
@@ -51,11 +53,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--batch", type=int, default=-1, help="-1 = as much as the GPU fits")
     parser.add_argument("--device", default="0", help="0 = first NVIDIA GPU, mps, cpu")
     parser.add_argument("--workers", type=int, default=8)
-    parser.add_argument("--name", default=None, help="run name (default: hand_s_<imgsz>)")
+    parser.add_argument("--name", default=None, help="default: <dataset>_s_<imgsz>")
     parser.add_argument("--smoke", action="store_true", help="1 epoch on 2%% of the data")
     args = parser.parse_args(argv)
 
-    name = args.name or f"hand_s_{args.imgsz}" + ("_smoke" if args.smoke else "")
+    # e.g. sh17_ours_s_640: one name per dataset, so the A / B / C runs never overwrite.
+    name = args.name or f"{args.data.parent.name}_s_{args.imgsz}" + ("_smoke" if args.smoke else "")
     runs = Path("data/processed/safety/runs").resolve()
     model = YOLO(args.weights)
     model.train(
