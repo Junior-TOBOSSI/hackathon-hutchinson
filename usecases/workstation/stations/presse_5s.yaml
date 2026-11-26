@@ -1,0 +1,45 @@
+# Station "presse_5S": hydraulic press with a 5S workbench (presse_5S_20, synthetic prototype).
+# THE reference data for the workstation use case from 2026-11-26.
+#
+# Two camera framings. "planche" is the framing of almost every photo (generated board AND
+# pilot-lot anomalies); its reference is good/good_002.png, EXCLUDED from the evaluation.
+# "pilote" is the provided reference.png: only good_001 (the same image, cropped) matches it.
+# The analyzer uses the view that aligns best (wrong cross-view alignments get 47-80
+# matches, right ones 97 and more: the best one is always the right one here).
+#
+# Paths are relative to --data-root. Coordinates are NORMALIZED [x, y] on each reference.
+# Zones ("empty_zones"): nothing may appear there compared with normal
+#   - zone_rouge : red hatched area next to the press, neither object nor person
+#   - etabli     : bench top, nothing left on it (5S disorder)
+# Slots ("element_slots"): tool groups of the shadow board must stay in their place.
+# The busy factory background varies between photos: it is never judged.
+name: presse_5s
+dataset: raw/workstation/presse_5S_20
+exclude_from_eval: [good/good_002.png]
+# Expected reason of each anomaly label: the zone where it must be found (null = any
+# problem outside the zones listed here, i.e. on the bench or the tool board).
+anomaly_types:
+  zone_object: zone_rouge
+  zone_person: zone_rouge
+  disorder: null
+views:
+  # Framing of almost every photo
+  - name: planche
+    reference_image: raw/workstation/presse_5S_20/good/good_002.png
+    empty_zones:
+      zone_rouge: [[0.792, 0.606], [0.911, 0.606], [0.998, 0.754], [0.998, 0.975], [0.827, 0.975]]
+      etabli: [[0.054, 0.548], [0.353, 0.548], [0.353, 0.671], [0.046, 0.677]]
+    element_slots:
+      bacs_bleus: [[0.101, 0.375], [0.175, 0.375], [0.175, 0.572], [0.101, 0.572]]
+      tournevis: [[0.194, 0.409], [0.244, 0.409], [0.244, 0.486], [0.194, 0.486]]
+      pinces: [[0.254, 0.409], [0.304, 0.409], [0.304, 0.517], [0.254, 0.517]]
+  # The provided reference (pilot lot)
+  - name: pilote
+    reference_image: raw/workstation/presse_5S_20/reference.png
+    empty_zones:
+      zone_rouge: [[0.786, 0.511], [0.919, 0.511], [0.998, 0.708], [0.998, 0.978], [0.863, 0.978]]
+      etabli: [[0.067, 0.517], [0.355, 0.517], [0.355, 0.603], [0.062, 0.609]]
+    element_slots:
+      bacs_bleus: [[0.107, 0.262], [0.181, 0.262], [0.181, 0.486], [0.107, 0.486]]
+      tournevis: [[0.192, 0.271], [0.244, 0.271], [0.244, 0.338], [0.192, 0.338]]
+      pinces: [[0.254, 0.246], [0.298, 0.246], [0.298, 0.369], [0.254, 0.369]]

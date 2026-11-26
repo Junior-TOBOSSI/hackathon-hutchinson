@@ -1,27 +1,36 @@
 # Cas d'usage `workstation` — écarts au poste de travail
 
 ## Rôle
-Poste de travail **5S** : au début de la prise de poste, une **photo** du poste est comparée à sa **référence**, pour repérer (a) **ce qui n'est pas à sa place** (désordre sur le plan de travail, outil absent du tableau) et (b) **tout objet ou toute personne** dans la **zone interdite**.
+Poste **presse + établi 5S** : au début de la prise de poste, une **photo** du poste est comparée à sa **référence**, pour repérer (a) **ce qui n'est pas à sa place** (désordre sur l'établi, outil absent du tableau) et (b) **tout objet ou toute personne** dans la **zone rouge** hachurée à côté de la presse.
 
-**Données de référence (depuis le 26/11) : `dataset_5S_80_496x325`**, un prototype synthétique : 1 référence, 30 photos conformes, 50 anomalies (38 désordres, 12 violations de zone). Étiquettes **indicatives, non validées** par le client. Le jeu est rangé dans `<data-root>/raw/workstation/dataset_5S_80_496x325/` et n'est jamais versionné.
+**Données de référence (depuis le 26/11) : `presse_5S_20`**, 20 images synthétiques plus `reference.png` :
+
+| Catégorie | Nombre |
+|---|---|
+| `good` | 5 |
+| `disorder` | 7 |
+| `zone_object` (cartons, chariot, transpalette) | 4 |
+| `zone_person` (opérateur) | 4 |
+
+Les étiquettes sont **indicatives**. Le jeu est rangé dans `<data-root>/raw/workstation/presse_5S_20/` et n'est jamais versionné. Les jeux précédents (`dataset_5S`, `poste1` / `poste2`) ont été abandonnés.
 
 ## Analyseur : une photo comparée à la normalité apprise
 
-Classe `usecases.workstation.model:ZoneWorkstationAnalyzer`. [config.yaml](config.yaml) pointe vers le fichier de poste [stations/dataset_5s.yaml](stations/dataset_5s.yaml), seule source de vérité : vues, boîtes, photos conformes.
+Classe `usecases.workstation.model:ZoneWorkstationAnalyzer`. [config.yaml](config.yaml) pointe vers le fichier de poste [stations/presse_5s.yaml](stations/presse_5s.yaml), seule source de vérité : vues, boîtes, photos conformes.
 
-1. **Alignement sur la bonne vue** ([align.py](align.py)) : le jeu mélange **deux cadrages**. Le cadrage A est net, comme la référence fournie. Le cadrage B est plus serré, flou, avec un bac vert et un câble sur l'établi. Une photo B ne s'aligne pas sur la référence A. Chaque cadrage a donc sa référence (B : `good/good_017.png`, **exclue de la mesure**) et ses boîtes, et la photo est comparée à la vue qui s'aligne le mieux. Échec partout : `alignment_failed`, donc `a_verifier`.
-2. **Normalité apprise** ([normal.py](normal.py)) : une seule image ne suffit pas, car les photos conformes diffèrent déjà entre elles (bac décalé, hachures rendues autrement, panneau présent ou non). Pour chaque pixel, on retient la **moyenne** et la **dispersion** des photos conformes alignées. Un pixel n'a changé que s'il s'écarte de plus de `normal_k` (4) dispersions, et d'au moins `diff_threshold` (25 niveaux).
-3. **Zones** : `zone_interdite` (ni objet ni personne) et `plan_de_travail` (rien de nouveau sur l'établi). Tout changement y devient `unknown_object@<zone>`, avec un score d'au moins 0,45 (`a_verifier`).
-4. **Emplacements** : un emplacement par groupe d'outils du tableau (`cles`, `tournevis`, `pinces`, `marteau`, `metre`…). S'il a changé à plus de 25 %, l'outil n'est pas à sa place et va dans `missing`.
-5. **Détecteur** (optionnel, `none` par défaut) : il ne fait que **nommer** un changement, il ne déclenche jamais d'alerte seul. Sur ce jeu, YOLO26 COCO n'a rien nommé de plus et doublait la latence.
+1. **Alignement sur la bonne vue** ([align.py](align.py)) : `reference.png` (vue « pilote ») ne correspond qu'à `good_001`, qui est la même image recadrée. **Toutes les autres photos**, y compris les anomalies du lot pilote, ont le cadrage « planche », dont la référence est `good/good_002.png` (**exclue de la mesure**). La photo est comparée à la vue qui s'aligne le mieux : les faux alignements obtiennent 47 à 80 correspondances, les bons 97 et plus. Échec partout : `alignment_failed`, donc `a_verifier`.
+2. **Normalité apprise** ([normal.py](normal.py)) : moyenne et dispersion par pixel des photos conformes alignées, **référence comprise**. Un pixel n'a changé que s'il s'écarte de plus de `normal_k` (4) dispersions, et d'au moins `diff_threshold` (25 niveaux). Il faut au moins 2 photos par vue ; sinon la vue se compare à sa seule référence.
+3. **Zones** : `zone_rouge` (ni objet ni personne) et `etabli` (rien de nouveau). L'arrière-plan de l'atelier, qui bouge d'une photo à l'autre, n'est **jamais** jugé.
+4. **Emplacements** : `bacs_bleus`, `tournevis`, `pinces` sur le tableau. S'il a changé à plus de 25 %, l'outil n'est pas à sa place et va dans `missing`.
+5. **Détecteur YOLO26 COCO** (activé par défaut) : il **nomme** les personnes (`person@zone_rouge`), mais ne déclenche jamais d'alerte seul.
 
 | Fichier | Rôle |
 |---|---|
-| [stations/dataset_5s.yaml](stations/dataset_5s.yaml) | Les deux vues, leurs zones et emplacements (coordonnées normalisées) |
-| [station.py](station.py) | Lecture du fichier de poste, du jeu étiqueté et des photos conformes |
+| [stations/presse_5s.yaml](stations/presse_5s.yaml) | Les deux vues, leurs zones et emplacements, la raison attendue par type d'anomalie |
+| [station.py](station.py) | Lecture du fichier de poste et de `labels.csv` (les deux formats d'étiquettes) |
 | [align.py](align.py) / [normal.py](normal.py) / [zones.py](zones.py) | Alignement, normalité apprise, masques et changements |
-| [model.py](model.py) / [detector.py](detector.py) | Analyseur et détecteur optionnel |
-| [evaluate.py](evaluate.py) | Mesure en **validation croisée**, images annotées |
+| [model.py](model.py) / [detector.py](detector.py) | Analyseur et détecteur |
+| [evaluate.py](evaluate.py) | Mesure en validation croisée (une photo conforme mise de côté à chaque fois), images annotées |
 | [draw_zones.py](draw_zones.py) | Dessin de nouvelles zones à la souris (sur PC, fenêtre tkinter) |
 | [make_samples.py](make_samples.py) | Poste synthétique dessiné, pour les tests unitaires |
 
@@ -29,20 +38,23 @@ Classe `usecases.workstation.model:ZoneWorkstationAnalyzer`. [config.yaml](confi
 ```bash
 python -m usecases.workstation.evaluate --data-root ~/data --annotate      # --device cuda sur le cluster
 ```
-**Validation croisée en 5 groupes** : une photo conforme n'est jamais jugée par un modèle qui l'a vue pendant l'apprentissage. Sortie dans `<data-root>/processed/workstation/dataset_5s/` : `results.csv`, `preview_A.png` / `preview_B.png` (boîtes sur chaque référence), `annotated/` (chaque photo alignée, avec les boîtes et le verdict).
+Sortie dans `<data-root>/processed/workstation/presse_5s/` : `results.csv`, `preview_planche.png` / `preview_pilote.png` (boîtes sur chaque référence), `annotated/` (chaque photo alignée, avec les boîtes et le verdict).
 
-### Résultats (26/11, CPU du PC de dev, seuils 0,4 / 0,7, sans détecteur)
-| | Résultat |
-|---|---|
-| Anomalies détectées | **50/50** (100 %), toutes pour la bonne raison |
-| Fausses alertes | **1/29** (3 %) : `good_029`, dont le bac bleu est nettement décalé (écart 5S discutable) |
-| Échecs d'alignement | 0 |
-| Latence | ≈ 0,25 s par photo |
+### Résultats (26/11, CPU, seuils 0,4 / 0,7)
+| | Sans détecteur | Avec YOLO26 COCO |
+|---|---|---|
+| Anomalies détectées, pour la bonne raison | 15/15 | 15/15 |
+| Fausses alertes (photos conformes) | 0/4 | 0/4 |
+| Personnes nommées dans la zone rouge | 0/4 | 2/4 (les deux du lot généré) |
+| Latence | ≈ 0,4 s | ≈ 0,8 s |
 
-Limites à dire au jury : le jeu est **synthétique** et petit (29 photos conformes), avec des étiquettes indicatives ; les réglages ont été choisis au milieu d'une plage stable (k = 3 à 4) pour ne pas coller aux données ; à confirmer sur des photos réelles.
+**À dire au jury, ce n'est pas un chiffre de performance :**
+- 20 images seulement, dont **4 conformes pour mesurer**, donc une erreur vaudrait 25 %. Ce sont des démonstrations, à présenter image par image.
+- Les 5 anomalies du **lot pilote** sont bien détectées, mais avec des **signalements en trop** : leur zone rouge porte un pictogramme absent des photos de la planche, et leurs bacs diffèrent. Aucune photo conforme du lot pilote n'existe dans ce cadrage, donc les 0/4 fausses alertes **ne couvrent pas ce lot**.
+- En production : une référence **et quelques photos conformes** par caméra et par configuration du poste.
 
 ### Tests
-`pytest usecases/workstation` : tests unitaires sur le poste synthétique (sans données ni modèle), plus [tests/test_dataset_5s.py](tests/test_dataset_5s.py) qui rejoue la mesure sur le vrai jeu s'il est présent (sinon ignoré, par exemple en CI ; `WORKSTATION_DATA_ROOT=~/data` sur le cluster).
+`pytest usecases/workstation` : tests unitaires sur le poste synthétique (sans données ni modèle), plus [tests/test_presse_5s.py](tests/test_presse_5s.py) qui vérifie sur le vrai jeu, s'il est présent, que chaque type d'anomalie est détecté (sinon ignoré, par exemple en CI ; `WORKSTATION_DATA_ROOT=~/data` sur le cluster).
 
 ## Contrat
 

@@ -1,7 +1,7 @@
 """Tests of the single-photo chain: alignment, views, learned normal, slots, naming.
 
 Everything runs on the synthetic station generated in memory (make_samples): no data/,
-no model. The real dataset is tested in test_dataset_5s.py (skipped without the data).
+no model. The real dataset is tested in test_presse_5s.py (skipped without the data).
 """
 
 import cv2
@@ -112,7 +112,8 @@ def test_learned_normal_ignores_normal_variation_but_catches_new_objects(tmp_pat
 
     learned = analyzer()
     learned.learn_normal(goods)  # after the reference is set
-    assert learned.views[0].normal is not None and learned.views[0].normal.count == 8
+    # 8 conforming photos + the reference image itself
+    assert learned.views[0].normal is not None and learned.views[0].normal.count == 9
     assert learned.analyze(photo, META).score == 0.0
 
     cluttered = photo.copy()
@@ -172,10 +173,10 @@ def test_huge_box_around_a_small_change_does_not_name_it():
 
 
 def test_station_file_is_valid_without_the_data(tmp_path):
-    station = load_station("dataset_5s", tmp_path)  # empty data root
-    assert [v["name"] for v in station["views"]] == ["A", "B"]
+    station = load_station("presse_5s", tmp_path)  # empty data root
+    assert [v["name"] for v in station["views"]] == ["planche", "pilote"]
     for view in station["views"]:
-        assert {"zone_interdite", "plan_de_travail"} <= set(view["empty_zones"])
+        assert {"zone_rouge", "etabli"} <= set(view["empty_zones"])
     params = analyzer_params(station)
     assert params["normal_images"] == []  # no dataset here: no normal photos
     a = ZoneWorkstationAnalyzer()

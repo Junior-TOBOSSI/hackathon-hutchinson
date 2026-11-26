@@ -1,6 +1,6 @@
-"""Measure the workstation analyzer on a labelled station dataset (e.g. dataset_5S).
+"""Measure the workstation analyzer on a labelled station dataset (e.g. presse_5S).
 
-    python -m usecases.workstation.evaluate [--station dataset_5s] [--data-root data]
+    python -m usecases.workstation.evaluate [--station presse_5s] [--data-root data]
         [--detector none|coco|yoloe] [--device cpu|cuda] [--no-slots] [--annotate]
 
 The station file (``stations/<name>.yaml``) gives the dataset, the reference view(s) and
@@ -14,8 +14,8 @@ analyzer learned on all conforming photos (they are never used to learn).
 
 Printed results (the figures for the jury):
 - DETECTION: anomalies raising an alert (a_verifier or anomalie), and for the RIGHT
-  reason (zone_violation -> something in zone_interdite; workstation_disorder ->
-  something on the bench or a tool not in its place);
+  reason (station ``anomaly_types``: zone_object / zone_person -> something in
+  zone_rouge; disorder -> something on the bench or a tool not in its place);
 - FALSE ALARMS: conforming photos raising an alert;
 - per anomaly type and per view, alignment failures, mean latency.
 
@@ -41,8 +41,6 @@ from visionhub.config import load_use_case_config
 from visionhub.contracts import AnalysisResult, Decision, FrameMeta, Thresholds, UseCase
 from visionhub.decision import decide
 
-ZONE_FOR_TYPE = {"zone_violation": "zone_interdite"}
-
 
 def build_analyzer(
     station: dict[str, Any],
@@ -63,14 +61,18 @@ def build_analyzer(
     return analyzer, config.thresholds
 
 
-def right_reason(result: AnalysisResult, anomaly_type: str) -> bool:
-    """Did the analyzer report a problem of the expected kind?"""
+def right_reason(result: AnalysisResult, anomaly_type: str, reasons: dict) -> bool:
+    """Did the analyzer report a problem of the expected kind?
+
+    ``reasons`` (station ``anomaly_types``) maps an anomaly type to the zone where it must
+    be found; ``None`` means any problem outside those zones (bench, tool board)."""
     found = [f for f in result.details.missing + result.details.misplaced if f != ALIGNMENT_FAILED]
-    zone = ZONE_FOR_TYPE.get(anomaly_type)
+    zone = reasons.get(anomaly_type)
     if zone:  # an object or a person in that zone
         return any(f.endswith(f"@{zone}") for f in found)
     # disorder: something on the bench or a tool not in its place
-    return any(not f.endswith("@zone_interdite") for f in found)
+    zones = {z for z in reasons.values() if z}
+    return any(not any(f.endswith(f"@{z}") for z in zones) for f in found)
 
 
 def judge(
@@ -90,8 +92,9 @@ def judge(
         result = analyzer.analyze(image, meta)
         latency_ms = (time.perf_counter() - start) * 1000
         decision = decide(result.score, thresholds)
-        expected = "conforme" if row["label"] == "good" else "anomalie"
-        kind = row.get("anomaly_type_indicative") or "good"
+        kind = row["kind"]
+        expected = "conforme" if kind == "good" else "anomalie"
+        reasons = station.get("anomaly_types") or {}
         flagged = decision != Decision.CONFORME
         failed = ALIGNMENT_FAILED in result.details.misplaced
         results.append(
@@ -102,7 +105,10 @@ def judge(
                 "decision": decision.value,
                 "score": round(result.score, 3),
                 "correct": flagged == (expected == "anomalie"),
-                "right_reason": flagged and expected == "anomalie" and right_reason(result, kind),
+                "right_reason": flagged
+                and expected == "anomalie"
+                and right_reason(result, kind, reasons),
+                "named_person": any(f.startswith("person@") for f in result.details.misplaced),
                 "view": "-" if failed else analyzer.last_view,
                 "alignment_failed": failed,
                 "found": "; ".join(result.details.missing + result.details.misplaced),
@@ -124,8 +130,9 @@ def evaluate(
 ) -> tuple[list[dict[str, Any]], ZoneWorkstationAnalyzer]:
     """Cross-validated evaluation of the whole dataset (see the module docstring)."""
     rows = labelled_photos(station)
-    goods = [r for r in rows if r["label"] == "good"]
-    anomalies = [r for r in rows if r["label"] != "good"]
+    goods = [r for r in rows if r["kind"] == "good"]
+    anomalies = [r for r in rows if r["kind"] != "good"]
+    folds = min(folds, len(goods))  # few conforming photos: leave-one-out
 
     def path(r: dict[str, str]) -> str:
         return str(station["dataset_dir"] / r["filename"])
@@ -209,7 +216,7 @@ def _pct(a: int, b: int) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--station", default="dataset_5s")
+    parser.add_argument("--station", default="presse_5s")
     parser.add_argument("--data-root", default="data", help="folder holding raw/ and processed/")
     parser.add_argument("--detector", choices=["none", "coco", "yoloe"], help="override config")
     parser.add_argument("--device", default="cpu")
@@ -236,7 +243,7 @@ def main() -> None:
         writer.writerows(rows)
     print(
         f"Station {station['name']} - analyzer {analyzer.name}+{analyzer.detector.name}"
-        f" - {args.folds}-fold cross-validation{' - no slots' if args.no_slots else ''}"
+        f" - cross-validation{' - no slots' if args.no_slots else ''}"
     )
     print(summary(rows))
     print(f"\nDetails: {out_dir / 'results.csv'}")

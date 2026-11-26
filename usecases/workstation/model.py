@@ -154,7 +154,13 @@ class ZoneWorkstationAnalyzer(Analyzer):
 
         Each photo goes to the view it aligns best with; photos aligning nowhere are
         skipped. Without photos, a view compares with its single reference image."""
-        groups: dict[str, tuple[list, list]] = {v.name: ([], []) for v in self.views}
+        # Each reference image is itself a conforming photo of its view.
+        groups: dict[str, tuple[list, list]] = {
+            v.name: ([v.image], [np.ones(v.image.shape[:2], bool)])
+            if v.image is not None
+            else ([], [])
+            for v in self.views
+        }
         for path in paths:
             image = cv2.imread(str(Path(path).expanduser()))
             picked = self._pick_view(image) if image is not None else None
@@ -164,7 +170,7 @@ class ZoneWorkstationAnalyzer(Analyzer):
                 groups[view.name][1].append(alignment.valid)
         for view in self.views:
             aligned, valid = groups[view.name]
-            if view.image is not None and aligned:
+            if view.image is not None and len(aligned) >= 2:
                 view.normal = normal_from_aligned(view.image, aligned, valid)
                 log.info("View %s: normal model from %d photos", view.name, len(aligned))
 

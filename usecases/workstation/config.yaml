@@ -12,16 +12,16 @@ thresholds:
 
 params:
   # --- Station: THE description of the workstation (views, boxes, conforming photos) -----
-  # stations/dataset_5s.yaml: 5S workbench of dataset_5S_80_496x325, two camera framings.
+  # stations/presse_5s.yaml: press + 5S workbench of presse_5S_20, two camera framings.
   # data_root holds raw/ (images are never versioned): "data" on the PC, ~/data on the cluster.
-  station: dataset_5s
+  station: presse_5s
   data_root: data
 
   # --- Detector: only NAMES what changed (never raises an alert on its own) ------------
-  # none  : no model (default: on dataset_5S, COCO named nothing and doubled the latency)
-  # coco  : YOLO26 pre-trained on COCO (cell phone, cup, bottle, person...)
+  # none  : no model, only the comparison with normal
+  # coco  : YOLO26 pre-trained on COCO (default: names the PERSONS in the red zone)
   # yoloe : YOLOE open-vocabulary, looks for the names listed in prompts (in English)
-  detector: none
+  detector: coco
   weights: data/models/workstation/yolo26n.pt   # yoloe: data/models/workstation/yoloe-26s-seg.pt
   prompts: []                                   # yoloe only, e.g. [cardboard box, rag, screw]
   conf: 0.35                                    # minimum detection confidence

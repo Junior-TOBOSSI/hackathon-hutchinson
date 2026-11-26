@@ -54,7 +54,19 @@ def labelled_photos(station: dict[str, Any]) -> list[dict[str, str]]:
     with labels.open(encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     excluded = set(station.get("exclude_from_eval") or [])
-    return [r for r in rows if r["filename"] not in excluded]
+    return [_normalize(r) for r in rows if r["filename"] not in excluded]
+
+
+def _normalize(row: dict[str, str]) -> dict[str, str]:
+    """Add ``kind`` (good or the anomaly type) whatever the labels.csv layout:
+    either ``label`` = good / anomalies + ``anomaly_type_indicative``, or ``label`` = the
+    type itself (good, disorder, zone_object, zone_person...)."""
+    label = row.get("label", "").strip()
+    if label == "good":
+        kind = "good"
+    else:
+        kind = (row.get("anomaly_type_indicative") or "").strip() or label
+    return {**row, "kind": kind}
 
 
 def normal_photos(station: dict[str, Any]) -> list[str]:
@@ -62,7 +74,7 @@ def normal_photos(station: dict[str, Any]) -> list[str]:
     return [
         str(station["dataset_dir"] / r["filename"])
         for r in labelled_photos(station)
-        if r["label"] == "good"
+        if r["kind"] == "good"
     ]
 
 
