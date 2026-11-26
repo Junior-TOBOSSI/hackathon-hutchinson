@@ -3,6 +3,38 @@
 ## Rôle
 Vérifier que le **poste est configuré comme la référence** : chaque objet attendu (outils, bacs, gabarits…) est présent et à sa place, et aucun objet manquant n'est oublié. Piste : détection d'objets YOLO (Ultralytics), puis comparaison des détections à une liste et à des positions de référence.
 
+## Analyseur actuel : zones à garder vides + détection (squelette)
+
+Caméra **fixe, vue de dessus**. Classe : `usecases.workstation.model:ZoneWorkstationAnalyzer`, réglée dans [config.yaml](config.yaml).
+
+| Fichier | Rôle |
+|---|---|
+| [zones.py](zones.py) | Masque de zone, recouvrement boîte/zone, différence **couleur** avec l'image de référence. NumPy/OpenCV, sans modèle |
+| [detector.py](detector.py) | Détecteur : `none`, `coco` (YOLO26 COCO ou nos propres poids), `yoloe` (invites texte) |
+| [model.py](model.py) | L'analyseur : identifie les éléments, cherche les objets dans les zones, persistance, score |
+| [draw_zones.py](draw_zones.py) | Capture de la référence à la webcam et dessin des zones à la souris (local, tkinter) |
+| [make_samples.py](make_samples.py) / [run_samples.py](run_samples.py) | Images synthétiques de test et affichage du verdict pour chacune |
+
+Ce que fait l'analyseur pour chaque image :
+1. **Identification** : le détecteur tourne sur toute l'image ; chaque objet va dans `details.detected`, et les éléments attendus non vus vont dans `details.missing`.
+2. **Zones vides** : un objet détecté dont la boîte recouvre la zone à plus de `min_overlap` (15 %) est signalé avec son nom ; une région qui diffère de la référence et qu'aucune détection n'explique est signalée `unknown_object`. Les deux s'écrivent `"<label>@<zone>"` dans `details.misplaced`.
+3. **Persistance** : un problème compte après `persistence_frames` images consécutives (3, soit 1,5 s à 2 images/s), pour qu'une main qui passe ne déclenche rien.
+4. **Score** : celui du problème le plus grave (confiance de la détection, ou part de la zone couverte pour un objet inconnu).
+5. **L'opérateur** (`person`) n'est jamais un « objet dans la zone », et sa boîte est exclue de la différence d'image.
+
+### Démarrer
+```bash
+pip install -e ".[workstation]"            # puis : pip install "ultralytics>=8.4" (YOLO26)
+yolo settings sync=False                   # aucune statistique envoyée à Ultralytics
+python -m usecases.workstation.make_samples   # images synthétiques -> data/processed/workstation/synthetic
+python -m usecases.workstation.run_samples    # verdict de chaque scénario et de la séquence
+# Poste réel : référence (poste rangé, PERSONNE dans le champ) puis zones
+python -m usecases.workstation.draw_zones --camera 0 --save data/workstation/reference.png
+```
+Démo sur la séquence synthétique : `SOURCE=folder SOURCE_PATH=data/processed/workstation/synthetic/sequence`.
+
+Les images synthétiques testent la différence d'image, la géométrie et la persistance ; ce sont des formes, qu'un modèle COCO ne reconnaît pas. Pour tester le détecteur, il faut de **vraies photos** prises avec la caméra du poste.
+
 ## Contrat
 
 **Entrée** : `analyze(image, meta)`

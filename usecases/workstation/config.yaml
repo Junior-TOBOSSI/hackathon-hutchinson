@@ -1,7 +1,8 @@
-# Use case: workstation (station layout vs. reference)
+# Use case: workstation (top-view camera: identify the elements, keep some zones empty)
 
-# Class loaded by the registry ("module:Class"). Change this line to plug a real model.
-analyzer_class: usecases.workstation.analyzer:FakeWorkstationAnalyzer
+# Class loaded by the registry ("module:Class").
+# The fake analyzer is still available: usecases.workstation.analyzer:FakeWorkstationAnalyzer
+analyzer_class: usecases.workstation.model:ZoneWorkstationAnalyzer
 
 # Decision layer: score < low -> conforme ; low <= score < high -> a_verifier ; score >= high -> anomalie
 thresholds:
@@ -9,9 +10,33 @@ thresholds:
   high: 0.7
 
 params:
-  seed: 7
-  anomaly_rate: 0.08
-  min_latency_ms: 15
-  max_latency_ms: 40
-  # Reference layout: objects that must be on the station.
-  expected_objects: [screwdriver, gauge, parts_tray, torque_wrench]
+  # --- Detector: identifies the elements on the WHOLE image -------------------------------
+  # none  : no model, only the difference with the reference image (fallback plan)
+  # coco  : YOLO26 pre-trained on COCO (cell phone, cup, bottle, scissors, person...)
+  #         -> also the setting for a model trained on our own elements (change weights)
+  # yoloe : YOLOE open-vocabulary, looks for the names listed in prompts (in English)
+  detector: coco
+  weights: data/models/workstation/yolo26n.pt   # yoloe: data/models/workstation/yoloe-26s-seg.pt
+  prompts: []                                   # yoloe only, e.g. [wrench, caliper, parts tray]
+  conf: 0.35                                    # minimum detection confidence
+  imgsz: 640                                    # inference size; 960 or 1280 for small objects
+  ignore_labels: [person]                       # the operator is never an "object in the zone"
+
+  # --- Reference layout --------------------------------------------------------------------
+  expected_objects: []          # labels that must be visible; missing ones are reported
+  # Tidy station, nobody in the field (python -m usecases.workstation.draw_zones).
+  # If the file is missing, the first analyzed frame becomes the reference.
+  reference_image: data/workstation/reference.png
+
+  # --- Zones that must stay empty: normalized polygons [x, y] in [0, 1] -----------------
+  # Draw them with: python -m usecases.workstation.draw_zones --image <reference>
+  empty_zones:
+    keep_clear: [[0.62, 0.55], [0.95, 0.55], [0.95, 0.95], [0.62, 0.95]]
+
+  # --- Tuning --------------------------------------------------------------------------------
+  min_overlap: 0.15         # share of an object's box inside a zone to count it as "in"
+  diff_threshold: 35        # grey-level difference (0-255) that counts as a change
+  min_blob_area: 0.01       # smallest changed region, as a share of the zone area
+  full_blob_area: 0.05      # changed region giving a confidence of 1 (share of the zone)
+  persistence_frames: 3     # consecutive frames before a problem counts (3 = 1.5 s at 2 fps)
+  missing_score: 0.5        # score of a missing expected element (0.5 -> a_verifier)
