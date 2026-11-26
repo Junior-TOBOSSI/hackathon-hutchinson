@@ -144,16 +144,51 @@ def test_known_object_in_zone_is_named_and_not_duplicated():
     analyzer = make(FakeDetector([Detection("cell phone", 0.9, zone_box())]))
     result = run(analyzer, image)
     assert result.details.misplaced == ["cell phone@keep_clear"]
-    assert result.score == pytest.approx(0.9)
+    assert result.score >= 0.9  # the stronger of detector confidence and size of change
     assert [o.label for o in result.details.detected] == ["cell phone"]
 
 
-def test_operator_is_ignored():
+def test_hesitant_detector_never_lowers_a_clear_change():
+    """Regression: a person found with confidence 0.38 used to HIDE the change (score 0.38,
+    conforme) although the reference comparison alone raised an alert."""
+    image = REFERENCE.copy()
+    x1, y1, x2, y2 = zone_box()
+    image[y1:y2, x1:x2] = (30, 30, 30)
+    analyzer = make(FakeDetector([Detection("person", 0.38, zone_box())]))
+    result = run(analyzer, image)
+    assert result.details.misplaced == ["person@keep_clear"]  # named by the detector
+    assert result.score >= 0.7  # but scored by the clear change
+
+
+def test_detection_outside_the_zone_does_not_hide_a_change_inside():
+    image = REFERENCE.copy()
+    samples.cup(image, 0.80, 0.75)  # in the zone
+    # A huge box (the whole bench) contains the cup centre, but only ~13 % of the box lies
+    # in the zone (< min_overlap): it is NOT an object in the zone, so it must not
+    # "explain away" the cup.
+    big_box = (0, 0, samples.W, samples.H)
+    analyzer = make(FakeDetector([Detection("dining table", 0.9, big_box)]))
+    result = run(analyzer, image)
+    assert f"{UNKNOWN}@keep_clear" in result.details.misplaced
+
+
+ARM_BOX = (int(0.70 * samples.W), int(0.55 * samples.H), samples.W, samples.H)
+
+
+def test_person_in_zone_is_a_violation_by_default():
+    """Client rule: a zone of interest contains neither object NOR person."""
     image = REFERENCE.copy()
     samples.arm(image, 0.80, 0.70)
-    arm_box = (int(0.70 * samples.W), int(0.55 * samples.H), samples.W, samples.H)
-    analyzer = make(FakeDetector([Detection("person", 0.8, arm_box)]))
-    result = run(analyzer, image)
+    result = run(make(FakeDetector([Detection("person", 0.8, ARM_BOX)])), image)
+    assert "person@keep_clear" in result.details.misplaced
+    assert result.score >= 0.7
+
+
+def test_ignored_labels_are_not_judged():
+    image = REFERENCE.copy()
+    samples.arm(image, 0.80, 0.70)
+    detector = FakeDetector([Detection("person", 0.8, ARM_BOX)])
+    result = run(make(detector, ignore_labels=["person"]), image)
     assert result.score == 0.0
     assert result.details.misplaced == []
     assert [o.label for o in result.details.detected] == ["person"]  # still identified

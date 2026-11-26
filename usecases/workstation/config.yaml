@@ -1,4 +1,5 @@
-# Use case: workstation (top-view camera: identify the elements, keep some zones empty)
+# Use case: workstation. ONE photo at the start of the shift, compared with the client's
+# reference image: what is not in its place, and zones with neither object nor person.
 
 # Class loaded by the registry ("module:Class").
 # The fake analyzer is still available: usecases.workstation.analyzer:FakeWorkstationAnalyzer
@@ -20,7 +21,7 @@ params:
   prompts: []                                   # yoloe only, e.g. [wrench, caliper, parts tray]
   conf: 0.35                                    # minimum detection confidence
   imgsz: 640                                    # inference size; 960 or 1280 for small objects
-  ignore_labels: [person]                       # the operator is never an "object in the zone"
+  ignore_labels: []                             # labels never judged in zones (a person IS a violation)
 
   # --- Reference layout --------------------------------------------------------------------
   expected_objects: []          # labels that must be visible; missing ones are reported
@@ -28,15 +29,26 @@ params:
   # If the file is missing, the first analyzed frame becomes the reference.
   reference_image: data/workstation/reference.png
 
-  # --- Zones that must stay empty: normalized polygons [x, y] in [0, 1] -----------------
+  # --- Alignment of the photo onto the reference (SIFT + RANSAC) -------------------------
+  align: true
+  min_inliers: 25               # fewer consistent matches -> alignment_failed (a_verifier)
+  alignment_failed_score: 0.5
+
+  # --- Zones with neither object nor person: normalized polygons [x, y] in [0, 1] -------
   # Draw them with: python -m usecases.workstation.draw_zones --image <reference>
   empty_zones:
     keep_clear: [[0.62, 0.55], [0.95, 0.55], [0.95, 0.95], [0.62, 0.95]]
+
+  # --- Place of each element on the reference (stations/*.yaml give real examples) ------
+  element_slots: {}
 
   # --- Tuning --------------------------------------------------------------------------------
   min_overlap: 0.15         # share of an object's box inside a zone to count it as "in"
   diff_threshold: 35        # grey-level difference (0-255) that counts as a change
   min_blob_area: 0.01       # smallest changed region, as a share of the zone area
   full_blob_area: 0.05      # changed region giving a confidence of 1 (share of the zone)
-  persistence_frames: 3     # consecutive frames before a problem counts (3 = 1.5 s at 2 fps)
+  unknown_min_score: 0.45   # any object in an empty zone is at least worth a check (> low)
+  persistence_frames: 1     # one photo per check; >1 only for a video stream
+  slot_min_change: 0.25     # share of a slot that must change for "not in its place"
+  slot_full_change: 0.6     # changed share giving a score of 1
   missing_score: 0.5        # score of a missing expected element (0.5 -> a_verifier)

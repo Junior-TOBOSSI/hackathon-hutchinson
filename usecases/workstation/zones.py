@@ -86,6 +86,54 @@ def _smooth(image: np.ndarray) -> np.ndarray:
     return cv2.GaussianBlur(image, (5, 5), 0).astype(np.float32)
 
 
+def change_mask(
+    image: np.ndarray,
+    reference: np.ndarray,
+    diff_threshold: float,
+    valid: np.ndarray | None = None,
+) -> np.ndarray:
+    """Boolean mask (H, W) of the pixels that differ from the reference image.
+
+    Computed ONCE per image, then read by every zone and every element slot.
+    Steps: blur, global brightness compensation, absolute difference PER COLOUR CHANNEL
+    (the largest one is kept), threshold, morphological cleaning.
+    ``valid`` (optional) marks the pixels that exist in both images (after alignment, the
+    borders of the warped photo are empty and must not count as changes).
+
+    Why colour and not grayscale: an orange box on a grey bench can have the SAME
+    brightness as the bench; in grayscale it would be invisible.
+    """
+    h, w = image.shape[:2]
+    if reference.shape[:2] != (h, w):
+        reference = cv2.resize(reference, (w, h), interpolation=cv2.INTER_AREA)
+    if valid is None:
+        valid = np.ones((h, w), dtype=bool)
+
+    current, ref = _smooth(image), _smooth(reference)
+    # If the whole scene got brighter or darker (light switched on, cloud), scale each
+    # channel back to the reference level, so that only LOCAL changes remain.
+    current *= ref[valid].mean(axis=0) / np.maximum(current[valid].mean(axis=0), 1.0)
+
+    changed = (np.abs(current - ref).max(axis=2) > diff_threshold) & valid
+
+    # Opening removes isolated pixels, closing fills small holes inside an object.
+    kernel = np.ones((5, 5), np.uint8)
+    cleaned = cv2.morphologyEx(changed.astype(np.uint8), cv2.MORPH_OPEN, kernel)
+    cleaned = cv2.morphologyEx(cleaned, cv2.MORPH_CLOSE, kernel)
+    return cleaned.astype(bool)
+
+
+def blobs_in(changed: np.ndarray, min_area: int) -> list[Blob]:
+    """Connected regions of a boolean change mask larger than ``min_area`` pixels."""
+    n, _, stats, _ = cv2.connectedComponentsWithStats(changed.astype(np.uint8), connectivity=8)
+    blobs = []
+    for i in range(1, n):  # label 0 is the background
+        x, y, bw, bh, area = (int(v) for v in stats[i])
+        if area >= min_area:
+            blobs.append(Blob(box=(x, y, x + bw, y + bh), area=area))
+    return blobs
+
+
 def changed_blobs(
     image: np.ndarray,
     reference: np.ndarray,
@@ -94,39 +142,8 @@ def changed_blobs(
     min_area: int,
     ignore_mask: np.ndarray | None = None,
 ) -> list[Blob]:
-    """Regions of the zone that differ from the reference image.
-
-    Steps: blur, global brightness compensation, absolute difference PER COLOUR CHANNEL
-    (the largest one is kept), threshold, morphological cleaning, connected components
-    larger than ``min_area``. ``ignore_mask`` removes areas we do not want to judge (e.g.
-    the operator's arms).
-
-    Why colour and not grayscale: an orange box on a grey bench can have the SAME
-    brightness as the bench; in grayscale it would be invisible.
-    """
-    h, w = image.shape[:2]
-    if reference.shape[:2] != (h, w):
-        reference = cv2.resize(reference, (w, h), interpolation=cv2.INTER_AREA)
-
-    current, ref = _smooth(image), _smooth(reference)
-    # If the whole scene got brighter or darker (light switched on, cloud), scale each
-    # channel back to the reference level, so that only LOCAL changes remain.
-    current *= ref.mean(axis=(0, 1)) / np.maximum(current.mean(axis=(0, 1)), 1.0)
-
-    diff = np.abs(current - ref).max(axis=2)
-    changed = (diff > diff_threshold) & zone_mask
+    """Regions of the zone that differ from the reference (change_mask + blobs_in)."""
+    changed = change_mask(image, reference, diff_threshold) & zone_mask
     if ignore_mask is not None:
         changed &= ~ignore_mask
-
-    # Opening removes isolated pixels, closing fills small holes inside an object.
-    kernel = np.ones((5, 5), np.uint8)
-    cleaned = cv2.morphologyEx(changed.astype(np.uint8), cv2.MORPH_OPEN, kernel)
-    cleaned = cv2.morphologyEx(cleaned, cv2.MORPH_CLOSE, kernel)
-
-    n, _, stats, _ = cv2.connectedComponentsWithStats(cleaned, connectivity=8)
-    blobs = []
-    for i in range(1, n):  # label 0 is the background
-        x, y, bw, bh, area = (int(v) for v in stats[i])
-        if area >= min_area:
-            blobs.append(Blob(box=(x, y, x + bw, y + bh), area=area))
-    return blobs
+    return blobs_in(changed, min_area)

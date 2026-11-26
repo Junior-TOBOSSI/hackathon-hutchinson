@@ -37,6 +37,7 @@ def station(seed: int = 0) -> np.ndarray:
     # Slight texture so that the bench is not perfectly flat.
     texture = rng.normal(0, 4, (H, W, 1)).astype(np.int16)
     img = np.clip(img.astype(np.int16) + texture, 0, 255).astype(np.uint8)
+    landmarks(img)
 
     # Shadow board on the left: outlines + tools in place.
     cv2.rectangle(img, _px(0.03, 0.05), _px(0.40, 0.48), (90, 90, 95), -1)
@@ -51,6 +52,32 @@ def station(seed: int = 0) -> np.ndarray:
     pts = np.array([_px(*p) for p in KEEP_CLEAR], np.int32)
     cv2.polylines(img, [pts], True, (0, 220, 240), 8)
     return img
+
+
+def landmarks(img: np.ndarray) -> None:
+    """Fixed marks on the bench (screws, stains, labels), always at the same place.
+
+    A real station is full of such details; the alignment (align.py) relies on them. A
+    perfectly flat synthetic bench would give it nothing stable to hold on to.
+    """
+    rng = np.random.default_rng(7)  # same marks for every image
+    for _ in range(90):
+        x, y = int(rng.integers(10, W - 10)), int(rng.integers(10, H - 10))
+        shade = tuple(int(v) for v in rng.integers(20, 110, 3))
+        kind = rng.integers(3)
+        if kind == 0:  # screw
+            cv2.circle(img, (x, y), int(rng.integers(3, 8)), shade, -1)
+            cv2.line(img, (x - 4, y), (x + 4, y), (220, 220, 220), 1)
+        elif kind == 1:  # label
+            cv2.rectangle(img, (x, y), (x + int(rng.integers(8, 30)), y + 6), shade, -1)
+        else:  # stain / scratch
+            cv2.line(
+                img,
+                (x, y),
+                (x + int(rng.integers(-20, 20)), y + int(rng.integers(5, 20))),
+                shade,
+                2,
+            )
 
 
 def wrench(img: np.ndarray, x: float, y: float, angle: float = 0.0) -> None:

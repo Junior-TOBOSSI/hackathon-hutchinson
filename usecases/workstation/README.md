@@ -1,39 +1,59 @@
 # Cas d'usage `workstation` — écarts au poste de travail
 
 ## Rôle
-Vérifier que le **poste est configuré comme la référence** : chaque objet attendu (outils, bacs, gabarits…) est présent et à sa place, et aucun objet manquant n'est oublié. Piste : détection d'objets YOLO (Ultralytics), puis comparaison des détections à une liste et à des positions de référence.
+Besoin client (26/11) : **au début de la prise de poste**, une **photo** du poste est comparée à **l'image de référence fournie par le client**, pour repérer (a) **ce qui n'est pas à sa place** et (b) **tout objet ou toute personne** dans une zone d'intérêt qui doit rester vide.
 
-## Analyseur actuel : zones à garder vides + détection (squelette)
+## Analyseur : une photo comparée à la référence
 
-Caméra **fixe, vue de dessus**. Classe : `usecases.workstation.model:ZoneWorkstationAnalyzer`, réglée dans [config.yaml](config.yaml).
+Classe `usecases.workstation.model:ZoneWorkstationAnalyzer`, réglée dans [config.yaml](config.yaml). Pour chaque photo :
+
+0. **Alignement** ([align.py](align.py)) : la photo est recalée sur la référence (points SIFT + homographie RANSAC). En cas d'échec : `alignment_failed`, score 0,5, donc `a_verifier` (un humain regarde, le système ne devine pas).
+1. **Identification** : le détecteur (`none` / `coco` / `yoloe`) tourne sur toute l'image ; chaque objet va dans `details.detected`.
+2. **Changements** : un seul masque des pixels qui diffèrent de la référence (différence **couleur**, luminosité compensée), lu par les zones et les emplacements.
+3. **Emplacements d'éléments** (`element_slots`) : si une part suffisante (`slot_min_change`, 25 %) de l'emplacement a changé, l'élément n'est pas à sa place et va dans `details.missing` (ou `misplaced` si le détecteur le voit ailleurs).
+4. **Zones vides** (`empty_zones`) : un objet ou une personne détecté dans la zone, ou un changement qu'aucune détection n'explique (`unknown_object`), s'écrit `"<label>@<zone>"` dans `details.misplaced`. Score = la plus forte des deux preuves (confiance du détecteur, taille du changement), et au moins `unknown_min_score` (0,45, donc `a_verifier`) : « aucun élément » veut dire aucun.
+5. **Score** : celui du problème le plus grave ; la couche de décision commune donne conforme / a_verifier / anomalie.
 
 | Fichier | Rôle |
 |---|---|
-| [zones.py](zones.py) | Masque de zone, recouvrement boîte/zone, différence **couleur** avec l'image de référence. NumPy/OpenCV, sans modèle |
-| [detector.py](detector.py) | Détecteur : `none`, `coco` (YOLO26 COCO ou nos propres poids), `yoloe` (invites texte) |
-| [model.py](model.py) | L'analyseur : identifie les éléments, cherche les objets dans les zones, persistance, score |
-| [draw_zones.py](draw_zones.py) | Capture de la référence à la webcam et dessin des zones à la souris (local, tkinter) |
-| [make_samples.py](make_samples.py) / [run_samples.py](run_samples.py) | Images synthétiques de test et affichage du verdict pour chacune |
+| [zones.py](zones.py) / [align.py](align.py) | Géométrie des zones, masque de changements, alignement |
+| [detector.py](detector.py) / [model.py](model.py) | Détecteur et analyseur |
+| [stations/](stations/) | Un fichier par poste : image source, zones vides, emplacements (coordonnées normalisées) |
+| [clean_capture.py](clean_capture.py) | Capture de l'ancien système → référence propre (recadrage + effacement des incrustations) |
+| [make_variants.py](make_variants.py) | Photos de test générées depuis la référence, avec la réponse attendue |
+| [evaluate.py](evaluate.py) | Taux de détection, fausses alertes, latence ; images annotées |
+| [draw_zones.py](draw_zones.py) | Dessin des zones à la souris (sur PC, fenêtre tkinter) |
+| [make_samples.py](make_samples.py) / [run_samples.py](run_samples.py) | Poste synthétique dessiné, pour les tests automatiques |
 
-Ce que fait l'analyseur pour chaque image :
-1. **Identification** : le détecteur tourne sur toute l'image ; chaque objet va dans `details.detected`, et les éléments attendus non vus vont dans `details.missing`.
-2. **Zones vides** : un objet détecté dont la boîte recouvre la zone à plus de `min_overlap` (15 %) est signalé avec son nom ; une région qui diffère de la référence et qu'aucune détection n'explique est signalée `unknown_object`. Les deux s'écrivent `"<label>@<zone>"` dans `details.misplaced`.
-3. **Persistance** : un problème compte après `persistence_frames` images consécutives (3, soit 1,5 s à 2 images/s), pour qu'une main qui passe ne déclenche rien.
-4. **Score** : celui du problème le plus grave (confiance de la détection, ou part de la zone couverte pour un objet inconnu).
-5. **L'opérateur** (`person`) n'est jamais un « objet dans la zone », et sa boîte est exclue de la différence d'image.
-
-### Démarrer
-```bash
-pip install -e ".[workstation]"            # puis : pip install "ultralytics>=8.4" (YOLO26)
-yolo settings sync=False                   # aucune statistique envoyée à Ultralytics
-python -m usecases.workstation.make_samples   # images synthétiques -> data/processed/workstation/synthetic
-python -m usecases.workstation.run_samples    # verdict de chaque scénario et de la séquence
-# Poste réel : référence (poste rangé, PERSONNE dans le champ) puis zones
-python -m usecases.workstation.draw_zones --camera 0 --save data/workstation/reference.png
+### Données attendues (jamais versionnées)
 ```
-Démo sur la séquence synthétique : `SOURCE=folder SOURCE_PATH=data/processed/workstation/synthetic/sequence`.
+<data-root>/raw/workstation/poste1_capture.png   # capture de l'ancien système
+<data-root>/raw/workstation/poste2_atelier.png   # photo d'atelier (2e poste)
+```
+`<data-root>` vaut `data` sur PC, `~/data` sur le cluster.
 
-Les images synthétiques testent la différence d'image, la géométrie et la persistance ; ce sont des formes, qu'un modèle COCO ne reconnaît pas. Pour tester le détecteur, il faut de **vraies photos** prises avec la caméra du poste.
+### Générer et mesurer
+```bash
+python -m usecases.workstation.make_variants --station poste1 --data-root ~/data --n 10
+python -m usecases.workstation.evaluate --station poste1 --data-root ~/data --detector none --annotate
+# --detector coco pour ajouter YOLO26 ; --device cuda sur le cluster
+```
+Sortie dans `<data-root>/processed/workstation/poste1/` : `reference.png`, `preview.png` (zones en rouge, emplacements en cyan), `variants/` + `labels.json`, `results.csv`, `annotated/`.
+
+Variantes générées (chacune avec un léger mouvement de caméra, de la lumière, du bruit et une compression JPEG) : `ok`, `object_outside` (conforme attendu), `missing_<emplacement>` (élément effacé par inpainting), `object_in_<zone>` (élément collé dans la zone), `person_in_<zone>` (personne découpée par YOLO26-seg, collée dans la zone).
+
+### Premiers résultats (variantes générées, seed 0, 26/11)
+| Poste | Détecteur | Alertes levées (bonne raison) | Fausses alertes | Latence CPU |
+|---|---|---|---|---|
+| poste1 | none | 24/24 | 0/20 | ~370 ms |
+| poste1 | coco | 24/24 | 0/20 | ~760 ms |
+| poste2 | none | 25/26 | 0/20 | ~390 ms |
+| poste2 | coco | 25/26 | 0/20 | ~830 ms |
+
+Limites connues : un objet **très petit** (quelques dizaines de pixels) ou de **même couleur que le sol** peut passer inaperçu (le seul raté du poste 2) ; `clean_capture` repère les incrustations par leur couleur, il ne convient que si la scène ne contient pas ce vert ou ce magenta vifs ; les variantes sont générées, pas réelles : à confirmer sur des photos du mini poste.
+
+### Tests
+`pytest usecases/workstation` : tests sur images synthétiques (sans modèle ni données), plus [tests/test_real_stations.py](tests/test_real_stations.py) qui traite **vos vraies images** s'il les trouve (sinon ignoré, par exemple en CI ; `WORKSTATION_DATA_ROOT=~/data` sur le cluster).
 
 ## Contrat
 
