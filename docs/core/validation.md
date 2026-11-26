@@ -24,3 +24,18 @@ Serveur démarré temporairement sur `127.0.0.1:8020`, arrêté ensuite. Le simu
 Les bases de cette validation sont dans `var/` (ignoré par Git). Le Core n'est pas encore raccordé à l'outbox Edge ni à un frontend en mode live. Le simulateur ne mesure aucune performance de modèle de Computer Vision.
 
 Un passage complet intermédiaire a échoué sur une allocation mémoire NumPy de 7 Mio dans le test historique `tests/production/test_api_production.py::test_acceptance_scenario`. Ce test a réussi isolément immédiatement après, puis les **134 tests** ont réussi au passage complet suivant. Aucun fichier de ce test ou du Production Engine n'a été modifié.
+
+## CORE-02 — liaison Edge → Core, 26 novembre 2026
+
+La validation HTTP a utilisé deux bases neuves et distinctes dans `var/`, ignoré par Git. Core : `127.0.0.1:8020` ; Edge : `127.0.0.1:18040` avec `ARGOS_CORE_URL=http://127.0.0.1:8020`. Le simulateur `visionhub.production.plc_sim` a appelé les vrais endpoints de cycles du Production Engine, qui ont exécuté `FakeQualityAnalyzer`. Aucun appel Databricks, aucune inférence Core.
+
+| Contrôle | Résultat observé |
+|---|---|
+| Simulateur PLC initial | 3 nouveaux cycles HTTP `201`, 1 rejeu `200` avec `Idempotent-Replay: true` ; Core : 3 pièces, 7 événements (shift ouvert, 3 inférences, 3 pièces), outbox : 7 livrés et 0 en attente. |
+| Correction et disposition | Une pièce passe de `effective_verdict=OK` à `NOK` via `/production/parts/{id}/corrections`, garde `predicted_verdict=OK`, puis reçoit `QUARANTINED`. Core : 3 pièces, 2 OK, 1 NOK, 1 corrigée ; 9 événements livrés. |
+| Core interrompu | Un nouveau cycle `201` et une correction `201` sont acceptés par l'Edge pendant l'arrêt du Core. L'outbox conserve 3 événements, avec erreur réseau constatée. |
+| Redémarrage et rattrapage | Edge redémarré sur la même base pendant la coupure, puis Core redémarré sur sa même base : outbox 12 livrés, 0 en attente ; Core 4 pièces, 12 événements, 2 corrections, sans pièce dupliquée. |
+| Alertes et shift | Seuils de démonstration abaissés par l'API Edge ; un nouveau cycle NOK `201` crée les alertes `quality.decision` et `part.nok` dans `/api/v1/alerts`. Fermeture du shift synchronisée : Core 5 pièces, 15 événements, 2 alertes ouvertes ; outbox 15 livrés, 0 en attente. |
+| Non-régression | Suite complète `pytest -q` : succès (140 tests collectés, dont 6 CORE-02). `ruff check .` : `All checks passed!`. `ruff format --check .` : `63 files already formatted`. `git diff --check` : succès. |
+
+Le premier passage complet a échoué sur `test_exported_artifacts_are_up_to_date` : la nouvelle route de diagnostic Edge apparaissait dans l'OpenAPI exporté du frontend. La route a été conservée mais exclue du schéma OpenAPI public (`include_in_schema=False`), afin de respecter le périmètre sans modifier `frontend/`. `python -m visionhub.integration.export --check` et le passage complet suivant ont réussi. L'absence d'authentification impose de garder les deux API sur localhost ; les événements rejetés par le Core restent conservés en outbox pour diagnostic manuel.

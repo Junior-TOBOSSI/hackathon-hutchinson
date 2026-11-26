@@ -11,10 +11,11 @@ import sqlite3
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from visionhub.contracts import Event
+from visionhub.integration.edge_events import EdgeEvent, EdgeEventType, IngestAck
 from visionhub.production.contracts import (
     AIPrediction,
     Correction,
@@ -27,6 +28,7 @@ from visionhub.production.contracts import (
 )
 from visionhub.production.db import migrate
 from visionhub.production.kpi import Tally
+from visionhub.production.outbox import enqueue
 
 PART_COLUMNS = (
     "part_id, station_id, cycle_id, shift_id, created_at, trigger_source, camera_id, "
@@ -63,7 +65,7 @@ class InvalidOperationError(ProductionError):
 
 
 class ProductionStore:
-    def __init__(self, path: str = ":memory:") -> None:
+    def __init__(self, path: str = ":memory:", *, simulated_default: bool = False) -> None:
         if path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         # Autocommit mode: transactions are opened explicitly (BEGIN IMMEDIATE).
@@ -73,6 +75,7 @@ class ProductionStore:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._lock = threading.RLock()
+        self.simulated_default = simulated_default
         with self._lock:
             self.migrations_applied = migrate(self._conn)
 
@@ -144,6 +147,36 @@ class ProductionStore:
                 raise DuplicateCycleError(
                     f"cycle {part.cycle_id!r} already exists on station {part.station_id!r}"
                 ) from exc
+            simulated = part.trigger_source == "plc_simulated"
+            if event is not None:
+                enqueue(
+                    conn,
+                    station_id=part.station_id,
+                    event_type=EdgeEventType.INFERENCE,
+                    payload={"kind": "inference", "event": event},
+                    occurred_at=event.frame.timestamp,
+                    simulated=simulated,
+                    camera_id=part.camera_id,
+                    cycle_id=part.cycle_id,
+                    use_case=event.use_case,
+                    model_name=event.model_name,
+                    model_version=event.model_version,
+                    score=event.score,
+                    decision=event.decision,
+                )
+            enqueue(
+                conn,
+                station_id=part.station_id,
+                event_type=EdgeEventType.PART_RECORDED,
+                payload={"kind": "part.recorded", "part": part},
+                occurred_at=part.created_at,
+                simulated=simulated,
+                camera_id=part.camera_id,
+                cycle_id=part.cycle_id,
+                part_id=part.part_id,
+                use_case="quality",
+                verdict=part.predicted_verdict,
+            )
 
     def get_part(self, part_id: str) -> Part | None:
         rows = self._fetch(f"SELECT {PART_COLUMNS} FROM parts WHERE part_id = ?", (part_id,))
@@ -177,13 +210,30 @@ class ProductionStore:
 
     def set_disposition(self, part_id: str, body: DispositionIn, at: datetime) -> Part:
         with self._write() as conn:
-            updated = conn.execute(
+            row = conn.execute(
+                "SELECT station_id, trigger_source FROM parts WHERE part_id = ?", (part_id,)
+            ).fetchone()
+            if row is None:
+                raise NotFoundError(f"unknown part {part_id!r}")
+            conn.execute(
                 "UPDATE parts SET disposition = ?, disposition_note = ?, "
                 "disposition_updated_at = ? WHERE part_id = ?",
                 (body.disposition.value, body.note, at.isoformat(), part_id),
-            ).rowcount
-        if not updated:
-            raise NotFoundError(f"unknown part {part_id!r}")
+            )
+            enqueue(
+                conn,
+                station_id=row["station_id"],
+                event_type=EdgeEventType.PART_DISPOSITION,
+                payload={
+                    "kind": "part.disposition",
+                    "part_id": part_id,
+                    "disposition": body.disposition,
+                    "note": body.note,
+                },
+                occurred_at=at,
+                simulated=row["trigger_source"] == "plc_simulated",
+                part_id=part_id,
+            )
         return self.get_part(part_id)
 
     # ------------------------------------------------------------------ corrections
@@ -194,7 +244,8 @@ class ProductionStore:
         """Append a human correction and update the effective verdict, atomically."""
         with self._write() as conn:
             row = conn.execute(
-                "SELECT effective_verdict, correction_count FROM parts WHERE part_id = ?",
+                "SELECT station_id, trigger_source, effective_verdict, correction_count "
+                "FROM parts WHERE part_id = ?",
                 (part_id,),
             ).fetchone()
             if row is None:
@@ -241,6 +292,16 @@ class ProductionStore:
                 "UPDATE parts SET effective_verdict = ?, correction_count = ? WHERE part_id = ?",
                 (correction.new_verdict, correction.sequence, part_id),
             )
+            enqueue(
+                conn,
+                station_id=row["station_id"],
+                event_type=EdgeEventType.PART_CORRECTED,
+                payload={"kind": "part.corrected", "correction": correction},
+                occurred_at=at,
+                simulated=row["trigger_source"] == "plc_simulated",
+                part_id=part_id,
+                verdict=PartVerdict(correction.new_verdict),
+            )
         return self.get_part(part_id), correction
 
     def list_corrections(self, part_id: str) -> list[Correction]:
@@ -273,13 +334,22 @@ class ProductionStore:
                         None,
                     ),
                 )
+                enqueue(
+                    conn,
+                    station_id=shift.station_id,
+                    event_type=EdgeEventType.SHIFT_OPENED,
+                    payload={"kind": "shift", "shift": shift},
+                    occurred_at=shift.started_at,
+                    simulated=self.simulated_default,
+                )
         except sqlite3.IntegrityError as exc:
             raise ConflictError(f"a shift is already open on station {shift.station_id!r}") from exc
 
     def close_shift(self, shift_id: str, at: datetime) -> Shift:
         with self._write() as conn:
-            row = conn.execute("SELECT status FROM shifts WHERE shift_id = ?", (shift_id,))
-            row = row.fetchone()
+            row = conn.execute(
+                f"SELECT {SHIFT_COLUMNS} FROM shifts WHERE shift_id = ?", (shift_id,)
+            ).fetchone()
             if row is None:
                 raise NotFoundError(f"unknown shift {shift_id!r}")
             if row["status"] != "OPEN":
@@ -288,7 +358,89 @@ class ProductionStore:
                 "UPDATE shifts SET status = 'CLOSED', ended_at = ? WHERE shift_id = ?",
                 (at.isoformat(), shift_id),
             )
+            closed = Shift(**{**dict(row), "status": "CLOSED", "ended_at": at})
+            enqueue(
+                conn,
+                station_id=closed.station_id,
+                event_type=EdgeEventType.SHIFT_CLOSED,
+                payload={"kind": "shift", "shift": closed},
+                occurred_at=at,
+                simulated=self.simulated_default,
+            )
         return self.get_shift(shift_id)
+
+    # ------------------------------------------------------------------ durable Edge -> Core outbox
+
+    def pending_events(self, limit: int = 100) -> list[EdgeEvent]:
+        """Return one station's earliest pending events, preserving its sequence order."""
+        rows = self._fetch(
+            "SELECT station_id, payload FROM outbox WHERE delivered_at IS NULL AND rejected = 0 "
+            "ORDER BY station_id, edge_sequence LIMIT ?",
+            (limit,),
+        )
+        if not rows:
+            return []
+        station = rows[0]["station_id"]
+        return [
+            EdgeEvent.model_validate_json(row["payload"])
+            for row in rows
+            if row["station_id"] == station
+        ]
+
+    def mark_ack(self, ack: IngestAck, sent: list[EdgeEvent]) -> None:
+        expected = {event.event_id for event in sent}
+        received = [result.event_id for result in ack.results]
+        if (
+            not sent
+            or ack.station_id != sent[0].station_id
+            or len(received) != len(expected)
+            or set(received) != expected
+        ):
+            raise ValueError("Core ACK does not match the sent batch")
+        delivered_at = datetime.now(UTC).isoformat()
+        with self._write() as conn:
+            for result in ack.results:
+                delivered = result.status in ("accepted", "duplicate")
+                updated = conn.execute(
+                    "UPDATE outbox SET attempts = attempts + 1, delivered_at = ?, "
+                    "rejected = ?, last_error = ? WHERE event_id = ? AND delivered_at IS NULL",
+                    (
+                        delivered_at if delivered else None,
+                        int(result.status == "rejected"),
+                        result.error if not delivered else None,
+                        result.event_id,
+                    ),
+                ).rowcount
+                if updated != 1:
+                    raise ValueError("Core ACK references a missing or delivered event")
+
+    def mark_failure(self, sent: list[EdgeEvent], error: str) -> None:
+        with self._write() as conn:
+            for event in sent:
+                conn.execute(
+                    "UPDATE outbox SET attempts = attempts + 1, last_error = ? "
+                    "WHERE event_id = ? AND delivered_at IS NULL",
+                    (error[:500], event.event_id),
+                )
+
+    def outbox_status(self) -> dict[str, int | str | None]:
+        row = self._fetch(
+            "SELECT COUNT(*) AS total, "
+            "SUM(delivered_at IS NULL AND rejected = 0) AS pending, "
+            "SUM(delivered_at IS NOT NULL) AS delivered, SUM(rejected) AS rejected "
+            "FROM outbox"
+        )[0]
+        error = self._fetch(
+            "SELECT last_error FROM outbox WHERE delivered_at IS NULL AND last_error IS NOT NULL "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+        return {
+            "total": row["total"],
+            "pending": row["pending"] or 0,
+            "delivered": row["delivered"] or 0,
+            "rejected": row["rejected"] or 0,
+            "last_error": error[0][0] if error else None,
+        }
 
     def get_shift(self, shift_id: str) -> Shift | None:
         rows = self._fetch(f"SELECT {SHIFT_COLUMNS} FROM shifts WHERE shift_id = ?", (shift_id,))

@@ -108,6 +108,26 @@ END;
 
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "production_core", MIGRATION_0001),
+    (
+        2,
+        "edge_outbox",
+        """
+CREATE TABLE IF NOT EXISTS outbox (
+    event_id TEXT PRIMARY KEY,
+    station_id TEXT NOT NULL,
+    edge_sequence INTEGER NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    delivered_at TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    rejected INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (station_id, edge_sequence)
+);
+CREATE INDEX IF NOT EXISTS ix_outbox_pending
+    ON outbox (delivered_at, rejected, station_id, edge_sequence);
+""",
+    ),
 ]
 
 

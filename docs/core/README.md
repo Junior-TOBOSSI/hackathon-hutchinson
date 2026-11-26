@@ -1,6 +1,6 @@
-# ARGOS Core — CORE-01
+# ARGOS Core — CORE-01 et CORE-02
 
-Service central local de supervision. Il **ne lance aucune inférence** et ne contacte ni Databricks, ni MLflow, ni un service externe. Il accepte les événements Edge conformes à `argos.edge-event/1`, conserve l'inbox dans une base SQLite distincte, et restitue des vues multipostes.
+Service central local de supervision. Il **ne lance aucune inférence** et ne contacte ni Databricks, ni MLflow, ni un service externe. Il accepte les événements Edge conformes à `argos.edge-event/1`, conserve l'inbox dans une base SQLite distincte, et restitue des vues multipostes. Depuis CORE-02, le Production Engine alimente automatiquement cette inbox par une outbox SQLite et un worker HTTP local ; voir [edge-integration.md](edge-integration.md) pour les trois commandes de démarrage.
 
 ## Architecture
 
@@ -55,7 +55,7 @@ La base est créée automatiquement au chemin `ARGOS_CORE_DB` (défaut `var/argo
 | `GET /api/v1/operator-reports` | `OperatorReport[]` | Rapports reçus via ingestion. |
 | `GET /api/v1/stations/{id}/model-status` | Payloads `ModelStatusPayload[]` | Préserve les versions Edge non numériques que `ModelRef` ne peut pas représenter. |
 
-Les routes MLOps de `/api/v1/models`, `/deployments`, `/monitoring`, `/training-jobs` et `/retraining-policies` pourront être montées plus tard sur cette application par le chantier MLOps. CORE-01 ne les implémente pas et ne renvoie pas de succès fictif.
+Les routes MLOps de `/api/v1/models`, `/deployments`, `/monitoring`, `/training-jobs` et `/retraining-policies` pourront être montées plus tard sur cette application par le chantier MLOps. Le Core industriel ne les implémente pas et ne renvoie pas de succès fictif.
 
 ## Règles des projections et limites
 
@@ -68,4 +68,4 @@ Les routes MLOps de `/api/v1/models`, `/deployments`, `/monitoring`, `/training-
 - Le simulateur génère des **verdicts synthétiques** ; ses versions de modèles sont fictives. Il démontre la chaîne événementielle, pas la précision d'un modèle. Chaque lancement produit de nouveaux identifiants de cycles ; le rejeu exact est effectué dans le même lancement.
 - Une vue en ligne fondée sur `occurred_at` reste une approximation tant qu'aucun heartbeat Edge signé et aucune synchronisation de l'horloge des postes n'existent. L'API ne possède pas de gestion d'accès.
 
-Voir [edge-integration.md](edge-integration.md) pour le raccordement transactionnel futur et [frontend-mapping.md](frontend-mapping.md) pour les écrans.
+Voir [edge-integration.md](edge-integration.md) pour le raccordement transactionnel opérationnel et [frontend-mapping.md](frontend-mapping.md) pour les écrans.
