@@ -51,8 +51,6 @@ EXPECTED = {
     "zone_object": "Objet dans la zone rouge",
     "zone_person": "Personne dans la zone rouge",
 }
-COLOURS = {"conforme": "#2e9e44", "a_verifier": "#f0a000", "anomalie": "#d62828"}
-LABELS = {"conforme": "OK", "a_verifier": "À VÉRIFIER", "anomalie": "NOK"}
 
 st.set_page_config(page_title="Poste 5S - démo", layout="wide")
 
@@ -113,13 +111,7 @@ def main() -> None:
     latency = (time.perf_counter() - start) * 1000
     decision = decide(result.score, thresholds)
 
-    st.markdown(
-        f"<div style='background:{COLOURS[decision.value]};color:white;padding:14px 20px;"
-        f"border-radius:8px;font-size:34px;font-weight:700'>{LABELS[decision.value]}"
-        f"<span style='font-size:18px;font-weight:400'>  ·  score {result.score:.2f}</span>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
+    # The verdict banner is drawn on the image itself (render.py): no second banner here.
     left, right = st.columns([3, 1])
     left.image(
         cv2.cvtColor(render(image, analyzer, result, decision), cv2.COLOR_BGR2RGB),
