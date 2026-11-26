@@ -143,7 +143,7 @@ def sequence() -> list[np.ndarray]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", default="data/processed/workstation/synthetic")
-    out = Path(parser.parse_args().out)
+    out = Path(parser.parse_args().out).expanduser()
     (out / "scenarios").mkdir(parents=True, exist_ok=True)
     (out / "sequence").mkdir(parents=True, exist_ok=True)
 

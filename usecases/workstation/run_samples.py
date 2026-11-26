@@ -23,14 +23,15 @@ from visionhub.decision import decide
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--folder", default="data/processed/workstation/synthetic")
-    parser.add_argument("--device", default="cpu")
-    folder = Path(parser.parse_args().folder)
+    parser.add_argument("--device", default="cpu", help="cpu, or cuda on the cluster")
+    args = parser.parse_args()
+    folder = Path(args.folder).expanduser()
     config = load_use_case_config(UseCase.WORKSTATION)
     params = {**config.params, "reference_image": str((folder / "reference.png").resolve())}
 
     def fresh() -> ZoneWorkstationAnalyzer:
         analyzer = ZoneWorkstationAnalyzer()
-        analyzer.load({**params, "device": "cpu"})
+        analyzer.load({**params, "device": args.device})
         return analyzer
 
     def show(i: int, name: str, analyzer: ZoneWorkstationAnalyzer, image) -> None:
