@@ -119,3 +119,18 @@ Tout se fait en serverless CPU, sans GPU, sans warehouse et sans endpoint.
    - durée attendue de quelques minutes sur CPU (non mesurée sur Databricks) ;
    - vérifier : courbes, matrice avec `A_VERIFIER`, galerie, artefacts, candidat sans alias.
 5. **Plus tard** : `quality-industrial` sur les données réelles, seulement après réception de `tri_nok.csv` et ton autorisation de transfert.
+
+## 8. DBX-05D — recettes Databricks (27/11/2026)
+
+État protégé relevé avant, pendant et après (`snapshot_*.json`) : **inchangé**. Quality Demo v2 reste champion, approuvée et servie par `argos-quality-poc` (READY) ; v1 reste challenger, non approuvée. Warehouse arrêté, aucun cluster.
+
+| Opération | Résultat |
+|---|---|
+| Code distant de `quality-demo` | Ancien `b1a74627…` sauvegardé (`code/_backup/` et `ARGOS_MLOPS_LOCAL/backups/`) ; version finale `15eb0663…` vérifiée (SHA-256). Plus d'alias automatique, versions candidates, écritures Delta par version, `--request-id`. |
+| 1er essai de lancement de `quality-demo` | **Refusé par Databricks** (`{{job.run_id}}` non accepté dans les paramètres passés au lancement) ; **aucune exécution créée**. Corrigé : lien exact par identifiant de requête. |
+| Exécution de `quality-demo` sur `synthetic-v2` | Job run `969619535979825`, **SUCCESS en 111 s**. Runs MLflow `7a5d09be…` et `6e1fde32…`, versions **v3 et v4 candidates** (sans approbation ni alias), manifeste `019e804d…`. Exactitude de test 0,85 et 0,825, identique à v1 : contenu d'entraînement inchangé. |
+| Import de `quality-synthetic-3c` v1 | Publiée via le catalogue : 108 JPG (72 / 18 / 18), 18 rafales préservées dans le manifeste (`group`), aucune rafale à cheval sur deux splits ; manifeste `a4d9e9dd…`. |
+| Installation de `quality-industrial` | 24 fichiers de code vérifiés dans `runs/hovis/code` ; poids `yolo26n-cls.pt` (`0dd6f8db…`, release officielle Ultralytics v8.4.0) ; expérience `/Shared/HOVIS/quality-industrial` (858114336591834) ; modèle `workspace.argos_poc.quality_industrial` ; job `315903472839295` (serverless CPU, sans nouvelle tentative ni planification). |
+| Exécution de `quality-industrial` | Job run `540537827556689`, **ÉCHEC à l'installation des bibliothèques** (environ 227 s de calcul, 567 s au total) : `protobuf` 5.29.4 → 7.36.2, `numpy` 1.26.4 → 2.2.6, `pyarrow` 15.0.2 → 26.0.1, puis le noyau Python ne démarre pas. **Aucun entraînement, aucun run MLflow, aucune version.** Log : `ARGOS_MLOPS_LOCAL/training/logs/540537827556689.txt`. Pas de relance. |
+
+Correctif proposé, non appliqué : environnement épinglé sur les versions du cœur (voir `pipeline.yaml`). Il demande une nouvelle autorisation : mise à jour de l'environnement du job, puis une seule exécution. Le verrou `HOVIS_TRAINING_REMOTE` est refermé.
