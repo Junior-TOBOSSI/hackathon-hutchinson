@@ -113,3 +113,28 @@ export function HBars({ items }: { items: { label: string; count: number; color:
     </ul>
   );
 }
+
+/** Horizontal comparison of two percentiles per row (P50 light, P95 red), same scale. */
+export function LatencyBars({ items, format }: { items: { label: string; p50: number | null; p95: number | null; n: number }[]; format: (v: number | null) => string }) {
+  const max = Math.max(1e-9, ...items.flatMap((i) => [i.p50 ?? 0, i.p95 ?? 0]));
+  return (
+    <div className="col" style={{ gap: 10 }}>
+      <ul className="mon-lat">
+        {items.map((i) => (
+          <li key={i.label}>
+            <span className="mon-hbar-label" title={i.label}>{i.label}<small className="muted"> · n={i.n}</small></span>
+            <span className="mon-lat-bars">
+              <span className="mon-hbar-track"><span style={{ width: `${((i.p50 ?? 0) * 100) / max}%`, background: 'var(--primary-light)' }} title={`P50 ${format(i.p50)}`} /></span>
+              <span className="mon-hbar-track"><span style={{ width: `${((i.p95 ?? 0) * 100) / max}%`, background: 'var(--red)' }} title={`P95 ${format(i.p95)}`} /></span>
+            </span>
+            <span className="mon-lat-values">{format(i.p50)}<br />{format(i.p95)}</span>
+          </li>
+        ))}
+      </ul>
+      <span className="row" style={{ gap: 16, fontSize: 13 }}>
+        <span className="row" style={{ gap: 6 }}><span className="hv-dot" style={{ background: 'var(--primary-light)' }} />P50</span>
+        <span className="row" style={{ gap: 6 }}><span className="hv-dot" style={{ background: 'var(--red)' }} />P95</span>
+      </span>
+    </div>
+  );
+}

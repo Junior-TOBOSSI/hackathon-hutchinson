@@ -1,11 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Icon, ICONS } from '../../../components/ui';
-import { monitoring, type CatalogRow, type DataKind, type DriftStatus, type Filters, type Snapshot } from '../../../api/monitoring';
+import { monitoring, type CatalogRow, type DataKind, type DriftStatus, type Filters, type Operational, type Snapshot } from '../../../api/monitoring';
 import { Loading, Unavailable } from '../common';
 import { errText, useStore } from '../data';
 import '../training/training.css';
 import { Chip, Donut, Kpi, SearchField, SelectField } from '../ui';
-import { HBars, Series } from './charts';
+import { HBars, LatencyBars, Series } from './charts';
 import ModelDetail from './ModelDetail';
 import './monitoring.css';
 import {
@@ -14,13 +14,16 @@ import {
 } from './shared';
 
 const PAGE = 10;
-const DRIFT_COLORS: Partial<Record<DriftStatus, string>> = {
-  alert: 'var(--red)', watch: 'var(--amber)', stable: 'var(--green)', reference_absent: 'var(--line-strong)',
-  insufficient_reference: '#e9b25c', insufficient_current: '#e9b25c', incompatible: 'var(--red-light)', mixed_data: '#e9b25c', no_production_data: 'var(--track)',
-};
+const DETECTED: DriftStatus[] = ['alert', 'watch'];
+const COVERAGE: DriftStatus[] = ['reference_absent', 'insufficient_reference', 'insufficient_current', 'mixed_data'];
+type Granularity = 'hour' | 'day' | 'snapshots';
+const GRANULARITIES: [Granularity, string][] = [['hour', 'Horaire · lecture Core'], ['day', 'Journalière · lecture Core'], ['snapshots', 'Journalière · instantanés collectés']];
+const bucketLabel = (iso: string, g: Granularity) => (g === 'hour'
+  ? `${day(iso)} ${new Date(iso).getHours()}h` : day(iso));
 
-/* Monitoring (DBX-07C) : vue globale sans modèle présélectionné, catalogue des modèles, détail
-   à la demande. Toutes les données viennent des API Monitoring DBX-07B (aucune série fictive). */
+/* Monitoring (DBX-07C, finitions DBX-07-FINAL) : vue globale sans modèle présélectionné,
+   catalogue des modèles, détail à la demande. Toutes les données viennent des API Monitoring
+   (aucune série fictive, aucun percentile combiné). */
 export default function MonitoringDashboard() {
   const store = useStore();
   const nav = useMonParams();
@@ -32,12 +35,16 @@ export default function MonitoringDashboard() {
   const [station, setStation] = useState('');
   const [cell, setCell] = useState('');
   const [period, setPeriod] = useState('all');
+  const [granularity, setGranularity] = useState<Granularity>('hour');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
 
   // Default origin: real production when it exists, otherwise the simulation (never both).
   const kind: DataKind | null = origin ?? (real.data ? (real.data.inferences > 0 ? 'real' : 'simulated') : real.error ? 'simulated' : null);
-  const filters: Filters | null = kind ? { data_kind: kind, use_case: useCase || undefined, model_key: modelKey || undefined, version: version || undefined, station: station || undefined, start: startOf(period) } : null;
+  const filters: Filters | null = kind ? {
+    data_kind: kind, granularity: granularity === 'snapshots' ? undefined : granularity, use_case: useCase || undefined,
+    model_key: modelKey || undefined, version: version || undefined, station: station || undefined, start: startOf(period),
+  } : null;
   const inf = useInferences(filters);
   const cat = useCatalog(filters);
   const alerts = useAlerts();
@@ -46,23 +53,18 @@ export default function MonitoringDashboard() {
   const rows = cat.data ?? [];
   const op = inf.data;
   const stationsInScope = useMemo(() => Array.from(new Set((op?.groups ?? []).map((g) => g.station_id))).sort(), [op]);
-  const cells = Array.from(new Set((op?.model_states ?? []).map((s) => s.cell).filter((c): c is string => !!c))).sort();
-  const stationOptions = (op?.model_states ?? []).filter((s) => !cell || s.cell === cell).map((s) => s.station_id).sort();
+  const declared = op?.model_states ?? [];
+  const cells = Array.from(new Set(declared.map((s) => s.cell).filter((c): c is string => !!c))).sort();
+  const stationOptions = declared.filter((s) => !cell || s.cell === cell).map((s) => s.station_id).sort();
   const modelRow = rows.find((r) => r.model_key === modelKey);
   const scopeText = [useCase ? useCaseFr(useCase) : 'tous cas d’usage', modelKey ? shortKey(modelKey) : 'tous modèles', version ? `v${version}` : null, station || (cell ? `cellule ${cell}` : 'tous postes')].filter(Boolean).join(' · ');
-  const availability = inf.error ? 'unavailable' : op?.status;
 
   const openAlerts = (alerts.data ?? []).filter((a) => a.state === 'open');
   const driftAlerts = openAlerts.filter((a) => a.kind === 'drift' && a.data_kind === kind && (!modelKey || a.model_key === modelKey) && (!version || a.model_version === version));
-  const operational = rows.filter((r) => r.source === 'operational' && r.n_inferences > 0 && (!modelKey || r.model_key === modelKey));
-  const investigate = rows.filter((r) => r.needs_investigation && (!modelKey || r.model_key === modelKey));
-
-  const meta = (extra?: ReactNode) => (
-    <span className="mon-kpi-meta">
-      <span>{scopeText}</span><span>· {periodLabel(period)}</span>
-      {kind && <OriginChip kind={kind} />}<SourceChip status={availability} />{extra}
-    </span>
-  );
+  const inScope = rows.filter((r) => !modelKey || r.model_key === modelKey);
+  const operational = inScope.filter((r) => r.source === 'operational' && r.n_inferences > 0);
+  const detected = inScope.filter((r) => DETECTED.includes(r.drift.status) || r.open_alerts > 0);
+  const coverage = inScope.filter((r) => r.source === 'operational' && COVERAGE.includes(r.drift.status));
   const v = (x: ReactNode, res: { loading: boolean; error: string | null }) => (res.error ? '—' : res.loading ? '…' : x);
 
   const collect = async () => {
@@ -89,7 +91,6 @@ export default function MonitoringDashboard() {
         </div>
         <div className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <SourceLine sources={op?.sources} res={inf} />
-          {kind && <OriginChip kind={kind} />}
           <button className="btn btn-ghost" disabled={busy} onClick={collect} title="Écriture locale explicite : instantanés et alertes">Collecter maintenant</button>
           <button className="btn btn-ghost" disabled={inf.refreshing} onClick={() => store.invalidate('mon:')}>Actualiser</button>
         </div>
@@ -111,22 +112,27 @@ export default function MonitoringDashboard() {
       {kind === 'simulated' && (
         <div className="mon-banner">
           <Chip tone="amber">Données simulées</Chip>
-          Les métriques affichées proviennent de la simulation des postes{real.data ? ` (production réelle : ${real.data.inferences} inférence${real.data.inferences > 1 ? 's' : ''})` : ''}. Elles ne sont jamais mélangées avec la production réelle et ne mesurent pas la performance en production.
+          Toute la page porte sur la simulation des postes{real.data ? ` (production réelle : ${real.data.inferences} inférence${real.data.inferences > 1 ? 's' : ''})` : ''}. Ces métriques ne sont jamais mélangées avec la production réelle et ne mesurent pas la performance en production.
         </div>
       )}
       {op?.status === 'partial' && <div className="mon-banner">Agrégation partielle : l’API Core est limitée à 500 éléments par poste. Les chiffres ne sont pas exhaustifs.</div>}
       {inf.error && <Unavailable tone="red">Données opérationnelles indisponibles : {inf.error}</Unavailable>}
       {op?.status === 'unavailable' && <Unavailable tone="red">Core indisponible : {op.sources[0]?.detail ?? 'aucune réponse'}. Aucun chiffre n’est affiché à la place.</Unavailable>}
 
+      <div className="mon-scope">
+        <span><b>Périmètre</b>{scopeText}</span><span><b>Période</b>{periodLabel(period)}</span>
+        {kind && <OriginChip kind={kind} />}<SourceChip status={inf.error ? 'unavailable' : op?.status} />
+      </div>
       <div className="mon-kpis">
-        <Kpi icon="layers" label="Modèles surveillés" value={v(operational.length, cat)} hint={meta(<span>{rows.filter((r) => r.source === 'registry').length} modèle(s) du registre sans inférence associée</span>)} />
-        <Kpi icon="grid" label="Postes concernés" value={v(stationsInScope.length, inf)} hint={meta()} />
-        <Kpi icon="bars" label="Inférences" value={v(op?.total.n_inferences.toLocaleString('fr-FR'), inf)} hint={meta(<span>{op ? `${op.total.n_parts} cycle(s) / pièce(s) inspecté(s)` : ''}</span>)} />
-        <Kpi icon="play" label="Latence P95" value={v(ms(op?.total.latency_ms.p95), inf)} hint={meta(<span>{op ? `P50 ${ms(op.total.latency_ms.p50)}` : ''}</span>)} />
+        <Kpi icon="layers" label="Modèles surveillés" value={v(operational.length, cat)} hint={`+ ${rows.filter((r) => r.source === 'registry').length} du registre sans inférence associée`} />
+        <Kpi icon="grid" label="Postes concernés" value={v(stationsInScope.length, inf)}
+          hint={`ayant émis au moins une inférence du périmètre · ${declared.length} déclaré(s), ${declared.filter((s) => s.online).length} en ligne`} />
+        <Kpi icon="bars" label="Inférences" value={v(op?.total.n_inferences.toLocaleString('fr-FR'), inf)} hint={op ? `${op.total.n_parts} cycle(s) inspecté(s)` : undefined} />
+        <Kpi icon="play" label="Latence P95" value={v(ms(op?.total.latency_ms.p95), inf)} hint={op ? `P50 ${ms(op.total.latency_ms.p50)}` : undefined} />
         <Kpi icon="warn" label="Alertes de dérive" value={v(driftAlerts.length, alerts)} tone={driftAlerts.length ? 'red' : undefined}
-          hint={meta(<span>{hist.data?.collections[0] ? `dernière collecte ${dt(hist.data.collections[0].at)}` : 'aucune collecte'}</span>)} />
-        <Kpi icon="shieldAlert" label="À investiguer" value={v(investigate.length, cat)} tone={investigate.length ? 'red' : undefined}
-          hint={meta(<span>alerte ouverte ou dérive ≥ seuil de surveillance</span>)} />
+          hint={hist.data?.collections[0] ? `dernière collecte ${dt(hist.data.collections[0].at)}` : 'aucune collecte'} />
+        <Kpi icon="shieldAlert" label="À investiguer · dérive" value={v(detected.length, cat)} tone={detected.length ? 'red' : undefined}
+          hint={coverage.length ? `${coverage.length} autre(s) à couverture statistique insuffisante` : 'couverture statistique suffisante'} />
       </div>
 
       <div className="mon-charts">
@@ -136,29 +142,47 @@ export default function MonitoringDashboard() {
             ? <Donut centerLabel="inférences" items={DECISIONS.map((d) => ({ label: d.label, count: op.total.decision_counts[d.id] ?? 0, color: d.color }))} />
             : <div className="mon-empty">Aucune inférence pour ces filtres.</div>}
         </section>
-        <VolumeChart snapshots={hist.data?.snapshots} filters={filters} loading={hist.loading} error={hist.error} />
-        <LatencyChart snapshots={hist.data?.snapshots} filters={filters} />
         <section className="card mon-card">
           <h3>État de la surveillance statistique</h3><span className="sub">Par modèle, dernière version observée, contre sa référence figée</span>
-          {cat.loading ? <Loading /> : <HBars items={(['alert', 'watch', 'stable', 'reference_absent', 'insufficient_reference', 'insufficient_current', 'incompatible', 'mixed_data', 'no_production_data'] as DriftStatus[])
-            .map((s) => ({ label: driftLabel(s), count: rows.filter((r) => r.drift.status === s).length, color: DRIFT_COLORS[s] ?? 'var(--line-strong)', hint: driftHelp(s) }))
-            .filter((i) => i.count > 0)} />}
-          <span className="muted" style={{ fontSize: 12 }}>Seuils PSI configurés côté backend (0,1 surveillance · 0,2 alerte), minimum 100 observations de part et d’autre.</span>
+          {cat.loading ? <Loading /> : <>
+            <HBars items={[
+              { label: 'Dérive détectée', count: detected.length, color: 'var(--red)', hint: 'alerte ou dérive ≥ seuil de surveillance' },
+              { label: 'Stable', count: inScope.filter((r) => r.drift.status === 'stable').length, color: 'var(--green)' },
+              { label: 'Couverture insuffisante', count: coverage.length, color: '#e9b25c', hint: 'référence absente, effectifs insuffisants ou origines mélangées' },
+              { label: 'Incompatible', count: inScope.filter((r) => r.drift.status === 'incompatible').length, color: 'var(--red-light)' },
+              { label: 'Registre sans inférence', count: inScope.filter((r) => r.drift.status === 'no_production_data').length, color: 'var(--line-strong)' },
+            ].filter((i) => i.count > 0)} />
+            {coverage.length > 0 && <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+              {COVERAGE.map((s) => [s, coverage.filter((r) => r.drift.status === s).length] as const).filter(([, n]) => n).map(([s, n]) => <Chip key={s} tone="amber" title={driftHelp(s)}>{driftLabel(s)} : {n}</Chip>)}
+            </span>}
+          </>}
+          <span className="muted" style={{ fontSize: 12 }}>Seuils PSI configurés côté backend (0,1 surveillance · 0,2 alerte), minimum 100 observations de part et d’autre. Une couverture insuffisante n’est ni une alerte ni une stabilité.</span>
         </section>
-        <section className="card mon-card">
-          <h3>Répartition des alertes</h3><span className="sub">Alertes MLOps ouvertes (distinctes des alertes Supervisor)</span>
-          {alerts.loading ? <Loading /> : openAlerts.length
-            ? <HBars items={Object.entries(openAlerts.reduce<Record<string, number>>((acc, a) => {
+        <TimeCharts granularity={granularity} onGranularity={setGranularity} op={op} infLoading={inf.loading} snapshots={hist.data?.snapshots} filters={filters} histLoading={hist.loading} histError={hist.error} />
+        <section className={`card mon-card${openAlerts.length ? '' : ' mon-span'}`}>
+          <h3>Latences P50 et P95 par modèle et version</h3><span className="sub">Percentiles calculés sur les observations brutes de chaque modèle · version (périmètre filtré)</span>
+          {inf.loading ? <Loading /> : op && op.by_model_version.length
+            ? <LatencyBars items={op.by_model_version.map((g) => ({ label: `${shortKey(g.model_key)} · v${g.model_version}`, p50: g.latency_ms.p50, p95: g.latency_ms.p95, n: g.n_inferences }))} format={ms} />
+            : <div className="mon-empty">Aucune inférence pour ces filtres.</div>}
+        </section>
+        {openAlerts.length > 0 ? (
+          <section className="card mon-card">
+            <h3>Répartition des alertes</h3><span className="sub">Alertes MLOps ouvertes (distinctes des alertes Supervisor)</span>
+            <HBars items={Object.entries(openAlerts.reduce<Record<string, number>>((acc, a) => {
               const k = a.kind === 'drift' ? `Dérive · ${a.indicator} (${a.method})` : `Disponibilité · ${a.indicator}`;
               acc[k] = (acc[k] ?? 0) + 1;
               return acc;
             }, {})).map(([label, count]) => ({ label, count, color: label.startsWith('Dérive') ? 'var(--red)' : 'var(--amber)' }))} />
-            : <div className="mon-empty">
-              Aucune alerte ouverte.{' '}
-              {rows.some((r) => r.drift.status === 'reference_absent') && `${rows.filter((r) => r.drift.status === 'reference_absent').length} modèle(s) sans référence : l’absence d’alerte ne signifie pas une stabilité. `}
-              {rows.some((r) => r.drift.status.startsWith('insufficient')) && 'Des effectifs insuffisants empêchent aussi toute alerte fiable.'}
-            </div>}
-        </section>
+          </section>
+        ) : (
+          <div className="card mon-alert-strip mon-span">
+            <Chip tone={alerts.error ? 'red' : 'green'}>{alerts.loading ? 'Alertes…' : alerts.error ? 'Alertes indisponibles' : 'Aucune alerte ouverte'}</Chip>
+            <span className="muted">
+              {coverage.length > 0 ? `${coverage.length} modèle(s) à couverture statistique insuffisante : l’absence d’alerte ne signifie pas une stabilité. ` : ''}
+              {hist.data?.collections[0] ? `Dernière collecte ${dt(hist.data.collections[0].at)}.` : 'Aucune collecte enregistrée.'}
+            </span>
+          </div>
+        )}
       </div>
 
       <Catalog rows={rows} loading={cat.loading} error={cat.error} selected={nav.key} onOpen={(k) => nav.set({ key: k, tab: null })} detail={
@@ -175,41 +199,52 @@ function scopedSnapshots(snapshots: Snapshot[] | undefined, f: Filters | null): 
     && (!f.start || s.window_end > f.start));
 }
 
-function VolumeChart({ snapshots, filters, loading, error }: { snapshots?: Snapshot[]; filters: Filters | null; loading: boolean; error: string | null }) {
+/** Volume and P50/P95 over time: live Core buckets (hour / day, pooled raw observations) or
+    collected daily snapshots (percentiles of several scopes are never combined). */
+function TimeCharts({ granularity, onGranularity, op, infLoading, snapshots, filters, histLoading, histError }: {
+  granularity: Granularity; onGranularity: (g: Granularity) => void; op: Operational | null; infLoading: boolean;
+  snapshots?: Snapshot[]; filters: Filters | null; histLoading: boolean; histError: string | null;
+}) {
+  const picker = <SelectField label="Granularité" icon="none" value={granularity} onChange={(g) => onGranularity(g as Granularity)} options={GRANULARITIES} />;
+  if (granularity !== 'snapshots') {
+    const pts = op?.series?.points ?? [];
+    const sub = `${granularity === 'hour' ? 'Par heure' : 'Par jour'} · lecture actuelle du Core (500 derniers éléments par poste), tranches vides non représentées`;
+    return (
+      <>
+        <section className="card mon-card">
+          <div className="between" style={{ gap: 8, flexWrap: 'wrap' }}><h3>Volume d’inférences</h3>{picker}</div><span className="sub">{sub}</span>
+          {infLoading ? <Loading /> : <Series points={pts.map((p) => ({ x: bucketLabel(p.bucket_start, granularity), values: { Inférences: p.n_inferences } }))}
+            series={[{ name: 'Inférences', color: 'var(--primary)' }]} format={(n) => n.toLocaleString('fr-FR')} empty="Aucune inférence pour ces filtres." />}
+        </section>
+        <section className="card mon-card">
+          <h3>Latences P50 et P95 dans le temps</h3><span className="sub">{sub} · percentiles sur les observations brutes de chaque tranche</span>
+          {infLoading ? <Loading /> : <Series points={pts.map((p) => ({ x: bucketLabel(p.bucket_start, granularity), values: { P50: p.latency_p50, P95: p.latency_p95 } }))}
+            series={[{ name: 'P50', color: 'var(--primary-light)' }, { name: 'P95', color: 'var(--red)' }]} format={ms} empty="Aucune inférence pour ces filtres." />}
+        </section>
+      </>
+    );
+  }
   const rows = scopedSnapshots(snapshots, filters);
   const days = Array.from(new Set(rows.map((s) => s.window_start))).sort();
-  const points = days.map((d) => ({ x: day(d), values: { Inférences: rows.filter((s) => s.window_start === d).reduce((n, s) => n + s.n_inferences, 0) } }));
-  return (
-    <section className="card mon-card">
-      <h3>Volume d’inférences dans le temps</h3><span className="sub">Instantanés journaliers issus des collectes explicites{filters?.station ? ' (tous postes : le poste n’est pas une dimension des instantanés)' : ''}</span>
-      {loading ? <Loading /> : error ? <Unavailable tone="red">Historique indisponible : {error}</Unavailable>
-        : <Series points={points} series={[{ name: 'Inférences', color: 'var(--primary)' }]} format={(n) => n.toLocaleString('fr-FR')}
-          empty="Aucun instantané collecté pour ces filtres : utilisez « Collecter maintenant » pour enregistrer l’historique (aucune série n’est inventée)." />}
-    </section>
-  );
-}
-
-function LatencyChart({ snapshots, filters }: { snapshots?: Snapshot[]; filters: Filters | null }) {
-  const rows = scopedSnapshots(snapshots, filters);
-  const days = Array.from(new Set(rows.map((s) => s.window_start))).sort();
-  // Percentiles of different models cannot be combined: a day is plotted only for ONE scope.
-  const points = days.map((d) => rows.filter((s) => s.window_start === d)).filter((r) => r.length === 1)
+  const volume = days.map((d) => ({ x: day(d), values: { Inférences: rows.filter((s) => s.window_start === d).reduce((n, s) => n + s.n_inferences, 0) } }));
+  const single = days.map((d) => rows.filter((s) => s.window_start === d)).filter((r) => r.length === 1)
     .map(([s]) => ({ x: day(s.window_start), values: { P50: s.latency_ms.p50, P95: s.latency_ms.p95 } }));
-  const multi = days.length > 0 && points.length === 0;
+  const empty = 'Aucun instantané collecté pour ces filtres : utilisez « Collecter maintenant » pour enregistrer l’historique (aucune série n’est inventée).';
   return (
-    <section className="card mon-card">
-      <h3>Latences P50 et P95</h3><span className="sub">Par jour collecté, pour un seul modèle et une seule version</span>
-      {multi
-        ? <div className="col" style={{ gap: 8 }}>
-          <div className="mon-empty">Les percentiles de plusieurs modèles ne s’additionnent pas : sélectionnez un modèle pour tracer l’évolution. Dernier jour collecté :</div>
-          <table className="tf-table mon-table"><thead><tr><th>Modèle · version</th><th className="num">P50</th><th className="num">P95</th></tr></thead>
-            <tbody>{rows.filter((s) => s.window_start === days[days.length - 1]).map((s) => (
-              <tr key={s.snapshot_id} className="static"><td>{shortKey(s.scope_key.split('|')[0])} · v{s.scope_key.split('|')[1]}</td><td className="num">{ms(s.latency_ms.p50)}</td><td className="num">{ms(s.latency_ms.p95)}</td></tr>))}
-            </tbody></table>
-        </div>
-        : <Series points={points} series={[{ name: 'P50', color: 'var(--primary-light)' }, { name: 'P95', color: 'var(--red)' }]} format={ms}
-          empty="Aucun instantané collecté pour ces filtres." />}
-    </section>
+    <>
+      <section className="card mon-card">
+        <div className="between" style={{ gap: 8, flexWrap: 'wrap' }}><h3>Volume d’inférences</h3>{picker}</div>
+        <span className="sub">Par jour · instantanés des collectes explicites{filters?.station ? ' (tous postes : le poste n’est pas une dimension des instantanés)' : ''}</span>
+        {histLoading ? <Loading /> : histError ? <Unavailable tone="red">Historique indisponible : {histError}</Unavailable>
+          : <Series points={volume} series={[{ name: 'Inférences', color: 'var(--primary)' }]} format={(n) => n.toLocaleString('fr-FR')} empty={empty} />}
+      </section>
+      <section className="card mon-card">
+        <h3>Latences P50 et P95 dans le temps</h3><span className="sub">Par jour · un seul modèle et une seule version (les percentiles ne se combinent pas)</span>
+        {days.length > 0 && single.length === 0
+          ? <div className="mon-empty">Plusieurs modèles dans le périmètre : sélectionnez un modèle, ou utilisez la granularité « lecture Core » (percentiles recalculés sur les observations brutes).</div>
+          : <Series points={single} series={[{ name: 'P50', color: 'var(--primary-light)' }, { name: 'P95', color: 'var(--red)' }]} format={ms} empty={empty} />}
+      </section>
+    </>
   );
 }
 

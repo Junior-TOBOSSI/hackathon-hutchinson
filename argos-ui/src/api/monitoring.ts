@@ -7,7 +7,7 @@ const M = '/mlops/monitoring';
 
 export type DataKind = 'real' | 'simulated';
 export interface Filters {
-  data_kind: DataKind | 'all'; use_case?: string; model_key?: string; version?: string; station?: string; start?: string; end?: string;
+  data_kind: DataKind | 'all'; granularity?: 'hour' | 'day'; use_case?: string; model_key?: string; version?: string; station?: string; start?: string; end?: string;
 }
 export interface SourceStatus { name: string; status: 'available' | 'unavailable' | 'partial'; fetched_at: string | null; detail: string | null }
 export interface Aggregate {
@@ -33,7 +33,10 @@ export interface Operational {
   parts: { n_parts: number; with_inference_error: number; error_codes: Record<string, number>; note: string };
   model_states: { station_id: string; cell: string | null; simulated: boolean; online: boolean; last_seen_at: string | null; equipment: { equipment_id: string; status: string }[] }[];
   human: Human;
+  by_model_version: (Aggregate & { model_key: string; model_version: string })[];
+  series: { granularity: 'hour' | 'day'; source: string; points: SeriesPoint[] } | null;
 }
+export interface SeriesPoint { bucket_start: string; n_inferences: number; latency_p50: number | null; latency_p95: number | null; decision_counts: Record<string, number> }
 export type DriftStatus = 'alert' | 'watch' | 'stable' | 'reference_absent' | 'insufficient_reference' | 'insufficient_current'
   | 'incompatible' | 'mixed_data' | 'no_production_data' | 'available';
 export interface CatalogRow {
@@ -89,10 +92,10 @@ const qs = (f: Partial<Filters> & Record<string, string | undefined>) => {
 
 export const monitoring = {
   summary: (kind: string, o?: ReadOpts) => call<Summary>(`${M}/summary?data_kind=${kind}`, undefined, o),
-  models: (f: Filters, o?: ReadOpts) => call<CatalogRow[]>(`${M}/models?${qs({ ...f, model_key: undefined, version: undefined })}`, undefined, o),
+  models: (f: Filters, o?: ReadOpts) => call<CatalogRow[]>(`${M}/models?${qs({ ...f, model_key: undefined, version: undefined, granularity: undefined })}`, undefined, o),
   model: (key: string, kind: string, o?: ReadOpts) => call<ModelDetail>(`${M}/models/${q(key)}?data_kind=${kind}`, undefined, o),
   inferences: (f: Filters, o?: ReadOpts) => call<Operational>(`${M}/inferences?${qs({ ...f })}`, undefined, o),
-  human: (f: Filters, o?: ReadOpts) => call<Operational['human'] & { status: string; sources: SourceStatus[] }>(`${M}/human?${qs({ ...f })}`, undefined, o),
+  human: (f: Filters, o?: ReadOpts) => call<Operational['human'] & { status: string; sources: SourceStatus[] }>(`${M}/human?${qs({ ...f, granularity: undefined })}`, undefined, o),
   performance: (modelId: string, o?: ReadOpts) => call<Performance>(`${M}/performance/${q(modelId)}`, undefined, o),
   drift: (p: { model_key: string; version: string; data_kind: DataKind; reference_id?: string }, o?: ReadOpts) =>
     call<DriftResult>(`${M}/drift?${qs(p)}`, undefined, o),

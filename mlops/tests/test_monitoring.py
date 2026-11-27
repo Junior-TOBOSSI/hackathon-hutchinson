@@ -604,3 +604,25 @@ def test_drift_reports_thresholds_and_histograms_on_reference_edges(tmp_path):
     h = out["histogram"]
     assert len(h["reference"]) == len(h["edges"]) - 1 == len(h["current"])
     assert sum(h["reference_counts"]) == 150 and abs(sum(h["current"]) - 1) < 1e-9
+
+
+def test_latency_by_model_version_and_time_series_use_raw_observations(tmp_path):
+    events = [
+        inference(i, 0.1, latency=10.0 * (i + 1), at=T0 + timedelta(minutes=20 * i))
+        for i in range(6)
+    ]
+    events += [
+        inference(50 + i, 0.1, version="2", latency=100.0, station="WS-02") for i in range(3)
+    ]
+    op = svc(tmp_path, FakeCore(events, stations=[station(), station("WS-02")])).operational(
+        granularity="hour"
+    )
+    by = {r["model_version"]: r for r in op["by_model_version"]}
+    assert by["1"]["latency_ms"]["p50"] == pytest.approx(35) and by["2"]["n_inferences"] == 3
+    pts = op["series"]["points"]
+    assert op["series"]["granularity"] == "hour" and sum(p["n_inferences"] for p in pts) == 9
+    assert [p["bucket_start"] for p in pts] == [
+        "2026-11-20T08:00:00Z",
+        "2026-11-20T09:00:00Z",
+    ]  # no empty bucket created
+    assert svc(tmp_path, FakeCore(events)).operational()["series"] is None

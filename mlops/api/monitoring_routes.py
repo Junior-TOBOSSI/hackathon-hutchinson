@@ -146,10 +146,17 @@ def create_monitoring_router(
 
     @router.get(f"{p}/inferences")
     def inferences(
-        c: Connector, response: Response, f: Filters, fresh: bool = False
+        c: Connector,
+        response: Response,
+        f: Filters,
+        granularity: Literal["hour", "day"] | None = None,
+        fresh: bool = False,
     ) -> dict[str, Any]:
-        """Operational aggregates per model / version / station over the window."""
-        return call(c, response, fresh, lambda: get_service(c).operational(**f))
+        """Operational aggregates per model / version / station over the window; optional
+        hourly or daily series computed from the live Core observations."""
+        return call(
+            c, response, fresh, lambda: get_service(c).operational(**f, granularity=granularity)
+        )
 
     @router.get(f"{p}/human")
     def human(c: Connector, response: Response, f: Filters, fresh: bool = False) -> dict[str, Any]:

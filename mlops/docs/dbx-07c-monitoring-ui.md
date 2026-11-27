@@ -105,3 +105,36 @@ Nouveaux tests : lien exact par identifiant d'événement, séparation registre 
   - production réelle : 0 inférence.
 - La capture d'écran automatique n'a pas pu être faite : la politique du poste interdit le
   débogage à distance d'Edge. La vérification visuelle reste à faire par l'équipe.
+
+## 5. DBX-07-FINAL — finitions
+
+- **KPI allégés.** Périmètre, période, origine et disponibilité apparaissent une seule fois,
+  dans une ligne au-dessus des KPI. Chaque KPI garde une précision courte.
+- **Postes concernés.** Ce sont les postes ayant émis au moins une inférence du périmètre
+  filtré ; le KPI rappelle aussi le nombre de postes déclarés et en ligne.
+- **À investiguer · dérive.** Le KPI compte les modèles avec une dérive détectée (alerte ou
+  niveau « à surveiller ») ou une alerte ouverte. Les modèles à couverture statistique
+  insuffisante (référence absente, effectifs insuffisants, origines mélangées) sont comptés à
+  part et ne sont jamais présentés comme stables ni comme en alerte.
+- **Bannière « Données simulées »** conservée pour toute la page.
+- **Grille de deux colonnes**, une seule en dessous de 1 100 px :
+  - décisions et état de la surveillance ;
+  - volume et latences dans le temps ;
+  - nouveau comparatif horizontal P50 / P95 par modèle et version ;
+  - alertes : un bandeau compact sur toute la largeur quand aucune n'est ouverte.
+- **Granularité des séries.**
+  - Horaire ou journalière, calculée sur la lecture actuelle du Core, avec les mêmes limites
+    de troncature (bandeau « partiel »). Les tranches vides ne sont pas créées.
+  - Journalière à partir des instantanés collectés. Les percentiles de plusieurs modèles n'y
+    sont jamais combinés.
+
+**Correction backend strictement nécessaire.** `GET /inferences` renvoie maintenant :
+- `by_model_version`, des percentiles calculés sur les observations brutes de chaque modèle et
+  version ;
+- `series` en option, avec `granularity=hour|day`.
+
+Sans cela, le comparatif et les séries horaires auraient dû combiner des percentiles par poste,
+ce qui est statistiquement faux. Un test couvre ce point (34 tests Monitoring).
+
+Le build par défaut (mode démo) n'embarque pas l'espace AI Leader réel, d'où une empreinte
+inchangée. La vérification a donc aussi été faite avec `VITE_LIVE_AI_LEADER=true`.

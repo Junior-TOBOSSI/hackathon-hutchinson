@@ -6,10 +6,10 @@ import { Chip } from '../ui';
 /* Ressources Monitoring (store DBX-PERF-01) : clés préfixées « mon: », chargées à la demande.
    Aucune lecture n'écrit côté serveur ; collecte et gel de référence sont des POST explicites. */
 
-const fkey = (f: Filters) => [f.data_kind, f.use_case, f.model_key, f.version, f.station, f.start, f.end].map((v) => v ?? '').join('|');
+const fkey = (f: Filters) => [f.data_kind, f.granularity, f.use_case, f.model_key, f.version, f.station, f.start, f.end].map((v) => v ?? '').join('|');
 
 export const useSummary = (kind: string | null) => useResource(kind ? `mon:summary:${kind}` : null, read((o) => monitoring.summary(kind as string, o)));
-export const useCatalog = (f: Filters | null) => useResource(f ? `mon:models:${fkey({ ...f, model_key: undefined, version: undefined })}` : null, read((o) => monitoring.models(f as Filters, o)));
+export const useCatalog = (f: Filters | null) => useResource(f ? `mon:models:${fkey({ ...f, model_key: undefined, version: undefined, granularity: undefined })}` : null, read((o) => monitoring.models(f as Filters, o)));
 export const useInferences = (f: Filters | null) => useResource(f ? `mon:inf:${fkey(f)}` : null, read((o) => monitoring.inferences(f as Filters, o)));
 export const useHuman = (f: Filters | null) => useResource(f ? `mon:human:${fkey(f)}` : null, read((o) => monitoring.human(f as Filters, o)));
 export const useAlerts = () => useResource('mon:alerts', read(monitoring.alerts));

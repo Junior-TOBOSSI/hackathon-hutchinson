@@ -296,6 +296,7 @@ class MonitoringService:
         start=None,
         end=None,
         use_case=None,
+        granularity=None,
     ) -> dict[str, Any]:
         snap = self._snapshot()
         infs, parts, corrections = observations(snap)
@@ -321,6 +322,15 @@ class MonitoringService:
             "sources": [snap.status.__dict__],
             "data_kind": data_kind,
             "total": aggregate(sel, start, end),
+            # Percentiles are computed on the RAW observations of each (model, version):
+            # never combined from per-station percentiles.
+            "by_model_version": [
+                {"model_key": k, "model_version": v, **aggregate(rows, start, end)}
+                for (k, v), rows in sorted(
+                    _group(sel, lambda i: (i["model_key"], i["model_version"])).items()
+                )
+            ],
+            "series": time_series(sel, granularity) if granularity else None,
             "groups": [
                 {
                     "model_key": k,
@@ -954,6 +964,31 @@ def _histograms(reference: dict, population: list[dict]) -> dict[str, Any] | Non
         "current_counts": cur_counts,
         "reference": [c / len(reference["scores"]) for c in ref_counts],
         "current": [c / len(cur) for c in cur_counts] if cur else None,
+    }
+
+
+def time_series(infs: list[dict], granularity: str) -> dict[str, Any]:
+    """Hourly or daily buckets of the LIVE Core observations (real events only, empty buckets
+    are not created). Same truncation caveat as the whole read (status partial)."""
+    cut = 13 if granularity == "hour" else 10  # ISO prefix: YYYY-MM-DDTHH or YYYY-MM-DD
+    buckets = _group(infs, lambda i: i["occurred_at"][:cut])
+    points = []
+    for b, rows in sorted(buckets.items()):
+        lat = [float(i["latency_ms"]) for i in rows if i.get("latency_ms") is not None]
+        dec = Counter(i.get("decision") for i in rows)
+        points.append(
+            {
+                "bucket_start": f"{b}:00:00Z" if granularity == "hour" else f"{b}T00:00:00Z",
+                "n_inferences": len(rows),
+                "latency_p50": stats.quantile(lat, 0.5),
+                "latency_p95": stats.quantile(lat, 0.95),
+                "decision_counts": {d: dec.get(d, 0) for d in DECISIONS_CORE},
+            }
+        )
+    return {
+        "granularity": granularity,
+        "source": "live Core read (pooled raw observations)",
+        "points": points,
     }
 
 
