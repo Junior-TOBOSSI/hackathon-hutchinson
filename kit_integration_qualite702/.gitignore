@@ -1,0 +1,8 @@
+# Données Hutchinson confidentielles : ne jamais pousser d'images
+*.jpg
+*.jpeg
+*.png
+*.cache
+modeles/*/entrainement/
+modeles/*/_donnees/
+__pycache__/
