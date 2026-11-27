@@ -1,25 +1,21 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { mlops, type DatasetFamilySummary } from '../../api/mlops';
+import { Icon, ICONS } from '../../components/ui';
 import { Badge, Loading, Unavailable } from './common';
 import { errText, useDatasetCatalog, useHealth, useStore } from './data';
 import DatasetFamilyDetail from './datasets/DatasetFamilyDetail';
 import './datasets/catalog.css';
+import { usePipelines } from './training/shared';
 import { fr, Kpi, SearchField, SelectField } from './ui';
 
 const useCases = ['quality', 'workstation', 'safety'] as const;
 const SPLIT_SHORT: Record<string, string> = { train: 'train', validation: 'val', test: 'test' };
 const useCaseName: Record<string, string> = { quality: fr('quality'), workstation: fr('workstation'), safety: fr('safety') };
-const expectedScientific = [
-  { id: 'quality-industrial-binary', name: 'Quality 702 — binaire industriel', useCase: 'quality', status: '5 plis préparés localement ; publication non effectuée' },
-  { id: 'poste-5s-11', name: 'Press cell', useCase: 'workstation', status: 'Livraison du jeu original attendue' },
-  { id: 'poste-bleu-5s-11', name: 'Machine cell', useCase: 'workstation', status: 'Livraison du jeu original attendue' },
-  { id: 'poste-variante-5s-11', name: 'Machine cell variant', useCase: 'workstation', status: 'Livraison du jeu original attendue' },
-  { id: 'poste-electrique-5s-11', name: 'Electrical bench', useCase: 'workstation', status: 'Livraison du jeu original attendue' },
-];
 
 export default function Datasets() {
   const catalog = useDatasetCatalog();
+  const pipelines = usePipelines();
   const health = useHealth();
   const store = useStore();
   const [params, setParams] = useSearchParams();
@@ -50,7 +46,11 @@ export default function Datasets() {
     ? null : families.reduce((sum, f) => sum + (f.latest_images ?? 0), 0);
   const versionCount = families.reduce((sum, f) => sum + f.version_count, 0);
   const totalDrafts = families.reduce((sum, f) => sum + f.draft_count, 0);
-  const expected = expectedScientific.filter((item) => !families.some((family) => family.dataset_id === item.id))
+  // Expected = declared by a training pipeline but not published yet (no hardcoded list).
+  const expected = (pipelines.data ?? []).flatMap((v) => v.spec.dataset.families.map((id) => ({
+    id, name: id, useCase: v.spec.use_case, status: `déclaré par le pipeline « ${v.spec.name} » — aucune version publiée`,
+  }))).filter((item, i, all) => all.findIndex((x) => x.id === item.id) === i)
+    .filter((item) => !families.some((family) => family.dataset_id === item.id))
     .filter((item) => (!filter || item.useCase === filter) && (!query || `${item.name} ${item.id}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
 
   return <div className="dataset-catalog col" style={{ gap: 14 }}>
@@ -114,6 +114,7 @@ export default function Datasets() {
         </section>
         {current && <DatasetFamilyDetail key={current.dataset_id} family={current} onClose={() => select(null)} />}
       </div>
+      <Lifecycle />
     </>}
   </div>;
 }
@@ -149,4 +150,33 @@ function CreateFamily({ onCreated, onError }: { onCreated: (id: string) => void;
     </div>
     <button className="btn btn-primary" disabled={busy}>{busy ? 'Création…' : 'Créer la famille'}</button>
   </form>;
+}
+
+/* Lifecycle of a dataset version, as implemented by the catalogue: draft (editable) ->
+   annotation review -> publication (integrity checks on Databricks) -> published (immutable). */
+const FILE = 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z M14 3v5h5 M9 13h6 M9 17h4';
+const CLOUD_UP = 'M7 18a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.5 1.5A3.75 3.75 0 0 1 17.5 18 M12 12v8 M9 15l3-3 3 3';
+const STEPS = [
+  { tone: 'amber', icon: FILE, title: 'Brouillon', text: 'Création ou mise à jour (modifiable)', legend: 'en préparation, modifiable' },
+  { tone: 'blue', icon: ICONS.log, title: 'Validation', text: 'Revue des annotations et corrections', legend: 'en cours de revue des annotations' },
+  { tone: 'violet', icon: CLOUD_UP, title: 'Publication', text: 'Contrôles d’intégrité (manifeste, empreinte)', legend: 'transfert et vérifications (Databricks)' },
+  { tone: 'green', icon: ICONS.check, title: 'Publié', text: 'Version finalisée et immuable (utilisable pour l’entraînement)', legend: 'disponible et versionné' },
+] as const;
+
+function Lifecycle() {
+  return <section className="card dataset-lifecycle">
+    <div className="dataset-lifecycle-intro">
+      <span className="dataset-lifecycle-icon"><Icon d={ICONS.layers} size={22} /></span>
+      <div><h2 className="h2" style={{ fontSize: 20 }}>Cycle de vie d’un dataset</h2><p className="muted">Étapes et statuts, de la préparation à la publication.</p></div>
+    </div>
+    <ol className="dataset-lifecycle-steps">{STEPS.map((step, i) => <li key={step.title} className="row">
+      {i > 0 && <span className="dataset-lifecycle-arrow" aria-hidden>→</span>}
+      <div className={`dataset-step ${step.tone}`}>
+        <b><Icon d={step.icon} size={18} />{step.title}</b><span>{step.text}</span>
+      </div>
+    </li>)}</ol>
+    <div className="dataset-lifecycle-legend"><b>Statuts des versions</b>
+      {STEPS.map((step) => <span key={step.title}><i className={`dot ${step.tone}`} /><b>{step.title}</b> : {step.legend}</span>)}
+    </div>
+  </section>;
 }

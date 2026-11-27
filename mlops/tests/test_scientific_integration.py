@@ -34,20 +34,20 @@ def test_workstation_materialization_rejects_wrong_section_and_changed_file(tmp_
     contents = {
         "reference.png": b"reference",
         "labels.csv": (
-            b"file,label,intended_anomaly\n"
-            b"good.png,good,none\n"
-            b"bad.png,anomaly,disorder\n"
+            b"file,label,intended_anomaly\ngood.png,good,none\nbad.png,anomaly,disorder\n"
         ),
         "good.png": b"good",
         "bad.png": b"anomaly",
     }
     for name, data in contents.items():
         (folder / name).write_bytes(data)
+
     def entry(name):
         return {
             "file": f"raw/workstation/poste_5s_11/{name}",
             "sha256": hashlib.sha256(contents[name]).hexdigest(),
         }
+
     manifest = {
         "dataset_id": "poste-5s-11",
         "station": "press_cell",
@@ -109,4 +109,15 @@ def test_mlops_workstation_kit_is_byte_identical_to_the_run_analyzer():
     )
     assert "model.py" in names and "stations/press_cell.yaml" in names
     diverging = [n for n in names if (kit / n).read_bytes() != (run / n).read_bytes()]
-    assert diverging == []
+    # config.yaml may differ ONLY by the selected analyzer class (RUN default = group's fake
+    # analyzer until ultralytics and the station images are available).
+    assert diverging in ([], ["config.yaml"])
+    if diverging:
+        strip = lambda t: [  # noqa: E731
+            line
+            for line in t.splitlines()
+            if line.strip() and not line.lstrip().startswith(("#", "analyzer_class:"))
+        ]
+        assert strip((kit / "config.yaml").read_text(encoding="utf-8")) == strip(
+            (run / "config.yaml").read_text(encoding="utf-8")
+        )

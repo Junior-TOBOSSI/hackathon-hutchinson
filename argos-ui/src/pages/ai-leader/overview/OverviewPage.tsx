@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Icon, ICONS } from '../../../components/ui';
 import {
@@ -8,7 +8,7 @@ import {
 import { Loading, Unavailable } from '../common';
 import { read, useResource, type Resource } from '../data';
 import '../training/training.css';
-import { Chip, Kpi, SelectField, type IconName } from '../ui';
+import { Chip, SelectField, type IconName } from '../ui';
 import { bucketRuns, frReason, RUN_GROUPS } from './history';
 import './overview.css';
 
@@ -91,39 +91,60 @@ export default function OverviewPage() {
     <div className="tf">
       <header className="card tf-hero">
         <div className="tf-hero-title">
-          <span className="tf-hero-icon"><Icon d={ICONS.home} size={24} /></span>
+          <span className="tf-hero-icon"><Icon d={ICONS.overview} size={24} /></span>
           <div><h1 className="h2">Tableau de bord</h1>
-            <p className="muted">Pilotez le cycle de vie des modèles de vision, de la donnée au déploiement, sur Databricks et sur les postes.</p></div>
+            <p className="muted">Pilotez vos modèles de vision industrielle, de la donnée à la production.</p></div>
         </div>
       </header>
 
       <div className="ov-kpis">
-        <Kpi icon="db" label="Familles de datasets" value={v(ds, (d) => n(d.families))}
-          hint={ds.data?.data ? `${n(ds.data.data.published_versions)} versions publiées · ${ds.data.data.latest_images == null ? 'images : inconnu' : `${n(ds.data.data.latest_images)} images (dernières versions)`}` : undefined} />
-        <Kpi icon="play" label="Entraînements en cours" value={v(tr, (d) => n(d.running))} tone={tr.data?.data?.running ? 'amber' : undefined}
+        <OvKpi icon={ICONS.db} label="Jeux de données" value={v(ds, (d) => n(d.families))}
+          hint={ds.data?.data ? `${n(ds.data.data.published_versions)} versions · ${ds.data.data.latest_images == null ? 'images inconnues' : `${n(ds.data.data.latest_images)} images`}` : undefined} />
+        <OvKpi icon={PLAY_FILLED} label="Entraînements en cours" value={v(tr, (d) => n(d.running))}
           hint={tr.data?.data ? `${n(tr.data.data.by_status.succeeded ?? 0)} réussis · ${n(tr.data.data.by_status.failed ?? 0)} échoués` : undefined} />
-        <Kpi icon="layers" label="Versions candidates" value={v(rg, (d) => n(d.candidates))} hint="sans approbation, sans alias, non rejetées" />
-        <Kpi icon="check" label="Versions approuvées" value={v(rg, (d) => n(d.approved))} tone={rg.data?.data?.approved ? 'green' : undefined}
-          hint={rg.data?.data ? `${n(rg.data.data.champions)} modèle(s) avec champion` : undefined} />
-        <Kpi icon="monitor" label="Endpoints Serving prêts" value={endpoints ? `${ready} / ${endpoints.length}` : v(inf, () => '—')}
-          hint="Databricks Serving (distinct du déploiement Edge)" />
-        <Kpi icon="shieldAlert" label="Modèles à investiguer" value={v(mon, (d) => n(d.to_investigate))} tone={mon.data?.data?.to_investigate ? 'red' : undefined}
-          hint={mon.data?.data ? `${n(mon.data.data.drift_alerts)} alerte(s) de dérive · ${n(mon.data.data.insufficient_coverage)} à couverture insuffisante` : undefined} />
+        <OvKpi icon={NEURONS} label="Modèles candidats" value={v(rg, (d) => n(d.candidates))} tone={rg.data?.data?.candidates ? 'amber' : undefined}
+          hint="En attente de décision" />
+        <OvKpi icon={ICONS.shield} label="Modèles approuvés" value={v(rg, (d) => n(d.approved))} tone={rg.data?.data?.approved ? 'green' : undefined}
+          hint={rg.data?.data ? `${n(rg.data.data.champions)} modèle${rg.data.data.champions > 1 ? 's' : ''} champion` : undefined} />
+        <OvKpi icon={ICONS.monitor} label="Modèles déployés sur Edge" value={v(rg, (d) => {
+          const edge = d.models.filter((m) => m.edge_declared.length > 0).length;
+          return edge ? n(edge) : '—';
+        })}
+          hint={endpoints ? `${ready} endpoint${(ready ?? 0) > 1 ? 's' : ''} cloud disponible${(ready ?? 0) > 1 ? 's' : ''}` : undefined} />
       </div>
 
 
-      <div className="ov-grid">
-        <Card title="Activité récente" icon="log" sub="Événements réels datés, avec leur provenance" res={act}><Activity res={act} goto={goto} /></Card>
-        <Card title="Historique des entraînements" icon="bars" sub="Job runs Databricks réels des pipelines déclarés" res={tr}><TrainingHistory res={tr} goto={goto} /></Card>
-        <Card title="État des modèles" icon="badge" sub="Registre Unity Catalog, Serving Databricks et versions déclarées par les postes" res={rg} className="ov-span"><Models res={rg} goto={goto} /></Card>
-        <Card title="Infrastructure" icon="grid" sub="Connexions et parc industriel" res={inf}><Infrastructure res={inf} /></Card>
-        <Card title="Monitoring" icon="shieldAlert" sub="Données et scores ; pas d’accuracy de production sans vérité terrain" res={mon}
-          right={<button className="btn btn-ghost ov-link" onClick={() => goto({ section: 'monitoring' })}>Ouvrir →</button>}><Monitoring res={mon} /></Card>
-        <Card title="Réentraînement" icon="key" sub="Lecture seule : aucune évaluation ni aucun lancement depuis cette page" res={ret}
-          right={<button className="btn btn-ghost ov-link" onClick={() => goto({ section: 'training', view: 'policies' })}>Politiques →</button>}><Retraining res={ret} /></Card>
-        <Card title="Datasets" icon="db" sub="Familles, versions publiées et images" res={ds}
-          right={<button className="btn btn-ghost ov-link" onClick={() => goto({ section: 'datasets' })}>Catalogue →</button>}><Datasets res={ds} goto={goto} /></Card>
+      <div className="ov-columns">
+        <div className="ov-col">
+          <Card title="Activité récente" icon="log" sub="Événements réels datés, avec leur provenance" res={act}><Activity res={act} goto={goto} /></Card>
+          <Card title="Infrastructure" icon="grid" sub="Connexions et parc industriel" res={inf}><Infrastructure res={inf} /></Card>
+          <Card title="Réentraînement" icon="key" res={ret}
+            right={<button className="btn btn-ghost ov-link" onClick={() => goto({ section: 'training', view: 'policies' })}>Politiques →</button>}><Retraining res={ret} /></Card>
+        </div>
+        <div className="ov-col">
+          <Card title="Historique des entraînements" icon="bars" sub="Job runs Databricks réels des pipelines déclarés" res={tr}><TrainingHistory res={tr} goto={goto} /></Card>
+          <Card title="Monitoring" icon="shieldAlert" sub="Données et scores ; pas d’accuracy de production sans vérité terrain" res={mon}
+            right={<button className="btn btn-ghost ov-link" onClick={() => goto({ section: 'monitoring' })}>Ouvrir →</button>}><Monitoring res={mon} /></Card>
+          <Card title="Datasets" icon="db" sub="Familles, versions publiées et images" res={ds}
+            right={<button className="btn btn-ghost ov-link" onClick={() => goto({ section: 'datasets' })}>Catalogue →</button>}><Datasets res={ds} goto={goto} /></Card>
+        </div>
       </div>
+      <Card title="État des modèles" icon="badge" sub="Registre Unity Catalog, Serving Databricks et versions déclarées par les postes" res={rg}><Models res={rg} goto={goto} /></Card>
+    </div>
+  );
+}
+
+/* Mockup KPI card: icon on top, label, value, hint (HOVIS colours). */
+const NEURONS = 'M5 6a2 2 0 1 0 0 .01 M5 18a2 2 0 1 0 0 .01 M12 4a2 2 0 1 0 0 .01 M12 12a2 2 0 1 0 0 .01 M12 20a2 2 0 1 0 0 .01 M19 9a2 2 0 1 0 0 .01 M19 15a2 2 0 1 0 0 .01 M7 6.5l3 -2 M7 6.5l3 5 M7 17.5l3 -5 M7 17.5l3 2 M14 4.5l3 4 M14 12l3 -2.5 M14 12l3 2.5 M14 19.5l3 -4';
+const PLAY_FILLED = 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M10 8.5v7l6-3.5z';
+
+function OvKpi({ icon, label, value, hint, tone }: { icon: string; label: string; value: ReactNode; hint?: string; tone?: 'green' | 'amber' }) {
+  return (
+    <div className="card ov-kpi">
+      <span className="ov-kpi-icon"><Icon d={icon} size={18} /></span>
+      <span className="ov-kpi-label">{label}</span>
+      <b className={`ov-kpi-value${tone ? ` ${tone}` : ''}`}>{value}</b>
+      {hint && <span className="ov-kpi-hint">{hint}</span>}
     </div>
   );
 }
@@ -181,9 +202,18 @@ function TrainingHistory({ res, goto }: { res: Resource<Block<TrainingData>>; go
 function History({ d, period, setPeriod, goto }: { d: TrainingData; period: string; setPeriod: (p: string) => void; goto: (p: Record<string, string>) => void }) {
   const { buckets, runs, weekly } = useMemo(() => bucketRuns(d.runs, period), [d.runs, period]);
   const max = Math.max(1, ...buckets.map(([, b]) => Object.values(b).reduce((x, y) => x + y, 0)));
-  const W = 520, H = 150, bw = Math.min(48, W / Math.max(1, buckets.length) - 8);
+  const box = useRef<HTMLDivElement>(null);
+  const [W, setW] = useState(520);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(240, Math.round(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const H = 170, bw = Math.min(56, W / Math.max(1, buckets.length) - 12);
   return (
-    <div className="col" style={{ gap: 10 }}>
+    <div className="col" style={{ gap: 10 }} ref={box}>
       <div className="between" style={{ gap: 8, flexWrap: 'wrap' }}>
         <SelectField label="Période" icon="none" value={period} onChange={setPeriod} options={PERIODS} />
         <span className="muted" style={{ fontSize: 13 }}>{runs.length} run(s) · regroupement {weekly ? 'par semaine' : 'par jour'}</span>
@@ -213,7 +243,6 @@ function History({ d, period, setPeriod, goto }: { d: TrainingData; period: stri
       </div>
       {runs[0] && <button className="ov-last" onClick={() => goto({ section: 'training', run: String(runs[0].job_run_id) })}>
         Dernier : <b>{runs[0].pipeline_id}</b> · {runs[0].dataset_id ?? '?'} {runs[0].dataset_version ?? ''} · {dt(runs[0].started_at)} →</button>}
-      <span className="muted" style={{ fontSize: 12 }}>Périmètre : 25 derniers job runs par pipeline (page de l’API Databricks).</span>
     </div>
   );
 }
@@ -246,7 +275,6 @@ function Models({ res, goto }: { res: Resource<Block<RegistryData>>; goto: (p: R
               : <span className="muted">aucune déclaration</span>}</td>
           </tr>))}</tbody></table></div>
       )}
-      <span className="muted" style={{ fontSize: 12 }}>Le Serving Databricks et le déploiement sur les postes sont deux cibles distinctes : une version servie n’est pas une version chargée sur les postes.</span>
     </div>
   )}</BlockState>;
 }
@@ -268,11 +296,7 @@ function Infrastructure({ res }: { res: Resource<Block<InfrastructureData>> }) {
         <li><span>Parc industriel</span><span className="row" style={{ gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <Chip tone="grey">{d.fleet.stations} poste(s)</Chip><Chip tone="green">{d.fleet.online} en ligne</Chip><Chip tone={d.fleet.offline ? 'amber' : 'grey'}>{d.fleet.offline} hors ligne</Chip>
           {d.fleet.simulated > 0 && <Chip tone="amber">{d.fleet.simulated} simulé(s)</Chip>}</span></li>
-        <li><span>Couverture du Monitoring</span><span className="muted" style={{ textAlign: 'right' }}>
-          {d.monitoring_coverage.with_representative_reference} / {d.monitoring_coverage.operational_models} modèle(s) opérationnel(s) avec référence évaluable
-          {d.monitoring_coverage.registry_models_without_inference ? ` · ${d.monitoring_coverage.registry_models_without_inference} modèle(s) du registre sans inférence reliée` : ''}</span></li>
       </ul>
-      <span className="muted" style={{ fontSize: 12 }}>« En ligne » = fraîcheur du dernier événement du poste. Le Core et les postes fonctionnent sans Databricks.</span>
     </div>
   )}</BlockState>;
 }
@@ -297,7 +321,6 @@ function Monitoring({ res }: { res: Resource<Block<MonitoringData>> }) {
         <Metric label="À investiguer" value={n(d.to_investigate)} tone={d.to_investigate ? 'red' : undefined} />
         <Metric label="Dernière collecte" value={d.last_collection ? dt(d.last_collection) : 'aucune'} />
       </div>
-      <span className="muted" style={{ fontSize: 12 }}>Une absence d’alerte n’est pas une preuve de stabilité. Aucune accuracy de production n’est affichée sans vérité terrain.</span>
     </div>
   )}</BlockState>;
 }
@@ -323,13 +346,14 @@ function Retraining({ res }: { res: Resource<Block<RetrainingData>> }) {
 }
 
 function Datasets({ res, goto }: { res: Resource<Block<DatasetsData>>; goto: (p: Record<string, string>) => void }) {
-  return <BlockState res={res} label="Les datasets">{(d) => (
-    d.items.length === 0 ? <Unavailable tone="grey">Aucune famille de datasets.</Unavailable> : (
+  return <BlockState res={res} label="Les datasets">{(d) => <>
+    {d.expected.length > 0 && <div className="ov-expected"><b>Attendus, non publiés :</b> {d.expected.map((e) => e.dataset_id).join(', ')}</div>}
+    {d.items.length === 0 ? <Unavailable tone="grey">Aucune famille de datasets.</Unavailable> : (
       <div className="tf-table-wrap"><table className="tf-table ov-table"><thead><tr><th>Famille</th><th>Cas d’usage</th><th className="num">Versions</th><th>Dernière</th><th className="num">Images</th></tr></thead>
         <tbody>{d.items.map((f) => (
           <tr key={f.dataset_id} tabIndex={0} onClick={() => goto({ section: 'datasets', dataset: f.dataset_id })}>
             <td><b>{f.name}</b><small>{f.dataset_id}{f.synthetic ? ' · synthétique' : ''}</small></td><td>{uc(f.use_case)}</td>
             <td className="num">{f.versions}</td><td>{f.latest_version ?? '—'}</td><td className="num">{n(f.latest_images)}</td>
-          </tr>))}</tbody></table></div>)
-  )}</BlockState>;
+          </tr>))}</tbody></table></div>)}
+  </>}</BlockState>;
 }

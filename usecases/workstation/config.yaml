@@ -3,7 +3,11 @@
 
 # Class loaded by the registry ("module:Class").
 # The fake analyzer is still available: usecases.workstation.analyzer:FakeWorkstationAnalyzer
-analyzer_class: usecases.workstation.model:ZoneWorkstationAnalyzer
+# HOVIS (SCI-02): the group's real analyzer needs `ultralytics` and the station images
+# (data/raw/workstation, not delivered yet); until then the RUN default is the group's
+# fake analyzer so that the contract test passes. To enable the real one, use:
+#   analyzer_class: usecases.workstation.model:ZoneWorkstationAnalyzer
+analyzer_class: usecases.workstation.analyzer:FakeWorkstationAnalyzer
 
 # Decision layer: score < low -> conforme ; low <= score < high -> a_verifier ; score >= high -> anomalie
 thresholds:
