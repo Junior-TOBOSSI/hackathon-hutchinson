@@ -13,7 +13,7 @@ Run, from the repo root (webcam access needed):
     YOLO_OFFLINE=1 uvicorn hovis_demo:app --port 8000 --app-dir usecases/safety/notebooks
 then argos-ui (branch ``interface``) with ``VITE_USE_MOCK=false npx vite``. The video is a
 stream, fluid whatever the page refresh (argos-ui keeps 2 s, on purpose, against blinking).
-Options (environment): CAMERA (0), WEIGHTS, FPS (analyses per second, 4).
+Options (environment): CAMERA (0), WEIGHTS, FPS (analyses per second, 2).
 """
 
 from __future__ import annotations
@@ -44,7 +44,9 @@ CAMERA = int(os.environ.get("CAMERA", "0"))
 _CHOSEN = "data/models/safety/sh17_ours_yolo26s_640.pt"
 _FALLBACK = "data/models/safety/sh17_ours_yolov8s_640.pt"
 WEIGHTS = os.environ.get("WEIGHTS", _CHOSEN if (REPO / _CHOSEN).is_file() else _FALLBACK)
-PERIOD = 1 / float(os.environ.get("FPS", "4"))  # analyses per second
+# 2 analyses per second: PPE do not move fast, and it halves the computing (frugality).
+# Alert in about 1 to 2 s with the 3-frame smoothing. FPS=4 for a smoother video.
+PERIOD = 1 / float(os.environ.get("FPS", "2"))  # analyses per second
 
 state = {"issues": [], "ppe": {}, "jpeg": None, "n": 0, "error": None}
 lock = threading.Lock()
@@ -53,14 +55,27 @@ lock = threading.Lock()
 latest = {"frame": None}
 
 
+camera_lock = threading.Lock()
+
+
 def reader(cap) -> None:
-    """Read the camera continuously and keep only the newest frame (no stale buffer)."""
+    """Keep the camera buffer fresh WITHOUT decoding: grab() is cheap, decoding 30 images per
+    second we never analyse was most of the CPU. Only the analysed image is decoded."""
     while True:
-        ok, frame = cap.read()
+        with camera_lock:
+            ok = cap.grab()
         if ok:
-            latest["frame"] = frame
+            latest["frame"] = True  # a fresh image is waiting in the camera
         else:
             time.sleep(0.05)
+        time.sleep(0.005)
+
+
+def newest_frame(cap):
+    """Decode the newest grabbed image, only when an analysis needs it."""
+    with camera_lock:
+        ok, frame = cap.retrieve()
+    return frame if ok else None
 
 
 # Labels shown on the camera image, in French, with the box colour (BGR).
@@ -129,11 +144,10 @@ def loop() -> None:
     n = 0
     while True:
         start = time.perf_counter()
-        frame = latest["frame"]
+        frame = newest_frame(cap) if latest["frame"] else None
         if frame is None:
             time.sleep(0.05)
             continue
-        frame = frame.copy()
         meta = FrameMeta(frame_id=f"demo-{n}", workstation_id=STATION, camera_id="front")
         result = analyzer.analyze(frame, meta)
         if analyzer.last_camera_blocked:  # hand on the lens: nobody seen, the screen shows the part
