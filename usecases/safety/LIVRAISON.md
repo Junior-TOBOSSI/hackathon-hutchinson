@@ -101,7 +101,7 @@ station_live["checks"].update(station_checks(station_live["issues"]))
 | État des EPI du poste, champ facultatif `safetyPpe` (casque, lunettes, gants, chaussures) | `api/types.ts`, `api/mock.ts` |
 | Démo locale seulement : bouton « simuler une pièce NOK », visible quand le modèle qualité est « simulé » | `pages/Operateur.tsx`, `api/client.ts` |
 | Graphique « Production de la cellule » : corrigé pour un shift qui passe minuit (shift C, 21 h → 5 h : axe 21 h … 5 h, plus de courbe qui repart en arrière) | `components/charts.tsx` |
-| Team leader : postes en **cartes** (une par poste : état, rythme, pièces NOK), détail au clic (avancement, alertes en cours, écran du poste, historique) ; champ poste : taper **ou choisir dans une liste** | `pages/TeamLeader.tsx` |
+| Team leader : postes en **cartes** (une par poste : sécurité OK/NOK, rythme, pièces OK, pièces NOK ; fond et contour selon l'état), détail au clic (avancement, alertes en cours, écran du poste, historique) ; champ poste : taper **ou choisir dans une liste** | `pages/TeamLeader.tsx` |
 | Vocabulaire : **NOK** au lieu de KO dans tous les textes affichés (la valeur technique `verdict: 'KO'` ne change pas) | `pages/*.tsx`, `components/*`, `api/mock.ts` |
 | Historique d'un poste : tout sur le **shift en cours** (plus de « shift B », « 13 h → 21 h », « depuis 15 h », « moyenne 1,7 % » écrits en dur), 3 cases sans doublon (production, NOK, sécurité), une seule liste des événements ; champs facultatifs `shift` et `elapsedMin` dans `StationDetail` | `pages/PosteDetail.tsx`, `api/types.ts` |
 | Démo locale seulement : sélecteur de vue « Opérateur | Team leader » (sans se déconnecter), visible en mode démo ou avec `VITE_DEMO_VIEWS=true` | `App.tsx`, `vite-env.d.ts` |

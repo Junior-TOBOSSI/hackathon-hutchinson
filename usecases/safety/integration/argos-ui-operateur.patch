@@ -542,7 +542,7 @@ index 89edae1..09c58d6 100644
        </main>
      </div>
 diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
-index 1642809..632a546 100644
+index 1642809..7ca5449 100644
 --- a/argos-ui/src/pages/TeamLeader.tsx
 +++ b/argos-ui/src/pages/TeamLeader.tsx
 @@ -88,7 +88,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
@@ -565,7 +565,7 @@ index 1642809..632a546 100644
          </div>
          <StationTable stations={cell.stations} alerts={alerts} />
        </div>
-@@ -119,128 +119,124 @@ const DOT: Record<StationStatus, string> = {
+@@ -119,128 +119,134 @@ const DOT: Record<StationStatus, string> = {
    OK: 'var(--green)', SECURITE: 'var(--red)', QUALITE: 'var(--red)', RYTHME: 'var(--amber)', CAMERA: 'var(--amber)', OBJET: 'var(--amber)',
  };
  
@@ -710,22 +710,22 @@ index 1642809..632a546 100644
 +        {filtered.map((s) => {
 +          const delta = s.good - s.expectedNow;
 +          const isSel = s.id === selected;
++          const safe = s.status !== 'SECURITE';
 +          return (
 +            <button
 +              key={s.id}
 +              onClick={() => setSelected(isSel ? null : s.id)}
 +              aria-expanded={isSel}
-+              aria-label={`Poste ${shortId(s.id)} : ${STATUS[s.status][0]}, ${deltaText(delta, true)}, ${s.ko} pièces NOK. Voir le détail`}
++              aria-label={`Poste ${shortId(s.id)} : sécurité ${safe ? 'OK' : 'NOK'}, ${deltaText(delta, true)}, ${s.good} pièces OK, ${s.ko} pièces NOK. Voir le détail`}
 +              className="col"
-+              style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px', borderRadius: 16, background: TINT[s.status],
++              style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 7, padding: '14px 16px', borderRadius: 16, background: TINT[s.status],
 +                border: isSel ? '2px solid var(--navy)' : `2px solid ${EDGE[s.status]}` }}
 +            >
 +              <span className="cond" style={{ fontWeight: 700, fontSize: 26, lineHeight: 1 }}>{shortId(s.id)}</span>
-+              <span className="row" style={{ gap: 8, fontWeight: 600, fontSize: 15 }}>
-+                <span style={{ width: 10, height: 10, borderRadius: 5, background: DOT[s.status], flexShrink: 0 }} />{STATUS[s.status][0]}
-+              </span>
-+              <span style={{ fontWeight: 700, fontSize: 17, color: delta < 0 ? 'var(--red-text)' : 'var(--green-text)' }}>{deltaText(delta, true)}</span>
-+              <span className="muted" style={{ fontSize: 14 }}><b style={{ color: 'var(--ink)', fontSize: 16 }}>{s.ko}</b> pièces NOK</span>
++              <CardLine label="Sécurité" value={safe ? 'OK' : 'NOK'} tone={safe ? 'ok' : 'bad'} />
++              <CardLine label="Rythme" value={deltaText(delta, true)} tone={delta < 0 ? 'bad' : 'ok'} />
++              <CardLine label="Pièces OK" value={fmt(s.good)} />
++              <CardLine label="Pièces NOK" value={fmt(s.ko)} />
 +            </button>
 +          );
 +        })}
@@ -737,6 +737,16 @@ index 1642809..632a546 100644
 +  );
 +}
  
++/** Une ligne de carte : libellé à gauche, valeur à droite (verte si OK, rouge sinon). */
++function CardLine({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'bad' }) {
++  return (
++    <span className="between" style={{ alignItems: 'baseline', fontSize: 15 }}>
++      <span style={{ color: 'var(--muted)' }}>{label}</span>
++      <b style={{ fontSize: 16, color: tone === 'ok' ? 'var(--green-text)' : tone === 'bad' ? 'var(--red-text)' : 'var(--ink)' }}>{value}</b>
++    </span>
++  );
++}
++
 +/** Détail d'un poste, ouvert d'un clic sur sa carte. */
 +function StationDetailPanel({ s, alerts, onClose, onScreen }: { s: StationSummary; alerts: Alert[]; onClose: () => void; onScreen: () => void }) {
 +  const delta = s.good - s.expectedNow;
