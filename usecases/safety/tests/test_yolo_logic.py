@@ -10,6 +10,7 @@ from usecases.safety.yolo_analyzer import (
     YoloSafetyAnalyzer,
     assess_frame,
     assess_person,
+    idle_phones,
 )
 from visionhub.contracts import Decision, FrameMeta, PPEState, Thresholds
 from visionhub.decision import decide
@@ -163,3 +164,10 @@ def test_problem_seen_on_two_frames_out_of_three_still_alerts():
     scores = [analyzer.analyze(IMAGE, meta(i)).score for i in range(4)]
     assert decide(scores[2], THRESHOLDS) == Decision.ANOMALIE
     assert decide(scores[3], THRESHOLDS) == Decision.ANOMALIE
+
+
+def test_idle_phone_is_one_touching_no_hand_and_no_head():
+    hand = Det("hands", 0.8, (0.32, 0.5, 0.36, 0.55))
+    held = Det("cell phone", 0.6, (0.33, 0.48, 0.37, 0.53))
+    on_bench = Det("cell phone", 0.6, (0.8, 0.9, 0.85, 0.95))
+    assert idle_phones([PERSON, hand], [held, on_bench], P) == [on_bench]

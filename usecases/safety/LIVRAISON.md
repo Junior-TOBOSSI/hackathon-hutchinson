@@ -50,7 +50,8 @@ argos-ui attend, dans `StationLive.issues`, des objets `StationIssue` (`argos-ui
 from usecases.safety.hovis import StationIssueTracker
 
 tracker = StationIssueTracker(station_id="C3·P06")   # un par poste, gardé en mémoire
-issues = tracker.update(safety_result)                # AnalysisResult du dernier passage
+issues = tracker.update(safety_result,                # AnalysisResult du dernier passage
+                        idle_phone=bool(analyzer.last_idle_phones))
 station_live["issues"] += issues
 ```
 
@@ -68,6 +69,7 @@ Exemple de sortie :
 | gants `absent` | `SECURITE_EPI` · Gants absents · Mettez vos gants |
 | chaussures `absent` | `SECURITE_EPI` · Chaussures de sécurité non détectées · Vérifiez vos chaussures de sécurité |
 | `phone = true` | `COMPORTEMENT` · Téléphone en main · Rangez votre téléphone |
+| téléphone vu sur le poste, loin de toute main ou tête (`analyzer.last_idle_phones`, passé en `idle_phone=True`) | `POSTE` · Téléphone sur le poste · Rangez le téléphone (2 images sur 3) |
 | `uncertain` (partie du corps non visible) | aucun problème affiché |
 
 Règles appliquées : rien n'est affiché si l'image est « conforme » (score lissé < 0,4) ; un seul problème par type pour le poste ; `since` garde l'heure de début tant que le problème dure ; aucune personne n'est identifiée.
@@ -83,7 +85,7 @@ Règles appliquées : rien n'est affiché si l'image est « conforme » (score l
 ## 6. Demandes à l'intégration
 
 1. **Contrat** : ajouter `shoes: PPEState = PPEState.UNCERTAIN` à `PersonPPE` (`visionhub/contracts.py`). Rétrocompatible. Tant que ce n'est pas fait, les chaussures comptent dans le score mais ne sont ni transmises au Core ni affichées.
-2. **Téléphone** : la branche `detection-telephone` contient un autre modèle de téléphone. Décider lequel garder pour éviter deux détections concurrentes.
+2. **Téléphone** : la branche `detection-telephone` contient un autre modèle de téléphone. Décider lequel garder pour éviter deux détections concurrentes. Le téléphone posé sur le poste relève normalement du groupe Workstation : se mettre d'accord pour ne pas le signaler deux fois.
 3. **Remontée au Core** : vérifier que les inférences Safety continues sont bien transmises (point ouvert du document de passation, section 16).
 
 ## 7. Résultats (validation SH17, 810 images)

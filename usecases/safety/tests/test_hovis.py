@@ -78,3 +78,17 @@ def test_no_identity_in_issues():
     issues = StationIssueTracker("P1").update(result(0.9, [person(3, gloves=A)]), T0)
     assert "3" not in issues[0]["id"].split(":")[-1]
     assert "person" not in str(issues)
+
+
+def test_phone_lying_on_the_station_is_a_poste_issue_after_two_frames():
+    tracker = StationIssueTracker("P1")
+    assert tracker.update(result(0.1, [person()]), T0, idle_phone=True) == []
+    issues = tracker.update(result(0.1, [person()]), T0, idle_phone=True)
+    assert [(i["category"], i["label"]) for i in issues] == [("POSTE", "Téléphone sur le poste")]
+
+
+def test_phone_in_use_is_not_also_reported_as_lying_on_the_station():
+    tracker = StationIssueTracker("P1")
+    tracker.update(result(0.9, [person(phone=True)]), T0, idle_phone=True)
+    issues = tracker.update(result(0.9, [person(phone=True)]), T0, idle_phone=True)
+    assert [i["category"] for i in issues] == ["COMPORTEMENT"]

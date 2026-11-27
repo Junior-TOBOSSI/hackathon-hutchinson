@@ -18,11 +18,15 @@ Rules:
   line per person); persons are never identified;
 - ``since`` is the first time the problem was seen and stays the same while it lasts, so
   the screen shows one ongoing problem, not a new one at every frame.
-- shoes appear as soon as ``PersonPPE`` has a ``shoes`` field (contract change pending).
+- shoes appear as soon as ``PersonPPE`` has a ``shoes`` field (contract change pending);
+- a phone lying on the station (seen, touching nobody) gives a POSTE issue "Téléphone sur
+  le poste" when seen on 2 of the last 3 frames. This is workstation tidiness: to be agreed
+  with the Workstation group so that the same phone is not reported twice.
 """
 
 from __future__ import annotations
 
+from collections import deque
 from datetime import UTC, datetime
 
 from visionhub.contracts import AnalysisResult, PPEState
@@ -35,6 +39,7 @@ PPE_ISSUES = {
     "shoes": ("Chaussures de sécurité non détectées", "Vérifiez vos chaussures de sécurité"),
 }
 PHONE_ISSUE = ("Téléphone en main", "Rangez votre téléphone")
+IDLE_PHONE_ISSUE = ("Téléphone sur le poste", "Rangez le téléphone")
 DEFAULT_REQUIRED = ("helmet", "glasses", "gloves", "shoes")
 
 
@@ -73,11 +78,22 @@ class StationIssueTracker:
         self.low = low
         self.required = required
         self._since: dict[str, str] = {}
+        self._idle_phone = deque(maxlen=3)  # phone lying on the station, last 3 frames
 
-    def update(self, result: AnalysisResult, now: datetime | None = None) -> list[dict]:
-        """Issues to display after this frame, in the argos-ui ``StationIssue`` format."""
+    def update(
+        self, result: AnalysisResult, now: datetime | None = None, idle_phone: bool = False
+    ) -> list[dict]:
+        """Issues to display after this frame, in the argos-ui ``StationIssue`` format.
+
+        ``idle_phone``: a phone was seen on the station, touching nobody (analyzer's
+        ``last_idle_phones``).
+        """
         stamp = (now or datetime.now(UTC)).isoformat()
         problems = current_problems(result, self.low, self.required)
+        self._idle_phone.append(idle_phone)
+        in_use = any(key == "phone" for key, *_ in problems)
+        if sum(self._idle_phone) >= 2 and not in_use:  # 2 of the last 3 frames
+            problems.append(("phone_on_station", "POSTE", *IDLE_PHONE_ISSUE))
         active = {key for key, *_ in problems}
         # A problem that disappeared is forgotten: if it comes back, it is a new episode.
         self._since = {k: v for k, v in self._since.items() if k in active}

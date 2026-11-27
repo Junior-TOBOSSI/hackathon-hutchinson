@@ -151,6 +151,12 @@ def assess_person(person: Det, parts: list[Det], phones: list[Det], p: dict) -> 
     return out
 
 
+def idle_phones(dets: list[Det], phones: list[Det], p: dict) -> list[Det]:
+    """Phones that touch no hand, gloved hand or head in the frame: not in use, lying around."""
+    zones = [d.box for d in dets if d.name in PHONE_ZONE]
+    return [ph for ph in phones if not any(touches(ph.box, z, p["phone_margin"]) for z in zones)]
+
+
 def assess_frame(
     dets: list[Det], phones: list[Det], p: dict
 ) -> tuple[list[PersonAssessment], float]:
@@ -214,6 +220,8 @@ class YoloSafetyAnalyzer(Analyzer):
 
         # Kept for overlays (e.g. a debug view drawing boxes) without a second inference.
         self.last_detections, self.last_phones = dets, phones
+        # Phones touching nobody's hand or head: lying on the station (workstation tidiness).
+        self.last_idle_phones = idle_phones(dets, phones, self.p)
         assessed, raw_score = assess_frame(dets, phones, self.p)
         self.recent.append(raw_score)
         # Smoothing: median of the window. While the window is not full yet (start-up),
