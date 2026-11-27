@@ -23,7 +23,9 @@ Le dépôt est public : **les poids ne sont pas dans Git**. Ils sont transmis à
 
 | Fichier, à placer dans `data/models/` | Rôle | SHA-256 |
 |---|---|---|
-| `safety/sh17_ours_yolov8s_640.pt` (22 Mo) | Modèle EPI recommandé : YOLOv8s, 9 classes | `4928624ec4a0e0db210df4d0422550f791e1aff2699822b55c12a55beae33b8e` |
+| `safety/sh17_ours_yolo26s_640.pt` | **Modèle EPI retenu : YOLO26s**, 9 classes | dans `SHA256SUMS` du paquet privé (`MODELS.md`) |
+| `safety/sh17_ours_yolo26n_640.pt` | Modèle léger pour Raspberry Pi 5 sans accélérateur : YOLO26n | dans `SHA256SUMS` du paquet privé |
+| `safety/sh17_ours_yolov8s_640.pt` (22 Mo) | Ancien modèle de référence : YOLOv8s | `4928624ec4a0e0db210df4d0422550f791e1aff2699822b55c12a55beae33b8e` |
 | `safety/sh17_ours_yolov8n_640.pt` (6 Mo) | Modèle EPI de repli, plus léger : YOLOv8n | `4699f7439d39423cad3f27b60b570182acc4aa8fae5d185588961cfd7458e84e` |
 | `yolov8n_coco.pt` (6 Mo) | Téléphones : modèle COCO générique, classe `cell phone` | `f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36` |
 
@@ -36,7 +38,7 @@ Dans `usecases/safety/config.yaml` :
 ```yaml
 analyzer_class: usecases.safety.yolo_analyzer:YoloSafetyAnalyzer
 params:
-  weights: data/models/safety/sh17_ours_yolov8s_640.pt
+  weights: data/models/safety/sh17_ours_yolo26s_640.pt
 ```
 
 Dépendance : `pip install -e ".[safety]"` (Ultralytics). Fonctionnement 100 % local : régler `YOLO_OFFLINE=1` et `yolo settings sync=False` (pas de télémétrie).
@@ -131,9 +133,11 @@ Côté serveur, la démo `notebooks/hovis_demo.py` fournit ces routes, et aussi 
 
 | Modèle | mAP50 moyen | Gants | Lunettes | Chaussures | Casque |
 |---|---|---|---|---|---|
-| YOLOv8s (recommandé) | 0,68 | 0,53 | 0,65 | 0,58 | 0,61 |
-| YOLOv8n (repli) | 0,63 | 0,45 | 0,56 | 0,53 | 0,57 |
+| **YOLO26s (retenu)** | **0,70** | **0,62** | **0,68** | **0,65** | **0,68** |
+| YOLOv8s | 0,68 | 0,53 | 0,65 | 0,58 | 0,61 |
+| YOLO26n (léger, Raspberry Pi) | 0,65 | 0,50 | 0,55 | 0,55 | 0,63 |
+| YOLOv8n | 0,63 | 0,45 | 0,56 | 0,53 | 0,57 |
 
-Les chiffres définitifs (jeu de test de 810 images jamais utilisées) et la comparaison avec YOLO26 sont à venir.
+YOLO26s est le plus précis sur chacun des 4 EPI. Tableau complet et recette : `MODELS.md`. Les chiffres définitifs (jeu de test de 810 images jamais utilisées) sont à venir.
 
 Données : SH17 (licence CC BY-NC-SA 4.0, prototype uniquement). En production, réentraîner sur les images de l'usine.

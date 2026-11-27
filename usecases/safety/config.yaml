@@ -22,7 +22,7 @@ params:
   # --- YoloSafetyAnalyzer (see usecases/safety/yolo_analyzer.py) ---
   # PPE model: official SH17 yolov8n for now; our retrained one once copied from the GPU:
   #   data/models/safety/sh17_ours_yolov8n_640.pt
-  weights: data/models/safety/sh17_yolov8n.pt
+  weights: data/models/safety/sh17_ours_yolo26s_640.pt   # chosen model (MODELS.md)
   phone_weights: data/models/yolov8n_coco.pt   # generic COCO model, "cell phone" class only
   detect_phone: true
   imgsz: 640
