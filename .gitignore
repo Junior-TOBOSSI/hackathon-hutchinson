@@ -75,4 +75,3 @@ hovis.local.env
 !data/**/*.pt
 !data/**/*.ts
 !data/raw/safety/videos/*.mp4
-data/raw/safety/videos/lunettes.mp4
