@@ -379,7 +379,7 @@ class MonitoringService:
             run_id = vs.version.run_id
             if not run_id:
                 continue
-            run = self.c.get_run(run_id)
+            run = tr.with_decision_metrics(self.c.get_run(run_id))
             m, tags = run.metrics, run.tags
             ds_id = tags.get("argos.dataset_id") or (
                 "quality-synthetic" if model_id == "quality-poc" else None
@@ -405,8 +405,15 @@ class MonitoringService:
                         "precision_nok": m.get("test_precision_nok"),
                         "recall_nok": m.get("test_rappel", m.get("test_recall_nok")),
                         "f1_nok": m.get("test_f1_nok"),
-                        "false_rejects": m.get("test_faux_rejets"),
-                        "missed_defects": m.get("test_nok_declarees_ok"),
+                        # counts (the UI shows them as integers); the group's rates
+                        # (test_faux_rejets, test_nok_declarees_ok) stay in Training Factory.
+                        "false_rejects": m.get("test_fp"),
+                        "missed_defects": m.get("test_fn"),
+                        "to_review": (
+                            m["test_a_verifier_ok"] + m["test_a_verifier_nok"]
+                            if "test_a_verifier_ok" in m and "test_a_verifier_nok" in m
+                            else None
+                        ),
                         "latency_ms_mean": m.get("test_latence_ms_moyenne"),
                         "latency_ms_p95": m.get("test_latence_ms_p95"),
                         "n_test": m.get("test_n_photos"),

@@ -58,6 +58,7 @@ export const training = {
   launch: (body: { pipeline_id: string; dataset_id: string; version: string; parameters: Record<string, unknown>; idempotency_key: string }) =>
     call<LaunchRecord>(`${T}/launch`, { method: 'POST', body: JSON.stringify(body) }, { timeoutMs: 60_000 }),
   summary: (o?: ReadOpts) => call<Kpis>(`${T}/summary`, undefined, o),
+  launchGuard: (o?: ReadOpts) => call<{ remote_launch_enabled: boolean; variable: string }>(`${T}/launch-guard`, undefined, o),
   runs: (o?: ReadOpts) => call<TrainingRow[]>(`${T}/runs`, undefined, o),
   run: (id: number, o?: ReadOpts) => call<RunDetail>(`${T}/runs/${id}`, undefined, o),
   cancel: (id: number) => call<{ status: string }>(`${T}/runs/${id}/cancel`, { method: 'POST' }),
@@ -73,3 +74,5 @@ export const training = {
 };
 
 export const artifactUrl = (runId: string, path: string) => `/api${T}/mlflow-runs/${q(runId)}/artifact?path=${q(path)}`;
+export const artifactDownloadUrl = (runId: string, path: string) => `${artifactUrl(runId, path)}&download=true`;
+export const artifactsExportUrl = (runId: string) => `/api${T}/mlflow-runs/${q(runId)}/export`;

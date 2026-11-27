@@ -284,12 +284,25 @@ def create_mlops_router(
     def compare(
         c: Connector, ids: str = Query(..., description="comma-separated run ids")
     ) -> dict[str, Any]:
-        return c.compare_runs([i for i in ids.split(",") if i])
+        tr = training_service_for(c)
+        runs = [tr.with_decision_metrics(c.get_run(i)) for i in ids.split(",") if i]
+        metric_keys = sorted({k for r in runs for k in r.metrics})
+        param_keys = sorted({k for r in runs for k in r.params})
+        return {
+            "runs": [{"run_id": r.run_id, "run_name": r.run_name} for r in runs],
+            "metrics": {k: {r.run_id: r.metrics.get(k) for r in runs} for k in metric_keys},
+            "params": {k: {r.run_id: r.params.get(k) for r in runs} for k in param_keys},
+        }
 
     @router.get("/mlops/runs/{run_id}")
     @translate
     def run(run_id: str, c: Connector, response: Response, fresh: Fresh = False) -> RunSummary:
-        return served(c, response, fresh, lambda: c.get_run(run_id))
+        return served(
+            c,
+            response,
+            fresh,
+            lambda: training_service_for(c).with_decision_metrics(c.get_run(run_id)),
+        )
 
     @router.get("/mlops/runs/{run_id}/metrics/{key}/history")
     @translate

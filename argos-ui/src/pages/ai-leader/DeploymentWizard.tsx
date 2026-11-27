@@ -100,7 +100,7 @@ export default function DeploymentWizard({ models, statuses, endpoints, initialE
             {busy ? 'Envoi…' : 'Soumettre à Databricks Serving'}</button></div>
       </div>}
       {busy && <Loading what="Opération en cours" />}
-      {prepared && <span className="muted" style={{ fontSize: 12 }}>Une préparation fermée reste dans le journal HOVIS jusqu’à expiration ou confirmation ; aucune mutation distante n’est lancée par la fermeture.</span>}
+      {prepared && <span className="muted" style={{ fontSize: 12 }}>Une préparation fermée reste dans le journal ARGOS jusqu’à expiration ou confirmation ; aucune mutation distante n’est lancée par la fermeture.</span>}
     </section>
   </div>;
 }

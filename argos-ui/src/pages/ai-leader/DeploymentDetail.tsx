@@ -45,7 +45,7 @@ export default function DeploymentDetail({ target, operations, statuses, onClose
       <Technical><KV k="config_update" v={target.endpoint.config_update ?? '—'} /><KV k="Entité" v={entity?.name ?? '—'} />
         <KV k="Modèle UC" v={entity?.model ?? '—'} /></Technical>
       <h3>Opérations sur cette cible</h3>
-      {related.length === 0 && <Unavailable tone="grey">Aucune opération HOVIS enregistrée. L’endpoint existant ne constitue pas un historique HOVIS.</Unavailable>}
+      {related.length === 0 && <Unavailable tone="grey">Aucune opération ARGOS enregistrée. L’endpoint existant ne constitue pas un historique ARGOS.</Unavailable>}
       {related.map((operation) => <button key={operation.operation_id} className="lifecycle-operation-row"
         onClick={() => onOperation(operation.operation_id)}><span>{dateTime(operation.created_at)}</span>
         <b>{operation.kind === 'rollback' ? 'Rollback' : 'Déploiement'} v{operation.previous_version} → v{operation.version}</b>

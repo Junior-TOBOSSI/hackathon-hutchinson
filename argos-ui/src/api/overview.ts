@@ -9,6 +9,7 @@ export interface Block<T> {
 }
 
 export interface DatasetsData {
+  expected: { dataset_id: string; use_case: string; pipelines: string[] }[];
   families: number; published_versions: number; latest_images: number | null; drafts: number; by_use_case: Record<string, number>;
   items: { dataset_id: string; name: string; use_case: string; synthetic: boolean; versions: number; latest_version: string | null; latest_images: number | null }[];
 }

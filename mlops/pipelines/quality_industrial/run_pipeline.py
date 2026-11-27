@@ -405,10 +405,21 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
             )
         summary = training_summary(history, int(hp["epochs"]))
         metrics = json.loads((out_root / "test" / "metriques.json").read_text(encoding="utf-8"))
+        from mlops.pipelines.quality_industrial.decision_metrics import (
+            mlflow_test_metrics,
+            rows_from_csv,
+        )
+
+        # Accuracy / precision / F1 / TP-TN-FP-FN counted on the group's real predictions.csv
+        # (A_VERIFIER kept apart, never counted as correct). No threshold or model change.
+        decision = mlflow_test_metrics(
+            rows_from_csv((out_root / "test" / "predictions.csv").read_bytes())
+        )
         mlflow.log_metrics(
             {
                 **summary,
                 **evaluation_metrics(metrics),
+                **decision,
                 "train_duration_s": time.time() - t0,
                 **timings,
                 "val_seuil_nok": float(cfg["seuil_nok"]),

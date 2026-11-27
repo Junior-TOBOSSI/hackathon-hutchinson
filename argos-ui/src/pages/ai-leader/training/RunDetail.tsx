@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { familyImageUrl, type RunSummary } from '../../../api/mlops';
-import { artifactUrl, training, type Evaluation as EvaluationData, type MlRun, type Point, type PredictionPage, type RunDetail as Detail } from '../../../api/training';
+import { artifactDownloadUrl, artifactsExportUrl, artifactUrl, training, type Evaluation as EvaluationData, type MlRun, type Point, type PredictionPage, type RunDetail as Detail } from '../../../api/training';
 import { KV, Loading, Technical, Unavailable } from '../common';
 import { errText, useStore } from '../data';
 import { MetricsBlock } from '../Registry';
@@ -276,10 +276,28 @@ function Artifacts({ run }: { run: MlRun }) {
   if (list.loading) return <Loading what="Liste des artefacts MLflow" />;
   if (list.error) return <Unavailable tone="red">{list.error}</Unavailable>;
   if (!list.data?.length) return <Unavailable tone="grey">Aucun artefact pour ce run.</Unavailable>;
-  return <table className="tf-table"><thead><tr><th>Artefact</th><th>Taille</th><th /></tr></thead><tbody>{list.data.map((a) => (
-    <tr key={a.path} style={{ cursor: 'default' }}><td>{a.path}</td><td>{a.size != null ? `${(a.size / 1024).toFixed(1).replace('.', ',')} Ko` : '—'}</td>
-      <td>{/\.(json|csv|md|ya?ml|txt|png|onnx|pt)$/i.test(a.path) ? <a href={artifactUrl(run.run_id, a.path)} target="_blank" rel="noreferrer">Ouvrir / télécharger</a> : <span className="muted">consultation dans MLflow</span>}</td></tr>))}</tbody></table>;
+  const total = list.data.reduce((sum, a) => sum + (a.size ?? 0), 0);
+  return <div className="col" style={{ gap: 12 }}>
+    <div className="between" style={{ gap: 10, flexWrap: 'wrap' }}>
+      <span className="muted">{list.data.length} fichier(s) · {size(total)}</span>
+      <a className="btn btn-primary" href={artifactsExportUrl(run.run_id)} download>Exporter tous les artefacts (.zip)</a>
+    </div>
+    <table className="tf-table"><thead><tr><th>Artefact</th><th>Taille</th><th /></tr></thead><tbody>{list.data.map((a) => {
+      const viewable = VIEWABLE.test(a.path);
+      return <tr key={a.path} style={{ cursor: 'default' }}><td>{a.path}</td><td>{a.size != null ? size(a.size) : '—'}</td>
+        <td className="row" style={{ gap: 12 }}>{DOWNLOADABLE.test(a.path) ? <>
+          {viewable && <a href={artifactUrl(run.run_id, a.path)} target="_blank" rel="noreferrer">Ouvrir</a>}
+          <a href={artifactDownloadUrl(run.run_id, a.path)} download>Télécharger</a></>
+          : <span className="muted">consultation dans MLflow</span>}</td></tr>;
+    })}</tbody></table>
+  </div>;
 }
+
+const VIEWABLE = /\.(json|csv|md|ya?ml|txt|log|png|jpe?g)$|(^|\/)MLmodel$/i;
+const DOWNLOADABLE = /\.(json|csv|md|ya?ml|txt|log|png|jpe?g|onnx|pt|pkl|npy|npz)$|(^|\/)MLmodel$/i;
+const size = (bytes: number) => bytes >= 1024 * 1024
+  ? `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} Mo`
+  : `${(bytes / 1024).toFixed(1).replace('.', ',')} Ko`;
 
 function Logs({ id }: { id: number }) {
   const logs = useLogs(id);

@@ -4,6 +4,15 @@ Usage: python -m mlops.datasets_prep.workstation_group --source-root <raw/workst
     --output-root <private staging folder>
 
 Missing sections are reported and not replaced with generated samples.
+
+The group's labels.csv files reference images with RELATIVE paths (``good/good_01.png``,
+``anomaly/anomaly_01.png``). They are accepted only when they stay inside the dataset folder
+(no absolute path, drive, backslash, ``.`` / ``..`` segment, symlink escape) and the tree is
+preserved in the staged version. The reference image, labels.csv and README.txt (when present)
+are kept as versioned assets with their SHA-256.
+
+Image provenance is declared from the group's own README: these pilot sets are SYNTHETIC
+(generative contact sheets, cropped and resized; labels indicative), never "industrial".
 """
 
 from __future__ import annotations
@@ -35,6 +44,23 @@ def digest(path: Path) -> str:
     return hasher.hexdigest()
 
 
+def safe_relative(name: str, root: Path) -> PurePosixPath:
+    """A labels.csv path, accepted only if it stays inside ``root`` (tree preserved)."""
+    rel = PurePosixPath(name)
+    if (
+        not name
+        or "\\" in name
+        or ":" in name
+        or rel.is_absolute()
+        or any(part in ("", ".", "..") for part in name.split("/"))
+    ):
+        raise ValueError(f"unsafe image path in labels.csv: {name!r}")
+    resolved = (root / Path(*rel.parts)).resolve()
+    if not resolved.is_relative_to(root.resolve()):
+        raise ValueError(f"image path escapes the dataset folder: {name!r}")
+    return rel
+
+
 def stage(section: str, source_root: Path, output_root: Path) -> Path:
     if output_root.resolve().is_relative_to(Path(__file__).resolve().parents[2]):
         raise ValueError("Workstation images must be staged outside the Git repository")
@@ -51,33 +77,41 @@ def stage(section: str, source_root: Path, output_root: Path) -> Path:
     for row in rows:
         filename = (row.get(columns["file"]) or "").strip()
         original_label = (row.get(columns["label"]) or "").strip()
-        if not filename or Path(filename).name != filename:
-            raise ValueError(f"{section}: unsafe or absent image filename")
+        rel = safe_relative(filename, source)
         if original_label == "reference":
             continue
         if original_label not in {"good", "anomaly"}:
             raise ValueError(f"{section}: unexpected original label {original_label!r}")
-        image = source / filename
+        image = source / Path(*rel.parts)
         if not image.is_file() or image.suffix.lower() not in {".png", ".jpg", ".jpeg"}:
             raise FileNotFoundError(image)
         kind = (row.get(columns["type"]) or "").strip()
         items.append(
             {
-                "file": f"raw/workstation/{dataset_name}/{filename}",
+                "file": f"raw/workstation/{dataset_name}/{rel.as_posix()}",
                 "label": original_label,
                 "split": "train" if original_label == "good" else "test",
                 "sha256": digest(image),
                 "anomaly_type": kind if original_label == "anomaly" else None,
                 "origin": "workstation-group-original",
+                "provenance": "synthetic",
             }
         )
     reference_files = {PurePosixPath(view["reference_image"]).name for view in config["views"]}
     assets = []
-    for name in sorted(reference_files | {"labels.csv"}):
+    optional = {"README.txt"} if (source / "README.txt").is_file() else set()
+    for name in sorted(reference_files | {"labels.csv"} | optional):
         file = source / name
         if not file.is_file():
             raise FileNotFoundError(file)
-        assets.append({"file": f"raw/workstation/{dataset_name}/{name}", "sha256": digest(file)})
+        role = "reference" if name in reference_files else name.split(".")[0].lower()
+        assets.append(
+            {
+                "file": f"raw/workstation/{dataset_name}/{name}",
+                "sha256": digest(file),
+                "role": role,
+            }
+        )
     counts = Counter(item["label"] for item in items)
     if counts != {"good": 5, "anomaly": 5}:
         raise ValueError(
@@ -89,9 +123,14 @@ def stage(section: str, source_root: Path, output_root: Path) -> Path:
         raise FileExistsError(version_root)
     target = version_root / "raw/workstation" / dataset_name
     target.mkdir(parents=True)
+    prefix = f"raw/workstation/{dataset_name}/"
     for entry in [*items, *assets]:
-        name = PurePosixPath(entry["file"]).name
-        shutil.copy2(source / name, target / name)
+        rel = PurePosixPath(entry["file"].removeprefix(prefix))
+        destination = target / Path(*rel.parts)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source / Path(*rel.parts), destination)
+        if digest(destination) != entry["sha256"]:
+            raise ValueError(f"{section}: copy of {rel} differs from its source")
     manifest = {
         "schema_version": 2,
         "dataset_id": family,
@@ -102,13 +141,17 @@ def stage(section: str, source_root: Path, output_root: Path) -> Path:
         "classes": ["good", "anomaly"],
         "synthetic": True,
         "description": (
-            "Original group dataset: real reference and good photos, group-made anomalies."
+            "Original Workstation group pilot set (synthetic generative images, cropped and "
+            "resized; labels indicative, to be validated). Not an industrial benchmark."
         ),
+        "image_provenance": "synthetic",
         "split_strategy": "group-cross-validation-inside-evaluator",
         "provenance": {
             "source": "workstation-group",
             "section": section,
             "source_dataset": dataset_name,
+            "images": "synthetic (group README: generative contact sheet, labels indicative)",
+            "source_git": "origin/integration data/raw/workstation",
         },
         "counts": {
             split: {

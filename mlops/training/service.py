@@ -41,7 +41,7 @@ from mlops.training.checks import (
     dataset_checks,
     effective_parameters,
 )
-from mlops.training.specs import PipelineSpec, PipelineView, load_specs, view
+from mlops.training.specs import PipelineSpec, PipelineView, load_specs, registers_into, view
 
 Status = Literal["queued", "running", "succeeded", "failed", "cancelled", "unknown"]
 HOME = Path(os.environ.get("ARGOS_MLOPS_HOME", Path.home() / "ARGOS_MLOPS_LOCAL"))
@@ -370,7 +370,7 @@ class TrainingService:
     def pipeline_for_model(self, model_id: str) -> PipelineSpec:
         """The ONE pipeline registering into this managed model (no guess when ambiguous)."""
         uc_name = self.c.managed(model_id).uc_name
-        found = [s for s in self.specs if s.mlflow.get("registered_model") == uc_name]
+        found = [s for s in self.specs if registers_into(s, uc_name)]
         if len(found) != 1:
             raise ConflictError(
                 f"{len(found)} pipelines register into {uc_name}: choose one in Training Factory"
@@ -480,7 +480,7 @@ class TrainingService:
             "dataset_dir": dataset_dir,
             "parameters": record.parameters,
             "experiment": spec.mlflow["experiment"],
-            "registered_model": spec.mlflow["registered_model"],
+            "registered_model": spec.registered_model_for(record.parameters),
             "code_commit": spec.code.get("commit", ""),
             "output_dir": f"{base}/outputs",
             "split_fingerprints": summary.split_fingerprints if summary else {},
@@ -516,44 +516,52 @@ class TrainingService:
         )
 
     def _versions(self, spec: PipelineSpec) -> list[Any]:
-        name = spec.mlflow["registered_model"]
-        try:
-            return self.c._cached(
-                f"training:versions:{spec.id}",
-                lambda: list(self.c.mlflow.search_model_versions(f"name = '{name}'")),
-            )
-        except DatabricksConnectorError:
-            return []
+        def load() -> list[Any]:
+            out: list[Any] = []
+            for name in spec.registered_models():
+                try:
+                    out += list(self.c.mlflow.search_model_versions(f"name = '{name}'"))
+                except DatabricksConnectorError:
+                    continue  # model not created yet
+            return out
+
+        return self.c._cached(f"training:versions:{spec.id}", load)
 
     def _version_states(self, spec: PipelineSpec) -> list[dict[str, Any]]:
-        """Approval tag and aliases of each version (UC search results carry no tags)."""
-        name = spec.mlflow["registered_model"]
+        """Approval tag and aliases of each version (UC search results carry no tags). One
+        registered model per section (Workstation): aliases are read per registered model."""
+        names = spec.registered_models()
 
         def load() -> list[dict[str, Any]]:
-            try:
-                aliases = dict(self.c.mlflow.get_registered_model(name).aliases or {})
-            except Exception:  # noqa: BLE001 - model not created yet
-                return []
             versions = self._versions(spec)
-            # INT-GLOBAL-01: N+1 reads in parallel (bounded) instead of one after the other.
-            with ThreadPoolExecutor(max_workers=4) as pool:
-                fulls = list(
-                    pool.map(
-                        lambda v: self.c._call(
-                            lambda: self.c.mlflow.get_model_version(name, str(v.version)),
-                            f"version {v.version}",
-                        ),
-                        versions,
+            states: list[dict[str, Any]] = []
+            for name in names:
+                try:
+                    aliases = dict(self.c.mlflow.get_registered_model(name).aliases or {})
+                except Exception:  # noqa: BLE001 - model not created yet
+                    continue
+                mine = [v for v in versions if getattr(v, "name", names[0]) == name]
+                # INT-GLOBAL-01: N+1 reads in parallel (bounded) instead of one after the other.
+                with ThreadPoolExecutor(max_workers=4) as pool:
+                    fulls = list(
+                        pool.map(
+                            lambda v, n=name: self.c._call(
+                                lambda: self.c.mlflow.get_model_version(n, str(v.version)),
+                                f"version {v.version}",
+                            ),
+                            mine,
+                        )
                     )
-                )
-            return [
-                {
-                    "version": str(v.version),
-                    "approved": (full.tags or {}).get("argos_approval") == "approved",
-                    "aliases": [a for a, ver in aliases.items() if str(ver) == str(v.version)],
-                }
-                for v, full in zip(versions, fulls, strict=True)
-            ]
+                states += [
+                    {
+                        "version": str(v.version),
+                        "registered_model": name,
+                        "approved": (full.tags or {}).get("argos_approval") == "approved",
+                        "aliases": [a for a, ver in aliases.items() if str(ver) == str(v.version)],
+                    }
+                    for v, full in zip(mine, fulls, strict=True)
+                ]
+            return states
 
         return self.c._cached(f"training:vstates:{spec.id}", load)
 
@@ -621,7 +629,7 @@ class TrainingService:
                         model_versions=sorted(
                             {str(v.version) for v in versions if v.run_id in run_ids}, key=int
                         ),
-                        registered_model=spec.mlflow["registered_model"],
+                        registered_model=_row_model(spec, params, launch),
                         run_page_url=jr.run_page_url,
                     )
                 )
@@ -667,10 +675,50 @@ class TrainingService:
 
     # ------------------------------------------------------------------ results
 
+    def with_decision_metrics(self, run):
+        """Historical Quality kit runs logged before the decision metrics existed: the missing
+        ``test_*`` metrics are computed from the run's OWN evaluation/predictions.csv artefact
+        (read-only; the MLflow run is never modified). Returns a copy, marked with the
+        ``hovis.metrics_derived_from`` tag (local to the response). Any other run is unchanged."""
+        tags = run.tags or {}
+        if (
+            not str(tags.get("hovis.pipeline", "")).startswith("quality-industrial")
+            or tags.get("hovis.evaluation_split") != "test"
+            or "test_accuracy" in run.metrics
+            or run.status not in ("FINISHED",)
+        ):
+            return run
+        try:
+            raw = self._artifact(run.run_id, "evaluation/predictions.csv")
+        except Exception:  # noqa: BLE001 - unreadable artefact: the run stays as logged
+            return run
+        if raw is None:
+            return run
+        from mlops.pipelines.quality_industrial.decision_metrics import (
+            mlflow_test_metrics,
+            rows_from_csv,
+        )
+
+        derived = {
+            k: v for k, v in mlflow_test_metrics(rows_from_csv(raw)).items() if k not in run.metrics
+        }
+        if not derived:
+            return run
+        return run.model_copy(
+            update={
+                "metrics": {**run.metrics, **derived},
+                "tags": {
+                    **tags,
+                    "hovis.metrics_derived_from": "evaluation/predictions.csv",
+                    "hovis.metrics_derived": ",".join(sorted(derived)),
+                },
+            }
+        )
+
     def detail(self, job_run_id: int) -> dict[str, Any]:
         row = self.row(job_run_id)
         spec = self.spec(row.pipeline_id)
-        runs = [self.c.get_run(r) for r in row.mlflow_runs]
+        runs = [self.with_decision_metrics(self.c.get_run(r)) for r in row.mlflow_runs]
         return {
             "row": row.model_dump(),
             "pipeline": spec.model_dump(),
@@ -888,6 +936,18 @@ class TrainingService:
 
 
 # --------------------------------------------------------------------------- evaluation helpers
+
+
+def _row_model(spec: PipelineSpec, params: dict[str, Any], launch: dict[str, Any]) -> str:
+    """Registered model of one training: the section's own model for Workstation."""
+    if not spec.mlflow.get("registered_models"):
+        return spec.mlflow["registered_model"]
+    for source in (params, launch.get("parameters") or {}):
+        try:
+            return spec.registered_model_for(source)
+        except ValueError:
+            continue
+    return ""  # section unknown: no guess
 
 
 def decision(r: dict[str, str]) -> str:

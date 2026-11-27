@@ -34,7 +34,7 @@ export async function call<T>(path: string, init?: RequestInit, opts: ReadOpts =
   } catch {
     if (opts.signal?.aborted) throw new ApiError(0, 'Requête annulée');
     if (controller.signal.aborted) throw new ApiError(0, `Délai dépassé (${Math.round(timeoutMs / 1000)} s)`);
-    throw new ApiError(0, 'Backend HOVIS injoignable');
+    throw new ApiError(0, 'Backend ARGOS injoignable');
   } finally {
     clearTimeout(timer);
     opts.signal?.removeEventListener('abort', onAbort);
@@ -46,16 +46,16 @@ export async function call<T>(path: string, init?: RequestInit, opts: ReadOpts =
       detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail ?? body);
     } catch {
       // Corps vide ou non JSON : en dev, c'est le proxy Vite qui ne joint pas le backend.
-      if (res.status >= 500) detail = 'Backend HOVIS injoignable ou en erreur (aucune donnée affichée)';
+      if (res.status >= 500) detail = 'Backend ARGOS injoignable ou en erreur (aucune donnée affichée)';
     }
     throw new ApiError(res.status, detail);
   }
   if (res.status === 204) return undefined as T;
   const data = await res.json();
   if (data !== null && typeof data === 'object') {
-    const cache = res.headers.get('X-HOVIS-Cache');
+    const cache = res.headers.get('X-ARGOS-Cache');
     META.set(data, {
-      fetchedAt: res.headers.get('X-HOVIS-Fetched-At'),
+      fetchedAt: res.headers.get('X-ARGOS-Fetched-At'),
       cache: cache === 'hit' || cache === 'miss' || cache === 'mixed' || cache === 'stale' ? cache : null,
     });
   }

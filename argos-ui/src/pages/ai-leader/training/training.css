@@ -48,3 +48,25 @@
 @media (max-width: 1500px) { .tf-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 1150px) { .tf-layout { grid-template-columns: 1fr; } .tf-layout:not(.full) .tf-catalog { display: none; } .tf-config { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .tf-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Execution environment choice + launch summary (Nouvel entraînement) */
+.tf-compute { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tf-compute-option { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; }
+.tf-compute-option div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tf-compute-option small { color: var(--muted); font-size: 12px; }
+.tf-compute-option.selected { border-color: var(--primary); background: var(--primary-soft); }
+.tf-compute-option.disabled { opacity: .55; }
+.tf-compute-radio { flex: none; width: 16px; height: 16px; margin-top: 2px; border-radius: 50%; border: 2px solid var(--line-strong); background: #fff; }
+.tf-compute-option.selected .tf-compute-radio { border-color: var(--primary); box-shadow: inset 0 0 0 3px #fff; background: var(--primary); }
+.tf-compute-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.tf-deps summary { cursor: pointer; font-size: 13px; color: var(--primary); font-weight: 600; margin-bottom: 8px; }
+.tf-summary { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: 14px; }
+.tf-summary dt { color: var(--muted); font-weight: 600; }
+.tf-summary dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.tf-summary dd small { display: block; color: var(--muted); font-size: 12px; }
+.tf-launch-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.tf-launch-summary > div { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.tf-launch-summary span { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tf-launch-summary b { font-size: 16px; overflow-wrap: anywhere; }
+.tf-launch-summary small { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+@media (max-width: 900px) { .tf-compute, .tf-launch-summary { grid-template-columns: 1fr 1fr; } }

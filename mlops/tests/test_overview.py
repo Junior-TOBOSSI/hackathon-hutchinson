@@ -200,6 +200,11 @@ class Monitoring:
 
 
 class Training:
+    specs = [
+        NS(id="p", use_case="quality", dataset=NS(families=["d1"])),
+        NS(id="ws", use_case="workstation", dataset=NS(families=["poste-x", "d1"])),
+    ]
+
     def trainings(self):
         return [
             NS(
@@ -376,3 +381,12 @@ def test_retraining_block_is_read_only(env, monkeypatch, tmp_path):
         and d["remote_lock"]["remote_launch_enabled"] is False
     )
     assert store.evaluations() == [] and store.audit() == []  # nothing evaluated or written
+
+
+def test_families_declared_by_pipelines_but_not_published_are_expected(env):
+    c, _ = env
+    d = ov.build(c, "datasets")["data"]
+    assert d["expected"] == [
+        {"dataset_id": "poste-x", "use_case": "workstation", "pipelines": ["ws"]}
+    ]
+    assert d["families"] == 2  # expected families are never counted as published

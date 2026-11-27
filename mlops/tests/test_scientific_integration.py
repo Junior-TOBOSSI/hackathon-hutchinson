@@ -34,20 +34,20 @@ def test_workstation_materialization_rejects_wrong_section_and_changed_file(tmp_
     contents = {
         "reference.png": b"reference",
         "labels.csv": (
-            b"file,label,intended_anomaly\n"
-            b"good.png,good,none\n"
-            b"bad.png,anomaly,disorder\n"
+            b"file,label,intended_anomaly\ngood.png,good,none\nbad.png,anomaly,disorder\n"
         ),
         "good.png": b"good",
         "bad.png": b"anomaly",
     }
     for name, data in contents.items():
         (folder / name).write_bytes(data)
+
     def entry(name):
         return {
             "file": f"raw/workstation/poste_5s_11/{name}",
             "sha256": hashlib.sha256(contents[name]).hexdigest(),
         }
+
     manifest = {
         "dataset_id": "poste-5s-11",
         "station": "press_cell",
@@ -92,3 +92,53 @@ def test_workstation_group_results_are_visible_in_training_factory(monkeypatch):
     assert page["total"] == 1
     assert page["items"][0]["right_reason"]
     assert page["items"][0]["annotated_path"] == "evaluation/annotated/bad.png"
+
+
+def test_mlops_workstation_kit_is_byte_identical_to_the_run_analyzer():
+    """ONE Workstation implementation: the kit used for MLOps computations and the analyzer
+    loaded by the Production Engine (usecases/workstation) must never diverge."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    run = root / "usecases" / "workstation"
+    kit = root / "mlops" / "pipelines" / "workstation" / "kit" / "usecases" / "workstation"
+    names = sorted(
+        p.relative_to(run).as_posix()
+        for p in run.rglob("*")
+        if p.is_file() and p.suffix in (".py", ".yaml") and "__pycache__" not in p.parts
+    )
+    assert "model.py" in names and "stations/press_cell.yaml" in names
+    diverging = [n for n in names if (kit / n).read_bytes() != (run / n).read_bytes()]
+    # config.yaml may differ ONLY by the selected analyzer class (RUN default = group's fake
+    # analyzer until ultralytics and the station images are available).
+    assert diverging in ([], ["config.yaml"])
+    if diverging:
+        strip = lambda t: [  # noqa: E731
+            line
+            for line in t.splitlines()
+            if line.strip() and not line.lstrip().startswith(("#", "analyzer_class:"))
+        ]
+        assert strip((kit / "config.yaml").read_text(encoding="utf-8")) == strip(
+            (run / "config.yaml").read_text(encoding="utf-8")
+        )
+
+
+def test_workstation_sections_register_into_separate_models():
+    """SCI-03: a section's model is never compared with / promoted over another section's."""
+    from mlops.databricks.settings import DEFAULT_MODELS
+    from mlops.training.specs import registers_into
+
+    spec = {s.id: s for s in load_specs()}["workstation-industrial"]
+    names = spec.registered_models()
+    assert len(names) == len(set(names)) == len(SECTIONS) == 4
+    for section in SECTIONS:
+        name = spec.registered_model_for({"station": section})
+        assert name.endswith(section) and registers_into(spec, name)
+    with pytest.raises(ValueError):
+        spec.registered_model_for({"station": "unknown"})
+    managed = {m.uc_name: m for m in DEFAULT_MODELS if m.argos_use_case == "workstation"}
+    assert set(managed) == set(names)  # one managed model per section, each its own alias set
+    assert "workspace.argos_poc.workstation_industrial" not in managed  # no shared model
+    quality = {s.id: s for s in load_specs()}["quality-industrial-binary"]
+    assert quality.registered_models() == [quality.mlflow["registered_model"]]
+    assert not registers_into(quality, names[0])

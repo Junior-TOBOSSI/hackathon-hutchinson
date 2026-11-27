@@ -26,8 +26,27 @@ from mlops.training.service import (
 from mlops.training.specs import PipelineView
 
 _LOCK = threading.Lock()
-SAFE_ARTIFACT = (".json", ".csv", ".md", ".yaml", ".yml", ".txt", ".png", ".onnx", ".pt")
+SAFE_ARTIFACT = (
+    ".json", ".csv", ".md", ".yaml", ".yml", ".txt", ".log", ".png", ".jpg", ".jpeg",
+    ".onnx", ".pt", ".pkl", ".npy", ".npz",
+)  # fmt: skip
+SAFE_NAMES = ("MLmodel",)  # MLflow model descriptor (no extension)
+INLINE_TEXT = (".json", ".csv", ".md", ".yaml", ".yml", ".txt", ".log")
+INLINE_IMAGE = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
 MAX_ARTIFACT_BYTES = 60 * 1024 * 1024
+MAX_EXPORT_BYTES = 300 * 1024 * 1024
+
+
+def safe_artifact(path: str) -> bool:
+    """Run-relative artefact path, no traversal, known type (read-only download)."""
+    name = path.rsplit("/", 1)[-1]
+    return (
+        bool(path)
+        and ".." not in path.split("/")
+        and not path.startswith("/")
+        and "\\" not in path
+        and (name.lower().endswith(SAFE_ARTIFACT) or name in SAFE_NAMES)
+    )
 
 
 def service_for(c: DatabricksConnector) -> TrainingService:
@@ -175,8 +194,10 @@ def create_training_router(get_connector: Callable[[], DatabricksConnector]) -> 
         return call(c, None, False, lambda: service_for(c).artifacts(run_id))
 
     @router.get("/mlflow-runs/{run_id}/artifact")
-    def artifact(run_id: str, c: Connector, path: str = Query(..., max_length=300)) -> Response:
-        if ".." in path or path.startswith("/") or not path.lower().endswith(SAFE_ARTIFACT):
+    def artifact(
+        run_id: str, c: Connector, path: str = Query(..., max_length=300), download: bool = False
+    ) -> Response:
+        if not safe_artifact(path):
             raise HTTPException(400, "artifact path refused")
         data = call(c, None, False, lambda: service_for(c)._artifact(run_id, path))
         if data is None:
@@ -184,15 +205,66 @@ def create_training_router(get_connector: Callable[[], DatabricksConnector]) -> 
         if len(data) > MAX_ARTIFACT_BYTES:
             raise HTTPException(413, "artifact too large")
         name = path.rsplit("/", 1)[-1]
-        inline = name.endswith((".json", ".csv", ".md", ".yaml", ".yml", ".txt", ".png"))
-        media = (
-            "image/png"
-            if name.endswith(".png")
-            else "text/plain; charset=utf-8"
-            if inline
-            else "application/octet-stream"
+        suffix = "." + name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        image = INLINE_IMAGE.get(suffix)
+        text = suffix in INLINE_TEXT or name in SAFE_NAMES
+        media = image or ("text/plain; charset=utf-8" if text else "application/octet-stream")
+        disposition = (
+            f'attachment; filename="{name}"' if download or not (image or text) else "inline"
         )
-        disposition = "inline" if inline else f'attachment; filename="{name}"'
-        return Response(data, media_type=media, headers={"Content-Disposition": disposition})
+        return Response(
+            data,
+            media_type=media,
+            headers={"Content-Disposition": disposition, "X-Content-Type-Options": "nosniff"},
+        )
+
+    @router.get("/mlflow-runs/{run_id}/export")
+    def export(run_id: str, c: Connector) -> Response:
+        """Every downloadable artefact of the run in ONE zip (read-only, bounded size)."""
+        import io
+        import zipfile
+        from concurrent.futures import ThreadPoolExecutor
+
+        svc = service_for(c)
+        listed = call(c, None, False, lambda: svc.artifacts(run_id))
+        paths = [item["path"] for item in listed]
+        wanted = [p for p in paths if safe_artifact(p)]
+        if sum(item.get("size") or 0 for item in listed if item["path"] in wanted) > (
+            MAX_EXPORT_BYTES
+        ):
+            raise HTTPException(413, "export too large: download the files one by one")
+        # Downloads in parallel (bounded): each file is cached locally after the first export.
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            fetched = dict(
+                zip(
+                    wanted,
+                    pool.map(
+                        lambda p: call(c, None, False, lambda: svc._artifact(run_id, p)), wanted
+                    ),
+                    strict=True,
+                )
+            )
+        buffer, total, skipped = io.BytesIO(), 0, []
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for path in paths:
+                if path not in fetched:
+                    skipped.append(path)
+                    continue
+                data = fetched[path]
+                if data is None:
+                    skipped.append(path)
+                    continue
+                total += len(data)
+                if total > MAX_EXPORT_BYTES:
+                    raise HTTPException(413, "export too large: download the files one by one")
+                archive.writestr(path, data)
+            if skipped:
+                archive.writestr("NOT_EXPORTED.txt", "\n".join(skipped) + "\n")
+        name = f"run-{run_id[:8]}-artifacts.zip"
+        return Response(
+            buffer.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        )
 
     return router
