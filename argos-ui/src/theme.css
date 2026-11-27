@@ -167,3 +167,6 @@ a { color: inherit; text-decoration: none; }
 .page-btn { min-width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); font-weight: 600; font-size: 15px; }
 .page-btn[aria-current='page'] { background: var(--navy); color: #fff; border-color: var(--navy); }
 .page-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* Team leader : une carte de poste en alerte (sécurité ou qualité NOK) pulse doucement. */
+@keyframes station-alert { 0%, 100% { background-color: #f8d3da; } 50% { background-color: #e8798c; } }

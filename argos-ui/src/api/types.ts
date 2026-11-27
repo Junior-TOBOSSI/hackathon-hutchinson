@@ -36,6 +36,8 @@ export interface PartResult {
   jointsDetected: number; // 0, 1 ou 2 (règle : exactement 1 joint = OK)
   score: number; // 0..1
   imageUrl: string; // photo prise au lancement du cycle, avec la zone en défaut dessinée si KO
+  /** true : pièce détectée KO, revérifiée par l'opérateur et requalifiée OK (fausse alerte). */
+  requalified?: boolean;
   takenAt: string; // ISO
   /** Pièce KO en attente : « Confirmer » (pièce au rebut) ou « Laisser passer » (erreur modèle). */
   awaitingConfirmation?: boolean;
@@ -142,8 +144,9 @@ export interface Alert {
   priority: boolean;
   action: AlertAction; // NONE pour EPI et poste : information seule
   reportedByOperator?: boolean;
-  /** Renseigné quand le team leader a acquitté l'alerte (« je m'en occupe »). */
+  /** Renseigné quand le team leader a pris l'alerte en charge : qui, et à quelle heure (ISO). */
   acknowledgedBy?: string;
+  acknowledgedAt?: string;
 }
 
 export interface StationEvent {
@@ -169,6 +172,9 @@ export interface StationDetail {
   lanes: { name: string; episodes: [number, number][]; soft?: boolean }[];
   epiCounts: { label: string; count: number }[];
   events: StationEvent[];
+  /** Shift affiché (celui en cours) et minutes écoulées depuis son début. Absent : shift B, 282 min (démo). */
+  shift?: Shift;
+  elapsedMin?: number;
 }
 
 /* ------------------------------------------------------------------ */

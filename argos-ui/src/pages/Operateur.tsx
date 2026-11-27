@@ -20,7 +20,7 @@ import { useApi } from '../hooks/useApi';
  *
  * Le même écran sert au team leader qui CONSULTE un poste depuis son PC (`consultStationId`) :
  * il voit exactement ce que voit l'opérateur, sans le bouton Signaler, avec en plus
- * les alertes du poste qu'il peut acquitter (« je m'en occupe »).
+ * les alertes du poste qu'il peut prendre en charge.
  */
 export default function Operateur({ consultStationId }: { consultStationId?: string }) {
   const { user } = useAuth();
@@ -28,12 +28,18 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
   const scenario = (params.get('scenario') as Scenario) || 'ok';
   const consult = !!consultStationId;
   const stationId = consultStationId ?? user?.stationId ?? 'C3·P06';
-  const { data: live, reload } = useApi(() => api.stationLive(stationId, scenario), [stationId, scenario], 1000);
+  const { data: rawLive, reload } = useApi(() => api.stationLive(stationId, scenario), [stationId, scenario], 1000);
+  const [requalifiedPart, setRequalifiedPart] = useState<number | null>(null);
   const cellId = user?.cellId ?? 'C3';
   const { data: cellAlerts, setData: setCellAlerts } = useApi(() => (consult ? api.alerts(cellId) : Promise.resolve([] as Alert[])), [consult, cellId], 5000);
   const [reported, setReported] = useState(false);
 
-  if (!live) return <Loading />;
+  if (!rawLive) return <Loading />;
+  // Pièce KO revérifiée par l'opérateur et requalifiée OK : on l'affiche OK tout de suite.
+  const live: StationLive = rawLive.part.verdict === 'KO' && requalifiedPart === rawLive.part.number
+    ? { ...rawLive, part: { ...rawLive.part, verdict: 'OK', requalified: true }, checks: { ...rawLive.checks, qualite: true } }
+    : rawLive;
+  const requalify = async () => { await api.requalifyPart(stationId, live.part.number); setRequalifiedPart(live.part.number); };
   const actions = operatorActions(live);
   const envIssues = live.issues.filter((i) => i.category === 'SECURITE_EPI' || i.category === 'COMPORTEMENT' || i.category === 'POSTE');
   const ko = live.part.verdict === 'KO';
@@ -46,7 +52,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
 
   const report = async () => { await api.reportProblem(stationId); setReported(true); setTimeout(() => setReported(false), 4000); };
   const stationAlerts = (cellAlerts ?? []).filter((a) => a.stationId === stationId);
-  const acknowledge = (id: string) => api.acknowledgeAlert(id).then(() => setCellAlerts((cellAlerts ?? []).map((a) => (a.id === id ? { ...a, acknowledgedBy: user?.name ?? 'Team leader' } : a))));
+  const acknowledge = (id: string) => api.acknowledgeAlert(id).then(() => setCellAlerts((cellAlerts ?? []).map((a) => (a.id === id ? { ...a, acknowledgedBy: user?.name ?? 'Team leader', acknowledgedAt: new Date().toISOString() } : a))));
   const shiftChip = <span className="chip hide-mobile">Shift {live.shift.code} · {live.shift.start.slice(0, 2)} h – {live.shift.end.slice(0, 2)} h</span>;
 
   return (
@@ -72,7 +78,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
             ? <StartupPanel startup={startup} />
             : !ko && envIssues.length > 0 && live.frontSnapshotUrl
               ? <SnapshotPanel live={live} instruction={envIssues[0].instruction} />
-              : <PartPanel live={live} onConfirm={consult ? undefined : confirm} onRelease={consult ? undefined : release} />}
+              : <PartPanel live={live} onConfirm={consult ? undefined : confirm} onRelease={consult ? undefined : release} onRequalify={consult ? undefined : requalify} />}
         </section>
 
         <section className="col grow" style={{ gap: 18 }}>
@@ -95,7 +101,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
                   </div>
                   <div className="row">
                     <MiniStat value={deltaText(live.counters.good - live.objective.expectedNow, true)} tone={live.counters.good >= live.objective.expectedNow ? 'green' : 'red'} />
-                    <MiniStat value={`${live.counters.ko} pièces KO`} tone={ko ? 'red' : 'grey'} />
+                    <MiniStat value={`${live.counters.ko} pièces NOK`} tone={ko ? 'red' : 'grey'} />
                   </div>
                   <span className="muted" style={{ fontSize: 14 }}>Trait noir (anneau et barre) : où vous devriez être maintenant ({live.objective.expectedNow})</span>
                 </div>
@@ -107,7 +113,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
           <div className="grid-3">
             <StatusTile ok={live.checks.securite} icon={live.checks.securite ? ICONS.shield : ICONS.shieldAlert} okTitle="Sécurité OK" okSub="EPI portés" koTitle="Sécurité" koSub={envIssues.find((i) => i.category !== 'POSTE')?.label ?? ''} />
             <StatusTile ok={live.checks.poste} icon={ICONS.grid} okTitle="Poste rangé" okSub="Rien qui traîne" koTitle="Poste" koSub={envIssues.find((i) => i.category === 'POSTE')?.label ?? ''} />
-            <StatusTile ok icon={ICONS.check} okTitle={ko ? 'Qualité' : 'Qualité OK'} okSub={`Taux KO ${live.checks.koRatePct.toLocaleString('fr-FR')} %`} koTitle="" koSub="" />
+            <StatusTile ok icon={ICONS.check} okTitle={ko ? 'Qualité' : 'Qualité OK'} okSub={`Taux NOK ${live.checks.koRatePct.toLocaleString('fr-FR')} %`} koTitle="" koSub="" />
           </div>
 
           {!consult && (
@@ -120,7 +126,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
       </main>
 
       <footer className="between muted" style={{ height: 40, alignItems: 'center', padding: '0 28px', fontSize: 13 }}>
-        <span>Visage flouté · aucune vidéo enregistrée</span>
+        <span>Visage flouté · aucune vidéo enregistrée{live.qualityModelVersion === 'simulé' && <button onClick={() => api.simulateNokPart()} style={{ marginLeft: 16, border: '1px solid var(--line)', background: '#fff', borderRadius: 8, padding: '2px 8px', fontSize: 12, color: 'var(--muted)' }}>Démo · simuler une pièce NOK</button>}</span>
         <span>Caméra pièce {live.partCameraOnline ? 'en ligne' : 'hors ligne'} · modèle qualité {live.qualityModelVersion}</span>
       </footer>
 
@@ -141,8 +147,8 @@ function ConsultBar({ stationId, alerts, onAcknowledge }: { stationId: string; a
         <span key={a.id} className="row" style={{ gap: 8, background: 'rgba(255,255,255,.08)', borderRadius: 12, padding: '4px 4px 4px 12px' }}>
           <span style={{ fontSize: 14, fontWeight: 600 }}>{a.title}</span>
           {a.acknowledgedBy
-            ? <span className="pill pill-green">Pris en charge</span>
-            : <button className="btn-report" onClick={() => onAcknowledge(a.id)} style={{ border: 'none', borderRadius: 10, padding: '6px 12px', fontWeight: 700, fontSize: 14, boxShadow: 'none' }}>Je m’en occupe</button>}
+            ? <span className="pill pill-green">Prise en charge{a.acknowledgedAt ? ` · ${new Date(a.acknowledgedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span>
+            : <button className="btn-report" onClick={() => onAcknowledge(a.id)} style={{ border: 'none', borderRadius: 10, padding: '6px 12px', fontWeight: 700, fontSize: 14, boxShadow: 'none' }}>Prendre en charge</button>}
         </span>
       ))}
       <Link to={`/team-leader/poste/${encodeURIComponent(stationId)}/historique`} className="chip" style={{ color: '#fff', fontWeight: 600 }}>Historique du shift</Link>
@@ -173,10 +179,11 @@ function ProblemBanner({ actions }: { actions: OperatorAction[] }) {
   );
 }
 
-function PartPanel({ live, onConfirm, onRelease }: { live: StationLive; onConfirm?: () => void; onRelease?: () => void }) {
+function PartPanel({ live, onConfirm, onRelease, onRequalify }: { live: StationLive; onConfirm?: () => void; onRelease?: () => void; onRequalify?: () => Promise<void> }) {
   const ko = live.part.verdict === 'KO';
   const c = ko ? 'var(--red)' : 'var(--green)';
-  const waiting = ko && live.part.awaitingConfirmation;
+  const waiting = ko && live.part.awaitingConfirmation; // demo scenario: CONFIRMER / LAISSER PASSER
+  const [checking, setChecking] = useState(false);
   return (
     <>
       <span className="label-caps" style={{ textAlign: 'center', fontSize: 18 }}>Pièce en cours · n° {live.part.number}</span>
@@ -197,6 +204,17 @@ function PartPanel({ live, onConfirm, onRelease }: { live: StationLive; onConfir
           </button>
         </div>
       )}
+      {ko && !waiting && onRequalify && (checking ? (
+        <div className="col" style={{ gap: 8, borderRadius: 16, border: '2px solid var(--line-strong)', background: '#fff', padding: '12px 14px' }}>
+          <span style={{ fontSize: 17, fontWeight: 600 }}>Regardez la pièce : y a-t-il un seul joint, bien placé ?</span>
+          <div className="row" style={{ gap: 10 }}>
+            <button onClick={async () => { await onRequalify(); setChecking(false); }} style={{ flex: 1, height: 48, border: 'none', borderRadius: 12, background: 'var(--green)', color: '#fff', fontWeight: 700, fontSize: 17 }}>Oui, la pièce est OK</button>
+            <button onClick={() => setChecking(false)} style={{ flex: 1, height: 48, borderRadius: 12, border: '2px solid var(--line-strong)', background: '#fff', color: 'var(--ink)', fontWeight: 700, fontSize: 17 }}>Non, elle est bien NOK</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setChecking(true)} style={{ height: 52, borderRadius: 14, border: '2px solid var(--ink)', background: '#fff', color: 'var(--ink)', fontWeight: 700, fontSize: 18, flexShrink: 0 }}>Revérifier la pièce</button>
+      ))}
     </>
   );
 }
@@ -216,7 +234,7 @@ function StartupPanel({ startup }: { startup: WorkstationStartup }) {
   return (
     <>
       <span className="label-caps" style={{ textAlign: 'center', fontSize: 18 }}>
-        Vérification du poste · photo {startup.step} / {startup.steps}
+        Vérification du poste · photo {startup.step} / {startup.step}
       </span>
       <div style={{ borderRadius: 18, overflow: 'hidden', border: `5px solid ${c}`, lineHeight: 0 }}>
         <img src={startup.imageUrl} alt={ok ? 'Photo du poste : conforme à la référence' : 'Photo du poste : écart encadré'} style={{ width: '100%', display: 'block' }} />
@@ -249,15 +267,8 @@ function StartupCard({ startup }: { startup: WorkstationStartup }) {
         Avant toute activité, la photo du poste est comparée à sa référence ({startup.section}) :
         rien dans les zones interdites, chaque élément à sa place. Cette vérification n'est faite qu'une fois.
       </span>
-      <div className="row" style={{ gap: 10 }}>
-        {Array.from({ length: startup.steps }, (_, i) => {
-          const done = i + 1 < startup.step || validated;
-          const current = i + 1 === startup.step && !validated;
-          const bg = current ? (startup.verdict === 'OK' ? 'var(--green)' : 'var(--red)') : done ? 'var(--navy)' : 'var(--op-bg)';
-          return <span key={i} style={{ width: 54, height: 12, borderRadius: 6, background: bg }} />;
-        })}
-        <span className="muted" style={{ fontSize: 15, fontWeight: 600 }}>photo {startup.step} / {startup.steps}</span>
-      </div>
+      {/* n / n : la progression ne dit pas combien de photos il reste */}
+      <span className="muted" style={{ fontSize: 15, fontWeight: 600 }}>photo {startup.step} / {startup.step}</span>
     </div>
   );
 }
@@ -329,7 +340,7 @@ function StatusTile({ ok, icon, okTitle, okSub, koTitle, koSub }: { ok: boolean;
 }
 
 function ScenarioSwitcher({ value, onChange }: { value: Scenario; onChange: (s: Scenario) => void }) {
-  const opts: [Scenario, string][] = [['ok', 'Tout va bien'], ['ko', 'Pièce KO'], ['epi', 'EPI manquant'], ['multi', 'Plusieurs problèmes']];
+  const opts: [Scenario, string][] = [['ok', 'Conforme'], ['ko', 'Pièce NOK'], ['epi', 'EPI manquant'], ['multi', 'Plusieurs problèmes']];
   return (
     <div style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 4, background: 'var(--navy)', color: '#fff', borderRadius: 12, padding: 4, display: 'flex', gap: 4, boxShadow: '0 8px 24px rgba(0,0,0,.3)', fontSize: 12 }}>
       <span style={{ alignSelf: 'center', padding: '0 6px', color: 'var(--on-navy-muted)' }}>Démo</span>

@@ -64,7 +64,7 @@ export default function CelluleTV() {
           <span style={{ color: 'var(--on-navy-muted)', fontSize: 16 }}>Trait blanc : où la cellule devrait être maintenant ({fmt(expected)} pièces)</span>
         </div>
         <Big label="Rythme" value={deltaText(delta, true)} color={t.text} />
-        <Big label="Pièces KO" value={fmt(ko)} sub={`taux ${((ko / (good + ko)) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`} />
+        <Big label="Pièces NOK" value={fmt(ko)} sub={`taux ${((ko / (good + ko)) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`} />
       </div>
 
       {/* Les postes, dans leur ordre physique */}
@@ -109,7 +109,7 @@ function StationTile({ s }: { s: StationSummary }) {
         <div style={{ position: 'absolute', left: `${(s.expectedNow / s.target) * 100}%`, top: -5, bottom: -5, width: 4, borderRadius: 2, background: t.fg, opacity: 0.6 }} />
       </div>
       <span className="num" style={{ fontSize: 32 }}>{deltaText(delta, true)}</span>
-      <span style={{ fontSize: 19, fontWeight: 500 }}>{s.good} bonnes · {s.ko} KO</span>
+      <span style={{ fontSize: 19, fontWeight: 500 }}>{s.good} bonnes · {s.ko} NOK</span>
     </div>
   );
 }

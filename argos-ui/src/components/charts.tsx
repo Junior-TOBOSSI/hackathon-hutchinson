@@ -1,5 +1,5 @@
 // Graphiques dessinés à la main (SVG / div) : aucune librairie à installer.
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { deltaText, fmt } from './ui';
 
 /* ------------------------------------------------------------------ */
@@ -44,10 +44,12 @@ export function CumulativeChart({ hourly, target, expectedNow, shiftStart, shift
   // Points du réel : 0 au début du shift, puis le cumul à chaque heure pleine, puis maintenant.
   const points: { x: number; y: number }[] = [{ x: shiftStart, y: 0 }];
   let cum = 0;
+  // Un shift peut passer minuit (21 h → 5 h) : après minuit, 0 h compte comme 24 h, 1 h comme 25 h…
+  const cont = (hour: number) => (hour < shiftStart ? hour + 24 : hour);
   for (const h of hourly) {
     if (h.good === null) break;
     cum += h.good;
-    if (h.hour + 1 <= now) points.push({ x: h.hour + 1, y: cum });
+    if (cont(h.hour) + 1 <= now) points.push({ x: cont(h.hour) + 1, y: cum });
   }
   points.push({ x: now, y: total });
 
@@ -71,7 +73,7 @@ export function CumulativeChart({ hourly, target, expectedNow, shiftStart, shift
     points.forEach((p, i) => { if (Math.abs(X(p.x) - px) < Math.abs(X(points[best].x) - px)) best = i; });
     setHover(best);
   };
-  const hhmm = (x: number) => `${Math.floor(x)}:${String(Math.round((x % 1) * 60)).padStart(2, '0')}`;
+  const hhmm = (x: number) => `${Math.floor(x) % 24}:${String(Math.round((x % 1) * 60)).padStart(2, '0')}`;
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -89,7 +91,7 @@ export function CumulativeChart({ hourly, target, expectedNow, shiftStart, shift
           </g>
         ))}
         {Array.from({ length: shiftHours + 1 }, (_, i) => shiftStart + i).map((h) => (
-          <text key={h} x={X(h)} y={height - 10} textAnchor="middle" fontSize="12" fill="var(--muted)" fontWeight={Math.floor(now) === h ? 700 : 400}>{h} h</text>
+          <text key={h} x={X(h)} y={height - 10} textAnchor="middle" fontSize="12" fill="var(--muted)" fontWeight={Math.floor(now) === h ? 700 : 400}>{h % 24} h</text>
         ))}
         {/* Réel */}
         <path d={area} fill="var(--chart-real)" opacity="0.1" />
@@ -161,69 +163,34 @@ export function ProgressRing({ value, target, expected, size = 220 }: { value: n
  *  - tronçon entamé de l'heure en cours ou à venir : vert clair (en cours).
  */
 export function HourlyGauges({ hours, perHour, currentHour, expected, height = 32 }: { hours: { hour: number; good: number | null }[]; perHour: number; currentHour: number; expected?: number; height?: number }) {
-  const cols = { display: 'grid', gridTemplateColumns: `repeat(${hours.length}, minmax(0, 1fr))` } as const;
+  // Une seule barre pour tout le shift : vert si on est dans les temps, rouge si on est en retard.
   const total = hours.reduce((sum, h) => sum + (h.good ?? 0), 0);
   const capacity = hours.length * perHour;
+  const late = expected !== undefined && total < expected;
+  const color = late ? 'var(--red)' : 'var(--green)';
+  const pct = (n: number) => `${Math.min(100, (n / capacity) * 100)}%`;
+  const last = hours[hours.length - 1];
   return (
     <div className="col" style={{ gap: 8, borderTop: '1px solid var(--line-soft)', paddingTop: 12 }}>
       <div className="between" style={{ flexWrap: 'wrap' }}>
-        <span className="label-caps">Heure par heure</span>
-        <span className="row muted" style={{ fontSize: 13, gap: 14, flexWrap: 'wrap' }}>
-          <span>1 tronçon = {perHour} pièces · le surplus remplit l’heure suivante</span>
-          <GaugeLegend swatch={<Dot color="var(--green)" />} text="heure faite" />
-          <GaugeLegend swatch={<Dot color="var(--green-light)" />} text="en cours" />
-          <GaugeLegend swatch={<Dot color="var(--amber)" />} text="en retard" />
+        <span className="label-caps">Progression du shift</span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: color }}>
+          {fmt(total)} / {fmt(capacity)}{expected !== undefined && <span className="muted" style={{ fontWeight: 500 }}> · attendu maintenant {fmt(expected)}</span>}
         </span>
       </div>
-
-      {/* Pièces réellement produites chaque heure */}
-      <div style={cols}>
-        {hours.map((h) => (
-          <span key={h.hour} style={{ fontSize: 15, fontWeight: 700, height: 18, paddingLeft: 8, color: h.hour === currentHour ? 'var(--green-text)' : 'var(--ink)' }}>
-            {h.good ?? ''}
-          </span>
-        ))}
-      </div>
-
-      {/* La barre cumulée */}
       <div style={{ position: 'relative' }}>
-        <div style={{ ...cols, height, borderRadius: 10, overflow: 'hidden', background: 'var(--track)' }}>
-          {hours.map((h, i) => {
-            const fill = Math.max(0, Math.min(perHour, total - i * perHour)) / perHour;
-            const color = fill >= 1 ? 'var(--green)' : h.hour < currentHour ? 'var(--amber)' : 'var(--green-light)';
-            return (
-              <div key={h.hour} style={{ position: 'relative', borderLeft: i ? '3px solid #fff' : 'none' }}>
-                {fill > 0 && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${fill * 100}%`, background: color }} />}
-              </div>
-            );
-          })}
+        <div style={{ height, borderRadius: height / 2, background: 'var(--track)', overflow: 'hidden' }}>
+          <div style={{ width: pct(total), height: '100%', background: color, borderRadius: height / 2 }} />
         </div>
-        {expected !== undefined && (
-          <div
-            title={`Où vous devriez être maintenant : ${expected} pièces`}
-            style={{ position: 'absolute', top: -5, bottom: -5, left: `calc(${Math.min(100, (expected / capacity) * 100)}% - 2px)`, width: 4, borderRadius: 2, background: 'var(--navy)' }}
-          />
-        )}
       </div>
-
-      {/* Heures sous chaque tronçon */}
-      <div style={cols}>
-        {hours.map((h) => (
-          <span key={h.hour} style={{ fontSize: 12, height: 16, paddingLeft: 8, fontWeight: h.hour === currentHour ? 700 : 400 }} className={h.hour === currentHour ? '' : 'muted'}>
-            {h.hour} h
-          </span>
+      {/* Les heures, en dessous de la barre */}
+      <div style={{ position: 'relative', height: 18 }}>
+        {[...hours.map((h) => h.hour), last ? (last.hour + 1) % 24 : null].filter((h): h is number => h !== null).map((h, i) => (
+          <span key={i} style={{ position: 'absolute', left: `${(i / hours.length) * 100}%`, transform: i === 0 ? 'none' : i === hours.length ? 'translateX(-100%)' : 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: 13, fontWeight: h === currentHour ? 700 : 400, color: h === currentHour ? 'var(--ink)' : 'var(--muted)' }}>{h} h</span>
         ))}
       </div>
     </div>
   );
-}
-
-function Dot({ color }: { color: string }) {
-  return <span style={{ width: 12, height: 12, borderRadius: 3, background: color }} />;
-}
-
-function GaugeLegend({ swatch, text }: { swatch: ReactNode; text: string }) {
-  return <span className="row" style={{ gap: 6 }}>{swatch}{text}</span>;
 }
 
 /** Barres par heure avec ligne d'objectif (team leader, production de la cellule). */
@@ -237,7 +204,7 @@ export function HourlyBars({ hours, perHour, currentHour, barMax = 120 }: { hour
           {h.good === null
             ? <div style={{ width: '100%', height: barMax, border: '2px dashed var(--line-strong)', borderRadius: '8px 8px 3px 3px' }} />
             : <div style={{ width: '100%', height: Math.round((h.good / perHour) * barMax), borderRadius: '8px 8px 3px 3px', background: h.hour === currentHour ? 'var(--green-light)' : 'var(--green)' }} />}
-          <span style={{ fontSize: 13, fontWeight: 700, height: 16, color: h.ko ? 'var(--red-text)' : 'transparent' }}>{h.ko ? `${h.ko} KO` : ''}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, height: 16, color: h.ko ? 'var(--red-text)' : 'transparent' }}>{h.ko ? `${h.ko} NOK` : ''}</span>
           <span className="muted" style={{ fontSize: 13, height: 16 }}>{h.hour} h</span>
         </div>
       ))}

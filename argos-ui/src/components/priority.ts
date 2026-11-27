@@ -25,7 +25,7 @@ export function operatorActions(live: StationLive): OperatorAction[] {
     key: i.id, title: i.instruction, subtitle: SUB[i.category], strong: RANK[i.category] <= 2, rank: RANK[i.category],
   }));
   if (live.part.verdict === 'KO') {
-    list.push({ key: 'piece', title: 'Pièce KO au bac rebuts', subtitle: 'Qualité · voir l’image de la pièce', strong: true, rank: 2 });
+    list.push({ key: 'piece', title: 'Pièce NOK au bac rebuts', subtitle: 'Qualité · voir l’image de la pièce', strong: true, rank: 2 });
   }
   return list.sort((a, b) => a.rank - b.rank);
 }

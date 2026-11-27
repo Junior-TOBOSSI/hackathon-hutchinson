@@ -62,6 +62,19 @@ export const api = {
     return http(`/stations/${encodeURIComponent(stationId)}/report`, { method: 'POST' });
   },
 
+  /**
+   * POST /api/stations/{id}/parts/{n}/requalify -> 204. L'opérateur a revérifié une pièce KO :
+   * elle est bonne (fausse alerte). La pièce repasse OK ; la requalification est tracée côté backend.
+   */
+  requalifyPart(stationId: string, partNumber: number): Promise<void> {
+    if (USE_MOCK) return later(undefined);
+    return http(`/stations/${encodeURIComponent(stationId)}/parts/${partNumber}/requalify`, { method: 'POST' });
+  },
+  /** Démo locale uniquement (modèle qualité simulé) : fait arriver une pièce NOK. */
+  simulateNokPart(): Promise<void> {
+    return http('/safety-demo/part-nok', { method: 'POST' });
+  },
+
   /* ---------------- Team leader et écran TV de la cellule ---------------- */
   /** GET /api/cells/{cellId}/overview -> CellOverview (postes de la cellule, production heure par heure) */
   cellOverview(cellId: string): Promise<CellOverview> {

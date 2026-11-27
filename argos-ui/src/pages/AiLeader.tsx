@@ -68,7 +68,7 @@ export default function AiLeader() {
         <div className="card col" style={{ gap: 6, overflowX: 'auto' }}>
           <div className="between"><h2 className="h2">Modèles déployés · par poste et groupe de postes</h2><span className="muted" style={{ fontSize: 14 }}>triés par santé</span></div>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760, fontSize: 15 }}>
-            <thead><tr className="muted" style={{ fontSize: 13, textAlign: 'left', letterSpacing: '0.06em' }}><th style={{ padding: '6px 0' }}>MODÈLE</th><th>CAS</th><th>POSTES</th><th>VERSION</th><th style={{ width: 220 }}>SANTÉ</th><th>RAPPEL KO</th><th /></tr></thead>
+            <thead><tr className="muted" style={{ fontSize: 13, textAlign: 'left', letterSpacing: '0.06em' }}><th style={{ padding: '6px 0' }}>MODÈLE</th><th>CAS</th><th>POSTES</th><th>VERSION</th><th style={{ width: 220 }}>SANTÉ</th><th>RAPPEL NOK</th><th /></tr></thead>
             <tbody>
               {[...ai.models].sort((a, b) => a.healthPct - b.healthPct).map((m) => {
                 const [c, t] = tone(m.healthPct, ai.threshold);
@@ -98,7 +98,7 @@ export default function AiLeader() {
             })}
           </div>
           <div className="row stack-mobile" style={{ gap: 28, flexWrap: 'wrap' }}>
-            <span>Rappel KO <b className="num" style={{ fontSize: 24, color: 'var(--green-text)' }}>{tr.recallKoPct} %</b> <span className="muted">(avant : {tr.previousRecallKoPct} %)</span></span>
+            <span>Rappel NOK <b className="num" style={{ fontSize: 24, color: 'var(--green-text)' }}>{tr.recallKoPct} %</b> <span className="muted">(avant : {tr.previousRecallKoPct} %)</span></span>
             <span>Joints absents arrêtés <b className="num" style={{ fontSize: 24 }}>{tr.absentStoppedPct} %</b></span>
             <span>Doubles joints arrêtés <b className="num" style={{ fontSize: 24 }}>{tr.doubleStoppedPct} %</b></span>
             <span style={{ flex: 1 }} />

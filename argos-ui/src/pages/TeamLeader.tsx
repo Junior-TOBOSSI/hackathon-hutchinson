@@ -23,7 +23,7 @@ export const CATEGORIES: (Category & { key: AlertCategory })[] = [
 ];
 
 const STATUS: Record<StationStatus, [string, string]> = {
-  OK: ['Tout va bien', 'pill-green'], SECURITE: ['Sécurité', 'pill-solid-red'], QUALITE: ['Qualité', 'pill-solid-red'],
+  OK: ['Conforme', 'pill-green'], SECURITE: ['Sécurité', 'pill-solid-red'], QUALITE: ['Qualité', 'pill-solid-red'],
   RYTHME: ['Rythme', 'pill-amber'], CAMERA: ['Caméra hors ligne', 'pill-amber'], OBJET: ['Objet étranger', 'pill-amber'],
 };
 
@@ -51,7 +51,7 @@ export default function TeamLeader() {
     { key: 'alerts', label: 'Alertes', icon: ICONS.warn, badge: alerts.length, hot: alerts.some((a) => a.priority) },
   ];
   const removeAlert = (id: string) => setAlerts(alerts.filter((a) => a.id !== id));
-  const acknowledge = (id: string) => api.acknowledgeAlert(id).then(() => setAlerts(alerts.map((a) => (a.id === id ? { ...a, acknowledgedBy: user?.name ?? 'Team leader' } : a))));
+  const acknowledge = (id: string) => api.acknowledgeAlert(id).then(() => setAlerts(alerts.map((a) => (a.id === id ? { ...a, acknowledgedBy: user?.name ?? 'Team leader', acknowledgedAt: new Date().toISOString() } : a))));
 
   return (
     <div className="screen">
@@ -88,7 +88,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
       <div className="grid-5">
         <Kpi label="Pièces bonnes · shift" value={fmt(good)} sub={`sur ${fmt(target)} · ${Math.round((good / target) * 100)} % de l’objectif`} />
         <Kpi label="Rythme de la cellule" value={deltaText(good - expected, true)} valueStyle={{ fontSize: 30, color: good >= expected ? 'var(--green-text)' : 'var(--red-text)' }} sub={`${fmt(expected)} pièces attendues à cette heure`} />
-        <Kpi label="Pièces KO · shift" value={fmt(ko)} sub={`taux de KO ${koRate.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} % · objectif < 2 %`} />
+        <Kpi label="Pièces NOK · shift" value={fmt(ko)} sub={`taux de NOK ${koRate.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} % · objectif < 2 %`} />
         <button onClick={openAlerts} style={{ all: 'unset', cursor: 'pointer', display: 'grid' }}>
           <Kpi label="Alertes ouvertes" value={alerts.length} sub={`${alerts.filter((a) => a.priority).length} prioritaires · voir les alertes`} valueStyle={{ color: 'var(--red)' }} />
         </button>
@@ -97,8 +97,8 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
 
       <div className="card col" style={{ gap: 8 }}>
         <div className="between">
-          <h2 className="h2">Postes de la {cell.cell.name.toLowerCase()}</h2>
-          <span className="muted hide-mobile" style={{ fontSize: 13 }}>Cliquez sur un poste pour voir son écran · trait noir = attendu maintenant</span>
+          <h2 className="h2">Postes</h2>
+          <span className="muted hide-mobile" style={{ fontSize: 13 }}>Cliquez sur un poste pour voir son détail</span>
         </div>
         <StationTable stations={cell.stations} alerts={alerts} />
       </div>
@@ -119,128 +119,137 @@ const DOT: Record<StationStatus, string> = {
   OK: 'var(--green)', SECURITE: 'var(--red)', QUALITE: 'var(--red)', RYTHME: 'var(--amber)', CAMERA: 'var(--amber)', OBJET: 'var(--amber)',
 };
 
-const PAGE_SIZE = 6;
+/** Fond très léger de la carte, selon l'état du poste (la pastille et le libellé restent l'info principale). */
+const TINT: Record<StationStatus, string> = {
+  OK: '#d5eedf', SECURITE: '#f8d3da', QUALITE: '#f8d3da', RYTHME: '#fbe3c0', CAMERA: '#fbe3c0', OBJET: '#fbe3c0',
+};
+/** Réglage système « réduire les animations » : la carte en alerte reste alors fixe. */
+const REDUCED_MOTION = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+/** Contour de la carte : la même couleur que le fond, un ton plus soutenu. */
+const EDGE: Record<StationStatus, string> = {
+  OK: '#9fd6b6', SECURITE: '#eb99a7', QUALITE: '#eb99a7', RYTHME: '#efbf78', CAMERA: '#efbf78', OBJET: '#efbf78',
+};
 
 /**
- * Tableau des postes : une ligne par poste, dans l'ordre physique de la cellule, 6 par page.
+ * Postes en cartes : une carte par poste, dans l'ordre physique de la cellule, avec 3 infos
+ * seulement (état, rythme, pièces NOK). Un clic ouvre le détail du poste sous la grille.
  * Filtres : état du poste et recherche par nom (« P06 », « 6 »…).
- * Toute la ligne ouvre l'écran du poste (clic ou Entrée) ; l'icône ouvre l'historique.
  */
 function StationTable({ stations, alerts }: { stations: StationSummary[]; alerts: Alert[] }) {
   const nav = useNavigate();
   const [status, setStatus] = useState<StationStatus | 'ALL'>('ALL');
   const [query, setQuery] = useState('');
-  const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
 
   const q = query.trim().toUpperCase().replace(/^P0?/, '');
   const filtered = stations.filter((s) =>
     (status === 'ALL' || s.status === status) && (!q || shortId(s.id).replace(/^P0?/, '').startsWith(q)));
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const current = Math.min(page, pages - 1);
-  const shown = filtered.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE);
-  // Un filtre qui change ramène à la première page.
-  const onStatus = (v: StationStatus | 'ALL') => { setStatus(v); setPage(0); };
-  const onQuery = (v: string) => { setQuery(v); setPage(0); };
   const present = (Object.keys(STATUS) as StationStatus[]).filter((k) => stations.some((s) => s.status === k));
+  const detail = stations.find((s) => s.id === selected);
 
-  const th = { padding: '8px 10px', fontSize: 12, letterSpacing: '0.08em', fontWeight: 600, textAlign: 'left' as const };
   return (
-    <div className="col" style={{ gap: 10 }}>
+    <div className="col" style={{ gap: 12 }}>
       <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+        {/* Taper un poste OU le choisir dans la liste (datalist : liste déroulante native) ;
+            choisir un poste ouvre aussi son détail. */}
         <input
-          aria-label="Rechercher un poste"
-          placeholder="Poste (ex. P06)"
+          aria-label="Rechercher ou choisir un poste"
+          placeholder="Poste (taper ou choisir)"
+          list="cell-stations"
           value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          style={{ height: 38, width: 170, borderRadius: 10, border: '2px solid var(--line-strong)', padding: '0 12px', fontFamily: 'var(--font)', fontSize: 15 }}
+          onChange={(e) => {
+            const v = e.target.value;
+            setQuery(v);
+            const hit = stations.find((s) => shortId(s.id) === v.trim().toUpperCase());
+            if (hit) setSelected(hit.id);
+          }}
+          style={{ height: 38, width: 220, borderRadius: 10, border: '2px solid var(--line-strong)', padding: '0 12px', fontFamily: 'var(--font)', fontSize: 15 }}
         />
-        <FilterChip active={status === 'ALL'} onClick={() => onStatus('ALL')}>Tous · {stations.length}</FilterChip>
+        <datalist id="cell-stations">
+          {stations.map((s) => <option key={s.id} value={shortId(s.id)}>{STATUS[s.status][0]}</option>)}
+        </datalist>
+        {query && <button className="icon-btn" onClick={() => { setQuery(''); setSelected(null); }} aria-label="Effacer le poste" title="Effacer">✕</button>}
+        <FilterChip active={status === 'ALL'} onClick={() => setStatus('ALL')}>Tous · {stations.length}</FilterChip>
         {present.map((k) => (
-          <FilterChip key={k} active={status === k} onClick={() => onStatus(k)}>
+          <FilterChip key={k} active={status === k} onClick={() => setStatus(k)}>
             <span style={{ width: 9, height: 9, borderRadius: 5, background: DOT[k] }} />
             {STATUS[k][0]} · {stations.filter((s) => s.status === k).length}
           </FilterChip>
         ))}
       </div>
 
-    <div style={{ overflowX: 'auto' }}>
-      <table className="station-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
-        <thead>
-          <tr className="muted">
-            <th style={th}>POSTE</th>
-            <th style={th}>ÉTAT</th>
-            <th style={{ ...th, width: '26%' }}>AVANCEMENT DU SHIFT</th>
-            <th style={th}>RYTHME</th>
-            <th style={{ ...th, textAlign: 'right' }}>KO</th>
-            <th style={th}>ALERTE EN COURS</th>
-            <th style={th}><span className="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          {shown.map((s) => {
-            const delta = s.good - s.expectedNow;
-            const stAlerts = alerts.filter((a) => a.stationId === s.id);
-            const hot = s.status === 'SECURITE' || s.status === 'QUALITE';
-            const open = () => nav(stationScreenUrl(s.id, s.status));
-            return (
-              <tr
-                key={s.id}
-                tabIndex={0}
-                onClick={open}
-                onKeyDown={(e) => { if (e.key === 'Enter') open(); }}
-                aria-label={`Poste ${shortId(s.id)} : ${STATUS[s.status][0]}, ${deltaText(delta, true)}. Ouvrir l’écran du poste`}
-                style={{ boxShadow: hot ? 'inset 4px 0 0 var(--red)' : undefined }}
-              >
-                <td style={{ padding: '12px 10px' }}><span className="cond" style={{ fontWeight: 700, fontSize: 22 }}>{shortId(s.id)}</span></td>
-                <td>
-                  <span className="row" style={{ gap: 8, fontWeight: 600, fontSize: 14 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 5, background: DOT[s.status], flexShrink: 0 }} />{STATUS[s.status][0]}
-                  </span>
-                </td>
-                <td>
-                  <div className="row" style={{ gap: 10 }}>
-                    <div className="track grow" style={{ height: 10, overflow: 'visible' }}>
-                      <div className="fill" style={{ width: `${(s.good / s.target) * 100}%`, background: delta >= 0 ? 'var(--green)' : 'var(--amber)' }} />
-                      <div style={{ position: 'absolute', left: `${(s.expectedNow / s.target) * 100}%`, top: -4, width: 3, height: 18, borderRadius: 2, background: 'var(--navy)' }} />
-                    </div>
-                    <span className="muted" style={{ fontSize: 13, width: 78, textAlign: 'right', whiteSpace: 'nowrap' }}>{s.good} / {fmt(s.target)}</span>
-                  </div>
-                </td>
-                <td style={{ fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap', color: delta < 0 ? 'var(--red-text)' : 'var(--green-text)' }}>{deltaText(delta, true)}</td>
-                <td style={{ textAlign: 'right', fontWeight: 600 }}>{s.ko}</td>
-                <td style={{ fontSize: 14, maxWidth: 260 }}>
-                  {stAlerts.length
-                    ? <span style={{ display: 'block', fontWeight: 600, color: 'var(--red-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={stAlerts.map((a) => a.title).join(' · ')}>{stAlerts[0].title}{stAlerts.length > 1 ? ` (+${stAlerts.length - 1})` : ''}</span>
-                    : <span className="muted">–</span>}
-                </td>
-                <td style={{ textAlign: 'right', whiteSpace: 'nowrap', paddingRight: 6 }}>
-                  <Link to={stationHistoryUrl(s.id)} onClick={(e) => e.stopPropagation()} className="icon-btn" title="Historique du shift" aria-label={`Historique du poste ${shortId(s.id)}`}>
-                    <Icon d={ICONS.log} size={18} />
-                  </Link>
-                  <span className="muted" aria-hidden="true" style={{ fontSize: 22, marginLeft: 10 }}>›</span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {!shown.length && <div className="muted" style={{ padding: '18px 10px' }}>Aucun poste ne correspond au filtre.</div>}
-    </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12 }}>
+        {filtered.map((s) => {
+          const delta = s.good - s.expectedNow;
+          const isSel = s.id === selected;
+          const safe = s.status !== 'SECURITE';
+          return (
+            <button
+              key={s.id}
+              onClick={() => setSelected(isSel ? null : s.id)}
+              aria-expanded={isSel}
+              aria-label={`Poste ${shortId(s.id)} : sécurité ${safe ? 'OK' : 'NOK'}, ${deltaText(delta, true)}, ${s.good} pièces OK, ${s.ko} pièces NOK. Voir le détail`}
+              className="col"
+              style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 7, padding: '14px 16px', borderRadius: 16, background: TINT[s.status],
+                border: isSel ? '2px solid var(--navy)' : `2px solid ${EDGE[s.status]}`,
+                animation: (s.status === 'SECURITE' || s.status === 'QUALITE') && !REDUCED_MOTION ? 'station-alert 0.8s ease-in-out infinite' : undefined }}
+            >
+              <span className="cond" style={{ fontWeight: 700, fontSize: 26, lineHeight: 1 }}>{shortId(s.id)}</span>
+              <CardLine label="Sécurité" value={safe ? 'OK' : 'NOK'} tone={safe ? 'ok' : 'bad'} />
+              <CardLine label="Rythme" value={deltaText(delta, true)} tone={delta < 0 ? 'bad' : 'ok'} />
+              <CardLine label="Pièces OK" value={fmt(s.good)} />
+              <CardLine label="Pièces NOK" value={fmt(s.ko)} />
+            </button>
+          );
+        })}
+      </div>
+      {!filtered.length && <div className="muted" style={{ padding: '18px 10px' }}>Aucun poste ne correspond au filtre.</div>}
 
+      {detail && <StationDetailPanel s={detail} alerts={alerts.filter((a) => a.stationId === detail.id)} onClose={() => setSelected(null)} onScreen={() => nav(stationScreenUrl(detail.id, detail.status))} />}
+    </div>
+  );
+}
+
+/** Une ligne de carte : libellé à gauche, valeur à droite (verte si OK, rouge sinon). */
+function CardLine({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'bad' }) {
+  return (
+    <span className="between" style={{ alignItems: 'baseline', fontSize: 15 }}>
+      <span style={{ color: 'var(--muted)' }}>{label}</span>
+      <b style={{ fontSize: 16, color: tone === 'ok' ? 'var(--green-text)' : tone === 'bad' ? 'var(--red-text)' : 'var(--ink)' }}>{value}</b>
+    </span>
+  );
+}
+
+/** Détail d'un poste, ouvert d'un clic sur sa carte. */
+function StationDetailPanel({ s, alerts, onClose, onScreen }: { s: StationSummary; alerts: Alert[]; onClose: () => void; onScreen: () => void }) {
+  const delta = s.good - s.expectedNow;
+  return (
+    <div className="col" style={{ gap: 14, border: '2px solid var(--navy)', borderRadius: 16, padding: '16px 20px', background: '#fff' }}>
       <div className="between" style={{ alignItems: 'center' }}>
-        <span className="muted" style={{ fontSize: 13 }}>
-          {filtered.length ? `Postes ${current * PAGE_SIZE + 1} à ${current * PAGE_SIZE + shown.length} sur ${filtered.length}` : ''}
-          {filtered.length !== stations.length ? ` (filtre actif sur ${stations.length})` : ''}
+        <span className="row" style={{ gap: 14 }}>
+          <span className="cond" style={{ fontWeight: 700, fontSize: 26 }}>Poste {shortId(s.id)}</span>
+          <span className="row" style={{ gap: 8, fontWeight: 600 }}><span style={{ width: 10, height: 10, borderRadius: 5, background: DOT[s.status] }} />{STATUS[s.status][0]}</span>
+          <span className="muted" style={{ fontSize: 14 }}>{s.product}</span>
         </span>
-        {pages > 1 && (
-          <nav className="row" aria-label="Pages du tableau" style={{ gap: 6 }}>
-            <button className="page-btn" disabled={current === 0} onClick={() => setPage(current - 1)} aria-label="Page précédente">‹</button>
-            {Array.from({ length: pages }, (_, i) => (
-              <button key={i} className="page-btn" aria-current={i === current ? 'page' : undefined} onClick={() => setPage(i)}>{i + 1}</button>
-            ))}
-            <button className="page-btn" disabled={current === pages - 1} onClick={() => setPage(current + 1)} aria-label="Page suivante">›</button>
-          </nav>
-        )}
+        <button onClick={onClose} className="icon-btn" aria-label="Fermer le détail" title="Fermer">✕</button>
+      </div>
+      <div className="col" style={{ gap: 6 }}>
+        <div className="between"><span className="muted" style={{ fontSize: 14 }}>Avancement du shift · attendu maintenant : {fmt(s.expectedNow)}</span><span style={{ fontWeight: 700 }}>{fmt(s.good)} / {fmt(s.target)}</span></div>
+        <div className="track" style={{ height: 12, overflow: 'visible' }}>
+          <div className="fill" style={{ width: `${(s.good / s.target) * 100}%`, background: delta >= 0 ? 'var(--green)' : 'var(--amber)' }} />
+        </div>
+      </div>
+      <div className="row" style={{ gap: 28, flexWrap: 'wrap' }}>
+        <span><span className="muted" style={{ fontSize: 14 }}>Rythme </span><b style={{ color: delta < 0 ? 'var(--red-text)' : 'var(--green-text)' }}>{deltaText(delta, true)}</b></span>
+        <span><span className="muted" style={{ fontSize: 14 }}>Pièces NOK </span><b>{s.ko}</b> <span className="muted" style={{ fontSize: 14 }}>({((s.ko / Math.max(1, s.good + s.ko)) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %)</span></span>
+      </div>
+      <div className="col" style={{ gap: 4 }}>
+        <span className="muted" style={{ fontSize: 14 }}>Alertes en cours</span>
+        {alerts.length ? alerts.map((a) => <span key={a.id} style={{ fontWeight: 600, color: 'var(--red-text)' }}>{a.title} <span className="muted" style={{ fontWeight: 400 }}>· {a.when}</span></span>) : <span className="muted">Aucune</span>}
+      </div>
+      <div className="row" style={{ gap: 10 }}>
+        <button className="btn btn-dark" onClick={onScreen} style={{ padding: '10px 18px', borderRadius: 12 }}>Voir l’écran du poste</button>
+        <Link to={stationHistoryUrl(s.id)} className="btn btn-ghost" style={{ padding: '10px 18px', borderRadius: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Historique du shift</Link>
       </div>
     </div>
   );
@@ -255,6 +264,8 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
 }
 
 /* ---------------- Alertes de la cellule : texte seul ---------------- */
+const ackTime = (iso?: string) => (iso ? ` · ${new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : '');
+
 function Alerts({ cell, alerts, onDone, onAcknowledge }: { cell: CellOverview; alerts: Alert[]; onDone: (id: string) => void; onAcknowledge: (id: string) => void }) {
   const [cat, setCat] = useState<AlertCategory | 'ALL'>('ALL');
   const list = useMemo(() => [...alerts].filter((a) => cat === 'ALL' || a.category === cat).sort((a, b) => Number(b.priority) - Number(a.priority)), [alerts, cat]);
@@ -285,7 +296,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
       <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
         <span className="cond" style={{ fontWeight: 700, fontSize: 26 }}>{a.stationId}</span>
         <span className={`pill ${a.category === 'SECURITE_EPI' ? 'pill-red' : 'pill-blue'}`}>{cat.name}</span>
-        {a.acknowledgedBy && <span className="pill pill-green">Pris en charge · {a.acknowledgedBy}</span>}
+        {a.acknowledgedBy && <span className="pill pill-green">Prise en charge · {a.acknowledgedBy}{ackTime(a.acknowledgedAt)}</span>}
         <span style={{ flex: 1 }} />
         <span className="muted" style={{ fontSize: 13 }}>{a.reportedByOperator ? 'signalé par l’opérateur' : ''}</span>
       </div>
@@ -294,7 +305,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
       <span style={{ fontSize: 14, fontWeight: 600 }}>Shift {a.shift} · {a.when}</span>
       {a.action === 'NONE' && <span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>Pour information : aucune validation demandée</span>}
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        {!a.acknowledgedBy && <button className="btn btn-primary grow" onClick={onAcknowledge}>Je m’en occupe</button>}
+        {!a.acknowledgedBy && <button className="btn btn-primary grow" onClick={onAcknowledge}>Prendre en charge</button>}
         {a.action === 'VALIDATE' && (
           <>
             <button className="btn btn-dark grow" onClick={() => api.decideAlert(a.id, 'VALIDER').then(onDone)}>Valider</button>
