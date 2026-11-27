@@ -250,6 +250,7 @@ Aucune ressource distante créée.
 ## 11. Limites et blocages restants
 - **À décider :** l'intégration de l'interface TeamLeader du groupe Interface (conflit avec Superviseur live), le dépôt orphelin détection-téléphone et le patch Operator de Safety.
 - **Travail en cours** non committé dans `HOVIS_INDUSTRIAL`, non repris.
+- **Safety a publié 4 nouveaux commits pendant le chantier** (`origin/EPI` df06ba9 → dd33949, 04:38–05:35, dont « YOLO26s is the chosen model »). Ils ne sont pas repris : la livraison évolue encore. Après confirmation du groupe : `git checkout origin/EPI -- usecases/safety`, puis `pytest usecases/safety tests/test_contract.py`.
 - **Données scientifiques manquantes** (§8).
 - **Démarrage à froid sans préchauffage :** les 11 s du catalogue Datasets restent possibles juste après un redémarrage, pendant les 42 à 47 s du préchauffage.
 - **Rafraîchissement forcé :** 2 à 4 s par endpoint, soit le coût réel de Databricks.
