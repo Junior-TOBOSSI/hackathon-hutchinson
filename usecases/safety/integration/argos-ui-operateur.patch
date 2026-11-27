@@ -312,7 +312,7 @@ index 0129f23..d1f9a41 100644
    );
  }
 diff --git a/argos-ui/src/pages/Operateur.tsx b/argos-ui/src/pages/Operateur.tsx
-index 6f36356..41590e7 100644
+index 6f36356..89d755a 100644
 --- a/argos-ui/src/pages/Operateur.tsx
 +++ b/argos-ui/src/pages/Operateur.tsx
 @@ -24,12 +24,18 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
@@ -414,7 +414,7 @@ index 6f36356..41590e7 100644
  
  function ScenarioSwitcher({ value, onChange }: { value: Scenario; onChange: (s: Scenario) => void }) {
 -  const opts: [Scenario, string][] = [['ok', 'Tout va bien'], ['ko', 'Pièce KO'], ['epi', 'EPI manquant'], ['multi', 'Plusieurs problèmes']];
-+  const opts: [Scenario, string][] = [['ok', 'Tout va bien'], ['ko', 'Pièce NOK'], ['epi', 'EPI manquant'], ['multi', 'Plusieurs problèmes']];
++  const opts: [Scenario, string][] = [['ok', 'Conforme'], ['ko', 'Pièce NOK'], ['epi', 'EPI manquant'], ['multi', 'Plusieurs problèmes']];
    return (
      <div style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 4, background: 'var(--navy)', color: '#fff', borderRadius: 12, padding: 4, display: 'flex', gap: 4, boxShadow: '0 8px 24px rgba(0,0,0,.3)', fontSize: 12 }}>
        <span style={{ alignSelf: 'center', padding: '0 6px', color: 'var(--on-navy-muted)' }}>Démo</span>
@@ -542,9 +542,18 @@ index 89edae1..09c58d6 100644
        </main>
      </div>
 diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
-index 1642809..d2cc3a3 100644
+index 1642809..d3c2e41 100644
 --- a/argos-ui/src/pages/TeamLeader.tsx
 +++ b/argos-ui/src/pages/TeamLeader.tsx
+@@ -23,7 +23,7 @@ export const CATEGORIES: (Category & { key: AlertCategory })[] = [
+ ];
+ 
+ const STATUS: Record<StationStatus, [string, string]> = {
+-  OK: ['Tout va bien', 'pill-green'], SECURITE: ['Sécurité', 'pill-solid-red'], QUALITE: ['Qualité', 'pill-solid-red'],
++  OK: ['Conforme', 'pill-green'], SECURITE: ['Sécurité', 'pill-solid-red'], QUALITE: ['Qualité', 'pill-solid-red'],
+   RYTHME: ['Rythme', 'pill-amber'], CAMERA: ['Caméra hors ligne', 'pill-amber'], OBJET: ['Objet étranger', 'pill-amber'],
+ };
+ 
 @@ -88,7 +88,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
        <div className="grid-5">
          <Kpi label="Pièces bonnes · shift" value={fmt(good)} sub={`sur ${fmt(target)} · ${Math.round((good / target) * 100)} % de l’objectif`} />
