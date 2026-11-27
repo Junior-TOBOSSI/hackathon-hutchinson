@@ -21,3 +21,11 @@ export const useDecisionHistory = (modelId: string | null, version: string | nul
     read((signal) => deploymentApi.decisionHistory(modelId as string, version as string, signal)));
 export const useEdgeStations = () =>
   useResource('deployment-edge-stations', read(deploymentApi.edgeStations));
+
+export const useEdgeStation = (id: string | null) =>
+  useResource(id ? `deployment-edge-station:${id}` : null,
+    read((signal) => deploymentApi.edgeStation(id as string, signal)));
+
+export const useEdgeModelStatus = (id: string | null) =>
+  useResource(id ? `deployment-edge-models:${id}` : null,
+    read((signal) => deploymentApi.edgeModelStatus(id as string, signal)));

@@ -26,7 +26,7 @@ export default function Registry({ onMessage }: { onMessage: (message: string) =
     (!useCase || row.model.argos_use_case === useCase)
     && (!decision || (decision === 'pending' ? row.pending > 0
       : decision === 'approved' ? !!row.status?.versions.some((v) => decisionOf(v) === 'approved') : row.versions === 0))
-    && `${row.model.display_name} ${row.model.id} ${row.model.uc_name} ${row.architecture ?? ''}`
+    && `${row.model.display_name} ${row.model.id} ${row.model.uc_name} ${row.architecture ?? ''} ${row.task ?? ''}`
       .toLocaleLowerCase('fr').includes(query.toLocaleLowerCase('fr')))
     .sort((a, b) => sort === 'activity' ? (b.activity ?? '').localeCompare(a.activity ?? '')
       : sort === 'versions' ? b.versions - a.versions : a.model.display_name.localeCompare(b.model.display_name, 'fr')),
@@ -68,14 +68,15 @@ export default function Registry({ onMessage }: { onMessage: (message: string) =
         {statuses.loading && <Loading what="Lecture des versions UC" />}
         <div className="dataset-table-wrap"><table className="dataset-table lifecycle-table lifecycle-registry-table"><thead><tr>
           <th>Modèle</th><th>Cas d’usage</th><th className="opt">Tâche / architecture</th><th>Versions</th><th>Dernière</th>
-          <th>Champion</th><th>Servie</th><th>En attente</th><th className="opt">Activité</th>
+          <th>Champion</th><th>Servie</th><th>En attente</th><th className="opt">Activité</th><th>Action</th>
         </tr></thead><tbody>{visible.map((row) => <tr key={row.model.id} tabIndex={0} className={selectedId === row.model.id ? 'selected' : ''}
           onClick={() => go('registry', row.model.id)} onKeyDown={(event) => { if (event.key === 'Enter') go('registry', row.model.id); }}>
           <td><b>{row.model.display_name}</b><small>{row.model.uc_name}</small></td>
-          <td>{fr(row.model.argos_use_case)}</td><td className="opt">{row.architecture ?? 'Non renseignée'}</td>
+          <td>{fr(row.model.argos_use_case)}</td><td className="opt">{[row.task, row.architecture].filter(Boolean).join(' / ') || 'Non renseignées'}</td>
           <td>{statuses.data ? row.versions : '—'}</td><td>{row.latest ? `v${row.latest.version.version}` : '—'}</td>
           <td>{row.champion ? `v${row.champion}` : '—'}</td><td>{row.served ? `v${row.served}` : '—'}</td>
           <td>{statuses.data ? row.pending : '—'}</td><td className="opt">{dateTime(row.activity)}</td>
+          <td><button className="btn btn-ghost" onClick={(event) => { event.stopPropagation(); go('registry', row.model.id); }}>Ouvrir</button></td>
         </tr>)}</tbody></table></div>
         {!managed.loading && !visible.length && <Unavailable tone="grey">Aucun modèle pour ces critères.</Unavailable>}
         {filtered.length > 10 && <div className="row lifecycle-pagination">

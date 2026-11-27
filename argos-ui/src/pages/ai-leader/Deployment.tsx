@@ -3,11 +3,12 @@ import { LIFECYCLE_READ_ONLY, type DeploymentOperation, type EdgeStation } from 
 import type { EndpointInfo, ManagedModel } from '../../api/mlops';
 import { Loading, Unavailable, useNav } from './common';
 import { useEndpoints, useManaged, useStatuses, useStore } from './data';
-import { useDeploymentHistory, useEdgeStations } from './lifecycleData';
+import { useDeploymentHistory } from './lifecycleData';
 import { dateTime } from './metrics';
 import DeploymentDetail from './DeploymentDetail';
 import { OperationBadge } from './DeploymentStatus';
 import DeploymentWizard from './DeploymentWizard';
+import IndustrialFleet from './IndustrialFleet';
 import OperationPanel from './OperationPanel';
 import { Chip, Kpi, SearchField, SelectField } from './ui';
 import './datasets/catalog.css';
@@ -27,7 +28,6 @@ export default function Deployment() {
   const models = useManaged();
   const statuses = useStatuses();
   const history = useDeploymentHistory();
-  const edge = useEdgeStations();
   const store = useStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [operationId, setOperationId] = useState<string | null>(null);
@@ -36,14 +36,13 @@ export default function Deployment() {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState('');
   const [state, setState] = useState('');
-  const [tab, setTab] = useState<'Cibles' | 'Historique'>('Cibles');
+  const [tab, setTab] = useState<'Parc industriel' | 'Databricks Serving' | 'Historique'>('Parc industriel');
   const { go } = useNav();
   const targets = useMemo<Target[]>(() => [
     ...(endpoints.data ?? []).filter((endpoint) => (models.data ?? []).some((model) => model.endpoint === endpoint.name))
       .map((endpoint): CloudTarget => ({ kind: 'Cloud', id: `cloud:${endpoint.name}`, endpoint,
         model: (models.data ?? []).find((model) => model.endpoint === endpoint.name) ?? null })),
-    ...(edge.data ?? []).map((station): EdgeTarget => ({ kind: 'Edge', id: `edge:${station.station_id}`, station })),
-  ], [endpoints.data, models.data, edge.data]);
+  ], [endpoints.data, models.data]);
   const selected = targets.find((target) => target.id === selectedId) ?? null;
   const filtered = targets.filter((target) => (!kind || target.kind === kind)
     && (!state || (state === 'ready' ? ready(target) : !ready(target)))
@@ -59,32 +58,32 @@ export default function Deployment() {
   const openRollback = (operation: DeploymentOperation) => { setRollbackSource(operation); setWizard(true); setOperationId(null); };
 
   return <div className="dataset-catalog lifecycle-catalog col" style={{ gap: 14 }}>
-    <header className="card dataset-hero"><div><h1 className="h2">Centre de déploiement — Cibles & opérations</h1>
-      <p className="muted">Serving Databricks et postes Edge sont deux déploiements distincts.</p>
+    <header className="card dataset-hero"><div><h1 className="h2">Centre de déploiement — Parc industriel</h1>
+      <p className="muted">État des modèles sur les postes industriels, Serving Databricks et historique HOVIS.</p>
       <span className="muted lifecycle-fresh">Lecture Serving : {dateTime(endpoints.fetchedAt)}{endpoints.cache === 'stale' ? ' · dernière valeur connue' : ''} · historique HOVIS : {dateTime(history.fetchedAt)}</span></div>
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}><button className="btn btn-ghost" onClick={() => store.invalidate('endpoints', 'deployment-history', 'deployment-edge-stations')}>Actualiser</button>
-        <button className="btn btn-primary" disabled={LIFECYCLE_READ_ONLY} onClick={openWizard}>Nouveau déploiement</button></div></header>
+        {tab === 'Databricks Serving' && <button className="btn btn-primary" disabled={LIFECYCLE_READ_ONLY} onClick={openWizard}>Nouveau déploiement Serving</button>}</div></header>
     {LIFECYCLE_READ_ONLY && <Unavailable tone="grey">Recette connectée en lecture seule : aucune mutation Serving, Registry ou Edge n’est accessible depuis cette interface.</Unavailable>}
-    {endpoints.error && <Unavailable tone="red">Serving indisponible : {endpoints.error}</Unavailable>}
-    {endpoints.staleError && <Unavailable>Dernière lecture Serving en échec : {endpoints.staleError}</Unavailable>}
-    {history.error && <Unavailable tone="red">Historique HOVIS indisponible : {history.error}</Unavailable>}
-    {edge.error && <Unavailable tone="grey">Statuts Edge non disponibles depuis cette passerelle : {edge.error}. Les cibles Cloud restent consultables.</Unavailable>}
-    <div className="dataset-kpis">
+    {tab === 'Databricks Serving' && endpoints.error && <Unavailable tone="red">Serving indisponible : {endpoints.error}</Unavailable>}
+    {tab === 'Databricks Serving' && endpoints.staleError && <Unavailable>Dernière lecture Serving en échec : {endpoints.staleError}</Unavailable>}
+    {tab === 'Historique' && history.error && <Unavailable tone="red">Historique HOVIS indisponible : {history.error}</Unavailable>}
+    {tab === 'Databricks Serving' && <div className="dataset-kpis">
       <Kpi icon="monitor" label="Endpoints gérés" value={endpoints.data ? cloud.length : '—'} hint="Périmètre HOVIS" />
       <Kpi icon="check" label="Endpoints prêts" value={endpoints.data ? cloud.filter((target) => ready(target)).length : '—'} tone="green" />
       <Kpi icon="layers" label="Versions servies" value={endpoints.data ? cloud.reduce((n, target) => n + target.endpoint.served.filter((entity) => entity.version).length, 0) : '—'} />
       <Kpi icon="play" label="Opérations en cours" value={count(operations.filter((operation) => ACTIVE.includes(operation.status)).length)} />
       <Kpi icon="warn" label="Opérations en échec" value={count(operations.filter((operation) => operation.status === 'failed').length)} tone="red" />
       <Kpi icon="flag" label="Rollbacks enregistrés" value={count(operations.filter((operation) => operation.kind === 'rollback').length)} hint="Sur l’historique chargé (500 max.)" />
-    </div>
-    <nav className="dataset-tabs" aria-label="Centre de déploiement">{(['Cibles', 'Historique'] as const).map((name) =>
+    </div>}
+    <nav className="dataset-tabs" aria-label="Centre de déploiement">{(['Parc industriel', 'Databricks Serving', 'Historique'] as const).map((name) =>
       <button key={name} className={tab === name ? 'active' : ''} onClick={() => { setTab(name); setOperationId(null); }}>{name}</button>)}</nav>
-    {tab === 'Cibles' && <div className={`dataset-layout${selected ? '' : ' dataset-layout-full'}`}>
+    {tab === 'Parc industriel' && <IndustrialFleet models={models.data ?? []} statuses={statuses.data ?? []} />}
+    {tab === 'Databricks Serving' && <div className={`dataset-layout${selected ? '' : ' dataset-layout-full'}`}>
       <section className="card dataset-list col" style={{ gap: 14 }}><h2 className="h2">Catalogue des cibles</h2>
         <div className="row dataset-filters"><SearchField value={query} onChange={setQuery} placeholder="Rechercher une cible…" />
-          <SelectField label="Type de cible" allLabel="Cloud et Edge" value={kind} onChange={setKind} options={[["Cloud", "Cloud"], ["Edge", "Edge"]]} />
+          <SelectField label="Type de cible" allLabel="Cloud" value={kind} onChange={setKind} options={[["Cloud", "Databricks Serving"]]} />
           <SelectField label="État" allLabel="Tous les états" value={state} onChange={setState} options={[["ready", "Prêt / en ligne"], ["unready", "À vérifier / hors ligne"]]} /></div>
-        {endpoints.loading && <Loading what="Lecture Serving" />}{edge.loading && <Loading what="Lecture Edge" />}
+        {endpoints.loading && <Loading what="Lecture Serving" />}
         <span className="muted" style={{ fontSize: 13 }}>{filtered.length} cible(s) dans le périmètre connu</span>
         <div className="dataset-table-wrap"><table className="dataset-table lifecycle-table lifecycle-deployment-table"><thead><tr>
           <th>Cible</th><th>Type</th><th>Modèle</th><th>Version active</th><th>État</th><th className="opt">Compute</th>
@@ -104,7 +103,7 @@ export default function Deployment() {
             <td>{active ? <OperationBadge operation={active} /> : '—'}</td>
           </tr>;
         })}</tbody></table></div>
-        {!endpoints.loading && !edge.loading && !filtered.length && <Unavailable tone="grey">Aucune cible pour ces critères.</Unavailable>}
+        {!endpoints.loading && !filtered.length && <Unavailable tone="grey">Aucune cible Serving pour ces critères.</Unavailable>}
       </section>
       {selected && <DeploymentDetail target={selected} operations={operations} statuses={statuses.data ?? []}
         onClose={() => setSelectedId(null)} onOperation={setOperationId} onNew={openWizard}

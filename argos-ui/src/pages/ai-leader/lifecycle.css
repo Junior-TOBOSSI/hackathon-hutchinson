@@ -37,4 +37,11 @@
 .lifecycle-steps span { flex: 1 1 145px; padding: 8px 10px; border-radius: 10px; background: var(--surface-soft); color: var(--muted); font-size: 13px; font-weight: 700; }
 .lifecycle-steps span.active { background: var(--primary-soft); color: var(--primary); }
 .lifecycle-config { max-width: 100%; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lifecycle-fleet-table { min-width: 1340px; }
+.lifecycle-fleet-table td:nth-child(n+5):nth-child(-n+7) { min-width: 185px; }
+.lifecycle-fleet-table td small { margin-top: 5px; }
+.lifecycle-fleet-table input[type="checkbox"], .lifecycle-wizard input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px; }
+.lifecycle-fleet-drawer { position: absolute; right: 0; top: 0; bottom: 0; width: min(780px, 58vw); max-height: 100vh; overflow-y: auto; border-radius: 18px 0 0 18px; padding: 24px; box-sizing: border-box; }
+.lifecycle-fleet-drawer .dataset-mini b { font-size: 16px; }
 @media (max-width: 720px) { .lifecycle-form-grid { grid-template-columns: 1fr; } .lifecycle-table { min-width: 680px; } }
+@media (max-width: 900px) { .lifecycle-fleet-drawer { width: min(100%, 680px); padding: 16px; } }

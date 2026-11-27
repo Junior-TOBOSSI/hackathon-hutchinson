@@ -10,6 +10,7 @@ export interface ModelRow {
   pending: number;
   activity: string | null;
   architecture: string | null;
+  task: string | null;
 }
 
 const versionNumber = (version: string) => Number.parseInt(version, 10) || 0;
@@ -32,8 +33,8 @@ export function modelCatalog(models: ManagedModel[], statuses: ModelStatus[]): M
       activity: sorted.flatMap((version) => [version.version.created_at, version.version.tags.argos_decision_at])
         .filter((date): date is string => !!date)
         .sort().reverse()[0] ?? null,
-      architecture: latest?.version.tags.argos_architecture ?? latest?.version.tags.architecture
-        ?? latest?.version.tags.argos_task ?? latest?.version.tags.task ?? null,
+      architecture: latest?.version.tags.argos_architecture ?? latest?.version.tags.architecture ?? null,
+      task: latest?.version.tags.argos_task ?? latest?.version.tags.task ?? null,
     };
   });
 }

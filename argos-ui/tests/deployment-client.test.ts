@@ -19,6 +19,8 @@ test('les actions envoient les contrats DBX-06B à un service simulé uniquement
     await deploymentApi.prepareRollback('operation-1', 'Retour explicite', 'jury');
     await deploymentApi.history();
     await deploymentApi.edgeStations();
+    await deploymentApi.edgeStation('CELL-01');
+    await deploymentApi.edgeModelStatus('CELL-01');
     assert.equal(calls[0].url, '/api/mlops/registry/candidate-A/versions/12/decisions');
     assert.equal(calls[0].method, 'POST');
     assert.deepEqual(calls[0].body, { decision: 'rejected', reason: 'Évaluation insuffisante',
@@ -28,6 +30,10 @@ test('les actions envoient les contrats DBX-06B à un service simulé uniquement
     assert.equal(calls[3].url, '/api/mlops/deployments/rollback/prepare');
     assert.equal(calls[4].method, 'GET');
     assert.equal(calls[5].url, '/api/v1/stations');
+    assert.equal(calls[6].url, '/api/v1/stations/CELL-01');
+    assert.equal(calls[7].url, '/api/v1/stations/CELL-01/model-status');
+    assert.equal(calls[6].method, 'GET');
+    assert.equal(calls[7].method, 'GET');
   } finally { globalThis.fetch = original; }
 });
 

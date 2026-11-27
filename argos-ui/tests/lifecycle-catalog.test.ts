@@ -24,6 +24,17 @@ test('catalogue et KPI utilisent seulement les statuts gérés réellement reçu
   assert.equal(modelCounts(modelCatalog([model], [])).models, 0);
 });
 
+test('une nouvelle famille industrielle configurée apparaît sans logique dédiée', () => {
+  const industrial = { ...model, id: 'quality_industrial', synthetic: false,
+    uc_name: 'catalog.production.quality_industrial', display_name: 'Quality Industrial' };
+  const industrialStatus = { ...status, model_id: industrial.id, versions: [version('4', 'approved')],
+    aliases: {}, served: {} } as ModelStatus;
+  const rows = modelCatalog([model, industrial], [status, industrialStatus]);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1].model.id, 'quality_industrial');
+  assert.equal(rows[1].latest?.version.version, '4');
+});
+
 test('comparaison signale les métadonnées manquantes ou différentes', () => {
   const a = run({ dataset_version: 'v1', evaluation_protocol: 'fixed', split_strategy: 'by_station' }, {});
   const b = run({ dataset_version: 'v2', evaluation_protocol: 'fixed', split_strategy: 'by_station' }, {});

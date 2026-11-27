@@ -1,4 +1,4 @@
-// Dedicated lifecycle client. No UI action calls it until the Registry and Deployment mockups land.
+// Dedicated lifecycle client. Edge reads never initiate a deployment.
 // The backend owns Databricks credentials; declared authors are not verified identities.
 
 const BASE = (import.meta as ImportMeta & { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? '/api';
@@ -99,6 +99,10 @@ export const deploymentApi = {
     `/mlops/deployments/${encodeURIComponent(id)}/events`, 'GET', undefined, signal),
   edgeStations: (signal?: AbortSignal) =>
     call<EdgeStation[]>('/v1/stations', 'GET', undefined, signal),
+  edgeStation: (id: string, signal?: AbortSignal) =>
+    call<EdgeStation>(`/v1/stations/${encodeURIComponent(id)}`, 'GET', undefined, signal),
+  edgeModelStatus: (id: string, signal?: AbortSignal) =>
+    call<EdgeModelStatus[]>(`/v1/stations/${encodeURIComponent(id)}/model-status`, 'GET', undefined, signal),
   prepare: (request: PrepareDeployment) =>
     call<DeploymentOperation>('/mlops/deployments/prepare', 'POST', request),
   prepareRollback: (sourceOperationId: string, reason: string, authorDeclared: string) =>
@@ -121,7 +125,19 @@ export interface EdgeStation {
     use_case: string;
     status: 'loaded' | 'loading' | 'failed' | 'absent';
     model: { registered_model: string; version: string } | null;
+    package_sha256?: string | null;
     loaded_at: string | null;
     error: string | null;
   }>;
+}
+
+/** Raw Core projection; retains local versions that ModelRef cannot represent. */
+export interface EdgeModelStatus {
+  kind: 'model.status';
+  use_case: string;
+  model_name: string;
+  model_version: string;
+  package_sha256: string | null;
+  loaded: boolean;
+  error: string | null;
 }

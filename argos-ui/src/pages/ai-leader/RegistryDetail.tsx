@@ -12,8 +12,9 @@ import { Chip, fr, SelectField } from './ui';
 const TABS = ['Vue d’ensemble', 'Versions', 'Comparaison', 'Évaluation', 'Lignage', 'Artefacts', 'Décisions'] as const;
 type Tab = typeof TABS[number];
 const COLORS = ['var(--navy)', 'var(--primary-light)', 'var(--cat-qualite)', 'var(--cat-rythme)'];
-const decisionLabel = (version: VersionStatus) => decisionOf(version) === 'approved' ? 'Approuvée'
-  : decisionOf(version) === 'rejected' ? 'Refusée' : 'En attente';
+const decisionLabel = (version: VersionStatus, latest?: boolean) => decisionOf(version) === 'approved' ? 'Approuvée'
+  : decisionOf(version) === 'rejected' ? 'Refusée'
+    : latest && version.aliases.length === 0 ? 'Dernier candidat · sans alias' : 'Sans décision';
 
 export default function RegistryDetail({ row, onClose, onMessage }: {
   row: ModelRow; onClose: () => void; onMessage: (message: string) => void;
@@ -37,10 +38,11 @@ export default function RegistryDetail({ row, onClose, onMessage }: {
         <button className="btn btn-ghost" aria-label="Fermer le détail" onClick={onClose}>✕</button>
       </div></header>
     <div className="row dataset-detail-meta"><span>Usage : <b>{fr(model.argos_use_case)}</b></span>
+      <span>Tâche : <b>{row.task ?? 'non renseignée'}</b></span>
       <span>Architecture : <b>{row.architecture ?? 'non renseignée'}</b></span>
       <span>Dernière activité : <b>{dateTime(row.activity)}</b></span></div>
     <div className="row lifecycle-states">
-      <Chip tone={selected ? decisionOf(selected) === 'approved' ? 'green' : decisionOf(selected) === 'rejected' ? 'red' : 'grey' : 'grey'}>Approbation : {selected ? decisionLabel(selected) : '—'}</Chip>
+      <Chip tone={selected ? decisionOf(selected) === 'approved' ? 'green' : decisionOf(selected) === 'rejected' ? 'red' : 'grey' : 'grey'}>Approbation {version ? `v${version}` : ''} : {selected ? decisionLabel(selected, row.latest?.version.version === version) : '—'}</Chip>
       <Chip tone="blue">Alias champion : {row.champion ? `v${row.champion}` : 'aucun'}</Chip>
       <Chip tone="amber">Servie : {row.served ? `v${row.served}` : 'aucune'}</Chip>
     </div>
@@ -62,7 +64,7 @@ export default function RegistryDetail({ row, onClose, onMessage }: {
       {[...(status?.versions ?? [])].sort((a, b) => Number(b.version.version) - Number(a.version.version)).map((item) =>
         <button key={item.version.version} className={`dataset-version${version === item.version.version ? ' selected' : ''}`}
           onClick={() => { setVersion(item.version.version); setTab('Vue d’ensemble'); }}>
-          <b>v{item.version.version}</b><Chip tone={decisionOf(item) === 'approved' ? 'green' : decisionOf(item) === 'rejected' ? 'red' : 'grey'}>{decisionLabel(item)}</Chip>
+          <b>v{item.version.version}</b><Chip tone={decisionOf(item) === 'approved' ? 'green' : decisionOf(item) === 'rejected' ? 'red' : 'grey'}>{decisionLabel(item, row.latest?.version.version === item.version.version)}</Chip>
           {item.aliases.map((alias) => <Chip key={alias} tone="blue">{alias}</Chip>)}
           {item.served_by.length > 0 && <Chip tone="amber">servie par {item.served_by.join(', ')}</Chip>}
           <span className="muted">{dateTime(item.version.created_at)}</span>
@@ -130,18 +132,20 @@ function ComparisonTab({ versions }: { versions: VersionStatus[] }) {
       return value == null ? [] : [{ label: `v${row.version.version.version}`, value, color: COLORS[index % COLORS.length] }];
     }),
   }));
+  const comparison = comparability(rows.map((row) => row.run));
+  const comparable = comparison.startsWith('Même');
   return <div className="col" style={{ gap: 14 }}>
     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}><b>Split :</b>
       {(['validation', 'test'] as const).map((item) => <button key={item} className={`btn ${split === item ? 'btn-dark' : 'btn-ghost'}`}
         onClick={() => setSplit(item)}>{item === 'validation' ? 'Validation' : 'Test'}</button>)}</div>
-    <Unavailable tone={comparability(rows.map((row) => row.run)).startsWith('Même') ? 'grey' : 'amber'}>{comparability(rows.map((row) => row.run))}</Unavailable>
+    <Unavailable tone={comparable ? 'grey' : 'amber'}>{comparison}</Unavailable>
     {available.length ? <><div className="dataset-table-wrap"><table className="dataset-table"><thead><tr><th>Métrique</th>
       {rows.map((row) => <th key={row.version.version.version}>v{row.version.version.version}</th>)}
       </tr></thead><tbody>{available.map((metric) => <tr key={metric.label}><td><b>{metric.label}</b></td>
         {rows.map((row) => { const value = metricValue(row.run, split, metric.bases);
           return <td key={row.version.version.version}>{value == null ? '—' : metric.unit === 'percent' ? `${(value * 100).toFixed(1).replace('.', ',')} %` : `${value.toLocaleString('fr-FR')}${metric.unit === 'ms' ? ' ms' : ''}`}</td>;
         })}</tr>)}</tbody></table></div>
-      {groups.length > 0 && <GroupedBars groups={groups} max={1} format={(value) => `${(value * 100).toFixed(1).replace('.', ',')} %`} />}</>
+      {comparable && groups.length > 0 && <GroupedBars groups={groups} max={1} format={(value) => `${(value * 100).toFixed(1).replace('.', ',')} %`} />}</>
       : <Unavailable tone="grey">Aucune métrique comparable sur ce split.</Unavailable>}
   </div>;
 }
@@ -173,6 +177,7 @@ function DecisionTab({ model, status, selected, version, onVersion, onMessage }:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const served = !!selected?.served_by.length;
+  const latestVersion = [...(status?.versions ?? [])].sort((a, b) => Number(b.version.version) - Number(a.version.version))[0]?.version.version;
   const decide = async () => {
     if (!selected || !version || reason.trim().length < 3 || !author.trim()) return;
     if (choice === 'rejected' && served && !acknowledge) { setError('Confirmez que le refus n’arrête pas la version déjà servie.'); return; }
@@ -194,7 +199,7 @@ function DecisionTab({ model, status, selected, version, onVersion, onMessage }:
   };
   return <div className="col" style={{ gap: 14 }}>
     <VersionPicker versions={status?.versions ?? []} value={version} onChange={onVersion} />
-    {selected && <div className="row lifecycle-states"><Chip tone={decisionOf(selected) === 'approved' ? 'green' : decisionOf(selected) === 'rejected' ? 'red' : 'grey'}>{decisionLabel(selected)}</Chip>
+    {selected && <div className="row lifecycle-states"><Chip tone={decisionOf(selected) === 'approved' ? 'green' : decisionOf(selected) === 'rejected' ? 'red' : 'grey'}>v{version} · {decisionLabel(selected, latestVersion === version)}</Chip>
       <Chip tone="blue">Champion {status?.aliases.champion === version ? `v${version}` : status?.aliases.champion ? `v${status.aliases.champion}` : '—'}</Chip>
       <Chip tone="amber">Serving {served ? `v${version}` : 'autre version / aucun'}</Chip></div>}
     <div className="lifecycle-form">
