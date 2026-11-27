@@ -221,10 +221,10 @@ function PartPanel({ live, onConfirm, onRelease, onRequalify }: { live: StationL
 
 /** Prise de poste : la photo du poste à la place de la pièce, avec son verdict. */
 function StartupPanel({ startup }: { startup: WorkstationStartup }) {
-  if (startup.phase === 'IDLE') {
+  if (startup.phase === 'IDLE' || startup.phase === 'OFF') {
     return (
       <>
-        <span className="label-caps" style={{ textAlign: 'center', fontSize: 18 }}>Vérification du poste</span>
+        <span className="label-caps" style={{ textAlign: 'center', fontSize: 18 }}>{startup.phase === 'OFF' ? 'Poste arrêté' : 'Vérification du poste'}</span>
         <div style={{ flex: 1, minHeight: 300, borderRadius: 18, border: '5px solid var(--op-bg)', background: 'var(--op-bg)' }} />
       </>
     );
@@ -249,11 +249,11 @@ function StartupPanel({ startup }: { startup: WorkstationStartup }) {
 /** Colonne de droite pendant la prise de poste : ce qui se passe et pourquoi. */
 function StartupCard({ startup }: { startup: WorkstationStartup }) {
   const validated = startup.phase === 'VALIDATED';
-  if (startup.phase === 'IDLE') {
+  if (startup.phase === 'IDLE' || startup.phase === 'OFF') {
     return (
       <div className="card-op col" style={{ gap: 14, padding: '22px 30px', flex: 1 }}>
         <span className="label-caps" style={{ fontSize: 18 }}>Prise de poste</span>
-        <div className="num" style={{ fontSize: 44, lineHeight: 1.05 }}>En attente de la prise de poste</div>
+        <div className="num" style={{ fontSize: 44, lineHeight: 1.05 }}>{startup.phase === 'OFF' ? "Pas d'activité sur ce poste" : 'En attente de la prise de poste'}</div>
       </div>
     );
   }

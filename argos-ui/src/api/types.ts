@@ -49,7 +49,7 @@ export interface PartResult {
  * la photo du poste à la place de la pièce.
  */
 export interface WorkstationStartup {
-  phase: 'IDLE' | 'CHECK' | 'VALIDATED' | 'RUNNING'; // IDLE = pas démarré ; RUNNING = activité en cours
+  phase: 'OFF' | 'IDLE' | 'CHECK' | 'VALIDATED' | 'RUNNING'; // OFF = pas d'activité ; IDLE = pas démarré ; RUNNING = activité en cours
   step: number; // photo n° step / steps
   steps: number;
   verdict: Verdict; // verdict de la photo affichée
@@ -105,7 +105,7 @@ export interface StationLive {
 /* Team leader : les postes de sa cellule                              */
 /* ------------------------------------------------------------------ */
 
-export type StationStatus = 'OK' | 'SECURITE' | 'QUALITE' | 'RYTHME' | 'CAMERA' | 'OBJET';
+export type StationStatus = 'OK' | 'SECURITE' | 'QUALITE' | 'RYTHME' | 'CAMERA' | 'OBJET' | 'ARRET'; // ARRET = pas d'activité
 
 /** Un poste de la cellule, vu par le team leader et par l'écran TV. */
 export interface StationSummary {

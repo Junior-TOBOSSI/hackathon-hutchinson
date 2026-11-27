@@ -1,21 +1,35 @@
 ﻿<#
-Démarre la démo HOVIS : serveur du scénario (port 8000) et interface argos-ui (port 5173),
+Démarre la démo HOVIS : un serveur PAR POSTE actif (ports 8001, 8002, ...), le serveur de
+la cellule C3 (port 8000, celui que l'interface appelle) et l'interface argos-ui (5173),
 chacun dans sa fenêtre, puis ouvre le navigateur.
 
-    .\demo\start.ps1              # avec l'analyse sécurité EPI (webcam), si ses poids sont là
-    .\demo\start.ps1 -NoSafety    # sans l'analyse webcam (démo centrée qualité)
+    .\demo\start.ps1                # 1 poste actif (C3·P06), les 5 autres sans activité
+    .\demo\start.ps1 -Stations 3    # 3 postes actifs : C3·P06, C3·P01, C3·P02
+    .\demo\start.ps1 -Stations 6 -NoSafety   # sans l'analyse webcam EPI
+
+Postes activés dans cet ordre : C3·P06, P01, P02, P03, P04, P05.
+- P06 et P01 : Machine cell variant, vérification du poste KO, KO, puis OK ;
+- P02 : Press cell (un AUTRE poste de travail), poste OK d'emblée ; P03 : Electrical bench,
+  P04 : Machine cell, P05 : Machine cell variant (autre photo), tous OK d'emblée.
+- La webcam EPI (sécurité) est analysée par le serveur de C3·P06.
+Dans la fenêtre de chaque poste, on voit chaque appel aux modèles :
+    POST /api/models/workstation/check   puis   POST /api/models/quality/classify
 
 Si PowerShell refuse le script : double-cliquer sur demo\start.bat, ou
-    powershell -ExecutionPolicy Bypass -File demo\start.ps1
+    powershell -ExecutionPolicy Bypass -File demo\start.ps1 -Stations 3
 
-Pour arrêter : fermer les deux fenêtres (ou Ctrl+C dans chacune).
-Si le port 8000 ou 5173 est déjà pris, le processus qui l'occupe est arrêté d'abord.
+Pour arrêter : fermer les fenêtres (ou Ctrl+C dans chacune).
+Si un port (8000 à 8006, 5173) est déjà pris, le processus qui l'occupe est arrêté d'abord.
 #>
-param([switch]$NoSafety)
+param(
+    [ValidateRange(1, 6)][int]$Stations = 1,
+    [switch]$NoSafety
+)
 
 $repo = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $repo ".venv\Scripts\python.exe"
 $ui = Join-Path $repo "argos-ui"
+$order = @("C3·P06", "C3·P01", "C3·P02", "C3·P03", "C3·P04", "C3·P05")
 
 if (-not (Test-Path $python)) {
     Write-Error "Environnement Python introuvable : $python (créer le venv et faire pip install -e .)"
@@ -23,7 +37,7 @@ if (-not (Test-Path $python)) {
 }
 # Ports déjà pris (ancienne démo restée ouverte, autre serveur) : on arrête le processus
 # qui les occupe, puis on les réutilise.
-foreach ($port in 8000, 5173) {
+foreach ($port in @(8000..8006) + 5173) {
     $owners = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
         Select-Object -ExpandProperty OwningProcess -Unique
     foreach ($id in $owners) {
@@ -42,15 +56,24 @@ foreach ($port in 8000, 5173) {
     }
 }
 
-$safety = if ($NoSafety) { "0" } else { "1" }
+# 1. Un serveur par poste actif (chacun charge ses modèles : environ 20 s)
+for ($k = 0; $k -lt $Stations; $k++) {
+    $station = $order[$k]
+    $port = 8001 + $k
+    $safety = if ($k -eq 0 -and -not $NoSafety) { "1" } else { "0" }  # la webcam = C3·P06
+    Start-Process powershell -WorkingDirectory $repo -ArgumentList @(
+        "-NoExit", "-Command",
+        "`$Host.UI.RawUI.WindowTitle = 'HOVIS - poste $station ($port)'; `$env:STATION_ID = '$station'; `$env:PROFILE = '$k'; `$env:PORT = '$port'; `$env:SAFETY = '$safety'; & '$python' -m uvicorn demo.station_server:app --port $port --host 127.0.0.1"
+    )
+}
 
-# 1. Serveur du scénario (charge les modèles : environ 20 s avant d'être prêt)
+# 2. Serveur de la cellule C3 (port 8000) : relaie vers les postes, vue team leader
 Start-Process powershell -WorkingDirectory $repo -ArgumentList @(
     "-NoExit", "-Command",
-    "`$Host.UI.RawUI.WindowTitle = 'HOVIS - serveur scenario (8000)'; `$env:SAFETY = '$safety'; & '$python' -m uvicorn demo.scenario:app --port 8000 --host 127.0.0.1"
+    "`$Host.UI.RawUI.WindowTitle = 'HOVIS - cellule C3 (8000)'; `$env:ACTIVE_STATIONS = '$Stations'; & '$python' -m uvicorn demo.cell_server:app --port 8000 --host 127.0.0.1"
 )
 
-# 2. Interface argos-ui en mode live (installe les dépendances la première fois)
+# 3. Interface argos-ui en mode live (installe les dépendances la première fois)
 if (-not (Test-Path (Join-Path $ui "node_modules"))) {
     Push-Location $ui
     npm install --no-audit --no-fund
@@ -61,7 +84,8 @@ Start-Process powershell -WorkingDirectory $ui -ArgumentList @(
     "`$Host.UI.RawUI.WindowTitle = 'HOVIS - interface (5173)'; `$env:VITE_USE_MOCK = 'false'; npx vite --port 5173 --host 127.0.0.1"
 )
 
-Write-Host "Démarrage... le navigateur s'ouvre dans quelques secondes."
+Write-Host "Postes actifs : $($order[0..($Stations - 1)] -join ', ') ; les autres : pas d'activité."
+Write-Host "Démarrage... le navigateur s'ouvre dans quelques secondes (modèles prêts en ~20 s)."
 Write-Host "Connexion : n'importe quel identifiant = opérateur ; c.diaz@hutchinson.com = superviseur."
 Write-Host "Clic sur le logo HOVIS = lancer / relancer la simulation ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant."
 Start-Sleep -Seconds 8

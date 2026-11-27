@@ -25,6 +25,7 @@ export const CATEGORIES: (Category & { key: AlertCategory })[] = [
 const STATUS: Record<StationStatus, [string, string]> = {
   OK: ['Conforme', 'pill-green'], SECURITE: ['Sécurité', 'pill-solid-red'], QUALITE: ['Qualité', 'pill-solid-red'],
   RYTHME: ['Rythme', 'pill-amber'], CAMERA: ['Caméra hors ligne', 'pill-amber'], OBJET: ['Objet étranger', 'pill-amber'],
+  ARRET: ["Pas d'activité", 'pill-grey'],
 };
 
 /** Adresse de l'écran d'un poste. En démo, il s'ouvre sur le scénario qui correspond à l'état du poste. */
@@ -116,18 +117,18 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
 
 /** Pastille d'état : couleur + libellé (jamais la couleur seule). */
 const DOT: Record<StationStatus, string> = {
-  OK: 'var(--green)', SECURITE: 'var(--red)', QUALITE: 'var(--red)', RYTHME: 'var(--amber)', CAMERA: 'var(--amber)', OBJET: 'var(--amber)',
+  OK: 'var(--green)', SECURITE: 'var(--red)', QUALITE: 'var(--red)', RYTHME: 'var(--amber)', CAMERA: 'var(--amber)', OBJET: 'var(--amber)', ARRET: '#9aa3ad',
 };
 
 /** Fond très léger de la carte, selon l'état du poste (la pastille et le libellé restent l'info principale). */
 const TINT: Record<StationStatus, string> = {
-  OK: '#d5eedf', SECURITE: '#f8d3da', QUALITE: '#f8d3da', RYTHME: '#fbe3c0', CAMERA: '#fbe3c0', OBJET: '#fbe3c0',
+  OK: '#d5eedf', SECURITE: '#f8d3da', QUALITE: '#f8d3da', RYTHME: '#fbe3c0', CAMERA: '#fbe3c0', OBJET: '#fbe3c0', ARRET: '#eceef1',
 };
 /** Réglage système « réduire les animations » : la carte en alerte reste alors fixe. */
 const REDUCED_MOTION = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 /** Contour de la carte : la même couleur que le fond, un ton plus soutenu. */
 const EDGE: Record<StationStatus, string> = {
-  OK: '#9fd6b6', SECURITE: '#eb99a7', QUALITE: '#eb99a7', RYTHME: '#efbf78', CAMERA: '#efbf78', OBJET: '#efbf78',
+  OK: '#9fd6b6', SECURITE: '#eb99a7', QUALITE: '#eb99a7', RYTHME: '#efbf78', CAMERA: '#efbf78', OBJET: '#efbf78', ARRET: '#cfd4da',
 };
 
 /**
