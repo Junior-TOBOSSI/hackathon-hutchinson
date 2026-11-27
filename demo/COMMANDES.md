@@ -15,6 +15,7 @@ Détails : [README.md](README.md).
 | tous les serveurs **dans mon terminal** (pas de fenêtres ; Ctrl+C arrête tout) | `.\demo\start.ps1 -Stations 2 -Mode auto -Here` |
 | choisir le **poste de travail** vérifié par chaque poste | `.\demo\start.ps1 -Stations 2 -Workstations press_cell:nok,electrical_bench` |
 | des **vidéos** à la place de la webcam (une par poste ; petit bouton caméra sur l'écran opérateur, lecture unique) | `.\demo\start.ps1 -Stations 2 -Videos video1,video2` : vidéos rangées dans `data\raw\safety\videos`, ou un chemin vers le fichier |
+| régler la **vitesse de lecture** des vidéos (0.1 à 4 ; 0.5 = deux fois plus lent) | `.\demo\start.ps1 -Stations 2 -Videos video3 -VideoSpeed 0.5` |
 | sans l'analyse webcam EPI (sécurité) | `.\demo\start.ps1 -NoSafety` |
 | sans le serveur AI leader (Databricks) | `.\demo\start.ps1 -NoAiLeader` |
 | si PowerShell refuse le script | `powershell -ExecutionPolicy Bypass -File demo\start.ps1 -Stations 2 -Mode auto` |

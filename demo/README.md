@@ -116,6 +116,7 @@ equirements-lock.txt
 | `VALIDATED_HOLD` | 3 | secondes d'affichage de « Poste validé » |
 | `QUALITY_MODE` | `manual` | `manual` : une pièce NOK attend l'opérateur ; `auto` : la ligne continue (fixé par `-Mode`) |
 | `CELL_URL` | `http://127.0.0.1:8000` | serveur de cellule qui décide des KO (sans lui : même règle, pour le poste seul) |
+| `VIDEO` · `VIDEO_SPEED` | — · 1 | vidéo à la place de la webcam ; vitesse de lecture (0.1 à 4), fixés par `-Videos` et `-VideoSpeed` |
 | `SAFETY` | 0 | 1 = analyse webcam EPI (le script la met sur C3·P06) |
 
 Serveur de cellule : `ACTIVE_STATIONS` (1 à 6), `FIRST_STATION_PORT` (8001), `KO_MAX` (2) KO au plus sur `KO_WINDOW` (200) pièces, `FIRST_KO_AT` (4) : la pièce du premier KO.

@@ -95,6 +95,8 @@ CHECK_PERIOD = float(os.environ.get("CHECK_PERIOD", "2.5"))
 QUALITY_PERIOD = float(os.environ.get("QUALITY_PERIOD", "3"))
 VALIDATED_HOLD = float(os.environ.get("VALIDATED_HOLD", "3"))
 VIDEO = os.environ.get("VIDEO", "")  # a video file instead of the webcam (Safety)
+# Playback speed of that video: 1 = real time, 0.5 = twice slower, 2 = twice faster
+VIDEO_SPEED = min(4.0, max(0.1, float(os.environ.get("VIDEO_SPEED", "1") or 1)))
 CELL_URL = os.environ.get("CELL_URL", "http://127.0.0.1:8000")  # decides the KO parts
 # manual: a NOK part stops the line until the operator answers; auto: it does not.
 QUALITY_MODE = "auto" if os.environ.get("QUALITY_MODE", "manual").lower() == "auto" else "manual"
@@ -442,7 +444,7 @@ def video_reader(cap) -> None:
     read as fast as possible). At the end the camera goes quiet and its issues are cleared:
     with no infraction left, the camera image closes on the operator screen."""
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-    period = 1.0 / (fps if 1 <= fps <= 120 else 25.0)
+    period = 1.0 / ((fps if 1 <= fps <= 120 else 25.0) * VIDEO_SPEED)
     if not cap.isOpened():
         log.error("safety: cannot open the video %s", epi.CAMERA)
         return
@@ -451,7 +453,7 @@ def video_reader(cap) -> None:
         video_play.clear()
         cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
         video_state["playing"] = True
-        log.info("safety: video started")
+        log.info("safety: video started (speed x%s)", VIDEO_SPEED)
         next_at = time.monotonic()
         while not video_play.is_set():  # pressed again: restart from the beginning
             ok, frame = cap.read()

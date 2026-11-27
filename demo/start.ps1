@@ -35,6 +35,9 @@ NOK puis OK), sinon OK d'emblée. Les postes non cités gardent leur poste de tr
 (C3·P06, P01, ...), séparés par des virgules ; un vide = pas de vidéo pour ce poste. Chaque
 poste qui a une vidéo a sa propre analyse EPI (visages floutés), la vidéo joue une fois avec le bouton « LANCER LA VIDÉO ».
 Sans vidéo, C3·P06 garde la webcam (sauf -NoSafety).
+-VideoSpeed : vitesse de lecture des vidéos, de 0.1 à 4 (1 = normale, 0.5 = deux fois plus
+lent, 2 = deux fois plus rapide). Plus lent, le modèle EPI analyse plus d'images du geste.
+    .\demo\start.ps1 -Stations 2 -Videos video3 -VideoSpeed 0.5
     .\demo\start.ps1 -Stations 2 -Videos video1,video2      # data\raw\safety\videos\video1.mp4...
     .\demo\start.ps1 -Stations 2 -Videos D:\films\casque.mp4  # ou un chemin
 
@@ -52,7 +55,8 @@ param(
     [switch]$NoAiLeader,
     [switch]$Here,
     [string[]]$Workstations = @(),
-    [string[]]$Videos = @()
+    [string[]]$Videos = @(),
+    [ValidateRange(0.1, 4.0)][double]$VideoSpeed = 1.0
 )
 
 $repo = Split-Path -Parent $PSScriptRoot
@@ -151,6 +155,7 @@ for ($k = 0; $k -lt $Stations; $k++) {
         QUALITY_MODE = $qualityMode; PYTHONIOENCODING = "utf-8"
         WORKSTATION = $(if ($k -lt $Workstations.Count) { $Workstations[$k] } else { "" })
         VIDEO = $video
+        VIDEO_SPEED = $VideoSpeed.ToString([Globalization.CultureInfo]::InvariantCulture)
     } $python @("-m", "uvicorn", "demo.station_server:app", "--port", "$port", "--host", "127.0.0.1")
 }
 

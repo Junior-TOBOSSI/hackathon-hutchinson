@@ -7,6 +7,7 @@
 #   SAFETY=0 ./demo/start.sh 3    # sans l'analyse webcam EPI (faite par C3·P06)
 #   ./demo/start.sh 3 auto        # mode NOK auto : la ligne continue (défaut : manuel)
 #   ./demo/start.sh 2 manuel press_cell:nok,electrical_bench   # poste de travail de chaque poste
+#   VIDEO_SPEED=0.5 ./demo/start.sh 2 auto   # vitesse de lecture des vidéos (VIDEO=... par poste)
 #
 # Tous les serveurs tournent dans ce terminal (logs mêlés, préfixés par le poste) ;
 # Ctrl+C arrête tout. Si un port (8000 à 8006, 5173) est pris, son processus est arrêté.
@@ -44,7 +45,7 @@ trap 'kill "${PIDS[@]}" 2>/dev/null' EXIT
 for ((k = 0; k < STATIONS; k++)); do
   safety=0
   if [ "$k" -eq 0 ]; then safety="${SAFETY:-1}"; fi   # la webcam = C3·P06
-  STATION_ID="${ORDER[$k]}" PROFILE="$k" PORT="$((8001 + k))" SAFETY="$safety" QUALITY_MODE="$QUALITY_MODE" WORKSTATION="${WORKSTATIONS[$k]:-}" \
+  STATION_ID="${ORDER[$k]}" PROFILE="$k" PORT="$((8001 + k))" SAFETY="$safety" QUALITY_MODE="$QUALITY_MODE" WORKSTATION="${WORKSTATIONS[$k]:-}" VIDEO_SPEED="${VIDEO_SPEED:-1}" \
     "$PYTHON" -m uvicorn demo.station_server:app --port "$((8001 + k))" --host 127.0.0.1 &
   PIDS+=($!)
 done
