@@ -20,7 +20,8 @@ Rules:
   the screen shows one ongoing problem, not a new one at every frame.
 - a problem ends only after ``hold_s`` seconds (5 s) without being seen: a detection that
   flickers (gloves seen, missed, seen) stays ONE episode and does not blink on screen, so the
-  team leader is not spammed. Cost: the issue stays ~5 s after the operator fixed it.
+  team leader is not spammed. But a PPE clearly seen WORN on 2 of the last 3 frames ends its
+  alert at once: the hold is for doubt, not for a problem that is fixed.
 - shoes: ``PersonPPE`` (contract) has no ``shoes`` field yet, so pass the analyzer's
   ``last_states`` (``person_states``), which has them: shoes then raise issues like the
   other PPE. Only the Core storage still waits for the contract change;
@@ -99,12 +100,16 @@ class StationIssueTracker:
         self._last_seen: dict[str, datetime] = {}
         self._problem: dict[str, tuple[str, str, str]] = {}  # key -> (category, label, instr.)
         self._idle_phone = deque(maxlen=3)  # phone lying on the station, last 3 frames
+        # PPE clearly worn by everyone in view, per item, last 3 frames (ends an alert at once).
+        self._worn: dict[str, deque] = {item: deque(maxlen=3) for item in required}
 
     def clear(self) -> None:
         """Forget every ongoing problem at once (e.g. camera covered: nobody can be seen)."""
         self._since.clear()
         self._last_seen.clear()
         self._idle_phone.clear()
+        for frames in self._worn.values():
+            frames.clear()
 
     def update(
         self,
@@ -121,6 +126,14 @@ class StationIssueTracker:
         now = now or datetime.now(UTC)
         stamp = now.isoformat()
         problems = current_problems(result, self.low, self.required, person_states)
+        states = person_states
+        if states is None and result.details.kind == "safety":
+            states = [
+                {i: getattr(p, i, None) for i in self.required} for p in result.details.persons
+            ]
+        for item in self.required:
+            seen = bool(states) and all(st.get(item) == PPEState.PRESENT for st in states)
+            self._worn[item].append(seen)
         self._idle_phone.append(idle_phone)
         in_use = any(key == "phone" for key, *_ in problems)
         if sum(self._idle_phone) >= 2 and not in_use:  # 2 of the last 3 frames
@@ -131,6 +144,9 @@ class StationIssueTracker:
             self._last_seen.pop("phone_on_station", None)
         # A problem not seen for hold_s seconds is over: if it comes back, new episode.
         held = {k for k, t in self._last_seen.items() if (now - t).total_seconds() <= self.hold_s}
+        # The hold covers doubt (PPE not visible, detection flickering). An EPI clearly seen worn
+        # on 2 of the last 3 frames is no doubt: its alert ends at once, not 5 s later.
+        held -= {k for k in held if k in self._worn and sum(self._worn[k]) >= 2}
         self._last_seen = {k: t for k, t in self._last_seen.items() if k in held}
         self._since = {k: v for k, v in self._since.items() if k in held}
         issues = []
