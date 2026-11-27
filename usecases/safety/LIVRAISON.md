@@ -80,6 +80,8 @@ Règles appliquées : rien n'est affiché si l'image est « conforme » (score l
 
 **Délai d'affichage** : l'analyse prend ~0,1 s par image et le lissage ~0,5 s (à 4 images/s). Le délai visible vient surtout du rafraîchissement d'argos-ui : `Operateur.tsx` interroge le serveur toutes les **2 s**. Proposition : garder 2 s pour la production, mais **pousser** les problèmes Safety (WebSocket ou SSE), ou à défaut rafraîchir toutes les 0,5 s (~62 Ko/s par écran, mesuré). Testé en démo locale à 0,5 s : détection inchangée, alerte affichée en moins de 1,2 s.
 
+**Image affichée (si HOVIS montre la caméra)** : pixelliser les visages **avant** tout encodage, avec `analyzer.last_privacy` (visages, têtes, personnes dès 0,10 de confiance) et non `last_detections` (0,25, réservé aux règles). Aucune image ne doit être enregistrée.
+
 ## 5. Logique de décision (résumé)
 
 - Un EPI est `absent` seulement si la partie du corps protégée est visible sans lui (main nue, tête, visage, corps entier sans chaussures). Sinon `uncertain`.
