@@ -542,7 +542,7 @@ index 89edae1..09c58d6 100644
        </main>
      </div>
 diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
-index 1642809..ec95c83 100644
+index 1642809..c003e5d 100644
 --- a/argos-ui/src/pages/TeamLeader.tsx
 +++ b/argos-ui/src/pages/TeamLeader.tsx
 @@ -88,7 +88,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
@@ -572,7 +572,7 @@ index 1642809..ec95c83 100644
 -const PAGE_SIZE = 6;
 +/** Fond très léger de la carte, selon l'état du poste (la pastille et le libellé restent l'info principale). */
 +const TINT: Record<StationStatus, string> = {
-+  OK: '#f3faf6', SECURITE: '#fdf2f4', QUALITE: '#fdf2f4', RYTHME: '#fef8ee', CAMERA: '#fef8ee', OBJET: '#fef8ee',
++  OK: '#e6f5ec', SECURITE: '#fbe4e8', QUALITE: '#fbe4e8', RYTHME: '#fdf0dc', CAMERA: '#fdf0dc', OBJET: '#fdf0dc',
 +};
  
  /**
