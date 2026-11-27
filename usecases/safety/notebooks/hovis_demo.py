@@ -348,7 +348,7 @@ def cell_overview(cell_id: str) -> dict:
                "ko": 0 if h["good"] is None else 3 * n // 2} for h in prod["hourly"]]  # fmt: skip
     return {
         "uap": {"id": "UAP2", "name": "UAP 2 · Injection"},
-        "cell": {"id": cell_id, "name": "Cellule 3 · P06 réel, autres postes simulés"},
+        "cell": {"id": cell_id, "name": "Cellule 3"},  # P06 real, the 11 others simulated
         "date": f"{DAYS[local.weekday()]} {local.day} {MONTHS[local.month - 1]}",
         "currentShift": shift, "stations": stations, "hourly": hourly,
     }  # fmt: skip
