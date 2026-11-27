@@ -12,6 +12,7 @@ never followed by a second run.
 
 from __future__ import annotations
 
+import contextvars
 import csv
 import io
 import json
@@ -44,6 +45,16 @@ from mlops.training.specs import PipelineSpec, PipelineView, load_specs, view
 
 Status = Literal["queued", "running", "succeeded", "failed", "cancelled", "unknown"]
 HOME = Path(os.environ.get("ARGOS_MLOPS_HOME", Path.home() / "ARGOS_MLOPS_LOCAL"))
+
+
+def _parallel(fn, items, workers: int = 4) -> list[Any]:
+    """Bounded parallel map keeping the request context (fresh flag, time budget)."""
+    items = list(items)
+    if len(items) < 2:
+        return [fn(i) for i in items]
+    with ThreadPoolExecutor(max_workers=min(workers, len(items))) as pool:
+        futures = [pool.submit(contextvars.copy_context().run, fn, i) for i in items]
+        return [f.result() for f in futures]
 
 
 def remote_enabled() -> bool:
@@ -509,13 +520,30 @@ class TrainingService:
         # A run is linked by the databricks.job_run_id tag, or by the request id written at
         # launch (both exact; never by dates or names).
         rows = []
-        for spec in self.specs:
-            job = jobs.get(spec.job.get("name"))
-            if job is None:
-                continue
-            mlruns = self._mlflow_runs(spec)
-            versions = self._versions(spec)
-            for jr in self.c.job_runs(job.job_id, 25):  # Databricks API maximum
+        present = [
+            (spec, jobs[spec.job.get("name")])
+            for spec in self.specs
+            if spec.job.get("name") in jobs
+        ]
+        # INT-GLOBAL-01: independent remote reads in parallel (bounded), not one after the other.
+        tasks = [
+            (kind, spec, job) for spec, job in present for kind in ("runs", "versions", "jobruns")
+        ]
+        results = _parallel(
+            lambda t: (
+                self._mlflow_runs(t[1])
+                if t[0] == "runs"
+                else self._versions(t[1])
+                if t[0] == "versions"
+                else self.c.job_runs(t[2].job_id, 25)
+            ),  # Databricks API maximum
+            tasks,
+        )
+        fetched = {(t[0], t[1].id): r for t, r in zip(tasks, results, strict=True)}
+        for spec, _job in present:
+            mlruns = fetched[("runs", spec.id)]
+            versions = fetched[("versions", spec.id)]
+            for jr in fetched[("jobruns", spec.id)]:
                 request_id = launches.get(jr.run_id, {}).get("request_id")
                 linked = [
                     r
@@ -555,11 +583,19 @@ class TrainingService:
         return rows
 
     def kpis(self) -> Kpis:
-        rows = self.trainings()
+        parts = _parallel(
+            lambda k: (
+                self.trainings()
+                if k == "rows"
+                else self.pipelines()
+                if k == "views"
+                else [v for s in self.specs for v in self._version_states(s)]
+            ),
+            ["rows", "views", "states"],
+        )
+        rows, views, states = parts
         since = (datetime.now(UTC) - timedelta(days=30)).isoformat()
         recent = [r for r in rows if (r.started_at or "") >= since]
-        views = self.pipelines()
-        states = [v for s in self.specs for v in self._version_states(s)]
         candidates = sum(1 for v in states if not v["approved"] and not v["aliases"])
         last = rows[0] if rows else None
         return Kpis(
