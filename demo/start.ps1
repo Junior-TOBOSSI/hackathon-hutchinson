@@ -9,6 +9,7 @@ Si PowerShell refuse le script : double-cliquer sur demo\start.bat, ou
     powershell -ExecutionPolicy Bypass -File demo\start.ps1
 
 Pour arrêter : fermer les deux fenêtres (ou Ctrl+C dans chacune).
+Si le port 8000 ou 5173 est déjà pris, le processus qui l'occupe est arrêté d'abord.
 #>
 param([switch]$NoSafety)
 
@@ -20,9 +21,23 @@ if (-not (Test-Path $python)) {
     Write-Error "Environnement Python introuvable : $python (créer le venv et faire pip install -e .)"
     exit 1
 }
+# Ports déjà pris (ancienne démo restée ouverte, autre serveur) : on arrête le processus
+# qui les occupe, puis on les réutilise.
 foreach ($port in 8000, 5173) {
+    $owners = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique
+    foreach ($id in $owners) {
+        $proc = Get-Process -Id $id -ErrorAction SilentlyContinue
+        if ($proc) {
+            Write-Host "Port $port occupé par $($proc.ProcessName) (PID $id) : arrêt."
+            Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+        }
+    }
+    for ($i = 0; $i -lt 20 -and (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue); $i++) {
+        Start-Sleep -Milliseconds 250
+    }
     if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) {
-        Write-Error "Le port $port est déjà utilisé : un serveur tourne déjà ? Fermez-le d'abord."
+        Write-Error "Impossible de libérer le port $port (droits administrateur nécessaires ?)."
         exit 1
     }
 }
