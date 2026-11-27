@@ -22,7 +22,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import platform
 import subprocess
 import sys
@@ -30,7 +29,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-HERE = Path(__file__).resolve().parent
+# The Databricks launcher exec()s this file: no __file__ there, but sys.argv[0] is the script.
+HERE = Path(globals().get("__file__") or sys.argv[0]).resolve().parent
 KIT = HERE / "kit"
 HP_KEYS = [
     "modele_base",
@@ -184,28 +184,72 @@ def disable_ultralytics_mlflow() -> None:
 # --------------------------------------------------------------------------- orchestration
 
 
+def ensure_opencv(runner, log) -> None:
+    """Ultralytics needs OpenCV; on headless serverless images the GUI build may miss libGL.
+    Environment fix only (the group's code is untouched): switch to the headless build."""
+    try:
+        import cv2  # noqa: F401
+    except ImportError as exc:
+        log(f"OpenCV import failed ({exc}): installing opencv-python-headless")
+        runner([sys.executable, "-m", "pip", "uninstall", "-y", "opencv-python"], check=False)
+        runner(
+            [sys.executable, "-m", "pip", "install", "--quiet", "opencv-python-headless"],
+            check=True,
+        )
+
+
+def verify_onnx(model_dir: Path) -> bool:
+    """True only if modele.onnx exists, is non-empty and passes onnx.checker."""
+    path = model_dir / "modele.onnx"
+    if not path.is_file() or path.stat().st_size == 0:
+        return False
+    import onnx
+
+    onnx.checker.check_model(str(path))
+    return True
+
+
 def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) -> dict[str, Any]:
+    import shutil
+
     import yaml
 
     from mlops.training.materialize import materialize
 
     if mlflow is None:
         import mlflow  # noqa: PLC0415
+    if request.get("registry_uri"):
+        mlflow.set_registry_uri(request["registry_uri"])
     client = mlflow.MlflowClient()
-    rid, out_root = request["request_id"], Path(request["output_dir"])
+    rid, published = request["request_id"], Path(request["output_dir"])
     python, device = sys.executable, "cpu"
+    tags_candidate = {
+        "hovis_candidate": "true",
+        "argos_dataset_version": request["dataset_version"],
+        "argos_dataset_id": request["dataset_id"],
+        "hovis_request_id": rid,
+    }
     mlflow.set_experiment(request["experiment"])
     existing = client.search_runs(
         [mlflow.get_experiment_by_name(request["experiment"]).experiment_id],
         filter_string=f"tags.`hovis.request_id` = '{rid}'",
     )
-    if existing and (out_root / "test" / "metriques.json").is_file():
-        # Resume: training already done for this request -> only (re)register the candidate.
+    if existing and (published / "test" / "metriques.json").is_file():
+        # Resume: training already done for this request -> registration only (idempotent).
         run_id = existing[0].info.run_id
-        log(f"request {rid} already trained (run {run_id}): registration only")
-        return {"run_id": run_id, "resumed": True}
+        version = register_candidate(
+            client,
+            mlflow,
+            request["registered_model"],
+            run_id,
+            f"runs:/{run_id}/model",
+            tags_candidate,
+        )
+        log(f"request {rid} already trained (run {run_id}): candidate v{version.version}")
+        return {"run_id": run_id, "model_version": str(version.version), "resumed": True}
 
     work = Path(request.get("work_dir") or f"/tmp/hovis/{rid}")
+    out_root = work / "outputs"  # local; copied to the Volume at the end
     data_dir = work / "dataset"
     manifest = json.loads(Path(request["manifest_path"]).read_text(encoding="utf-8"))
     t0 = time.time()
@@ -220,9 +264,12 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
     )
     log(f"materialised: {counts}")
     hp = hyperparameters(request["parameters"])
+    if request.get("base_weights"):  # public pre-trained weights stored in the Volume
+        shutil.copy2(request["base_weights"], work / hp["modele_base"])
     hp_file = work / "hyperparametres.yaml"
     hp_file.write_text(yaml.safe_dump(hp, sort_keys=False), encoding="utf-8")
     model_dir = out_root / "modele"
+    ensure_opencv(runner, log)
     disable_ultralytics_mlflow()
     tags = {
         "hovis.request_id": rid,
@@ -240,16 +287,15 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
         tags[f"hovis.split_fingerprint.{split}"] = fp
     with mlflow.start_run(run_name=f"{request['pipeline_id']}-{rid[:8]}", tags=tags) as active:
         mlflow.log_params({**hp, "device": device, "fusionner_test": False})
-        steps = [("train", train_command(python, data_dir, model_dir, rid[:12], hp_file, device))]
-        for name, cmd in steps:
-            log(f"step {name}: {' '.join(cmd)}")
-            runner(cmd, check=True, cwd=str(KIT))
+        cmd = train_command(python, data_dir, model_dir, rid[:12], hp_file, device)
+        log(f"step train: {' '.join(cmd)}")
+        runner(cmd, check=True, cwd=str(work))
         cfg_path = model_dir / "config_qualite702.yaml"
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
         runner(
             evaluate_command(python, cfg_path, data_dir / "test", out_root / "test", device),
             check=True,
-            cwd=str(KIT),
+            cwd=str(work),
         )
         history = read_results(model_dir / "entrainement" / "results.csv")
         for row in history:
@@ -270,18 +316,19 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
             {f"versions.{k}": str(v) for k, v in (cfg.get("versions") or {}).items()}
             | {"python": platform.python_version()}
         )
-        onnx_ok = False
+        onnx_ok, onnx_error = False, ""
         try:
-            import onnx  # noqa: F401
-            import onnxruntime  # noqa: F401
-
-            runner(export_command(python, cfg_path, data_dir / "val"), check=True, cwd=str(KIT))
-            onnx_ok = (model_dir / "modele.onnx").is_file()
-        except Exception as exc:  # noqa: BLE001 - optional step, reported
-            log(f"ONNX export skipped: {type(exc).__name__}")
-        mlflow.set_tag("hovis.onnx_exported", str(onnx_ok).lower())
+            runner(export_command(python, cfg_path, data_dir / "val"), check=True, cwd=str(work))
+            onnx_ok = verify_onnx(model_dir)
+        except Exception as exc:  # noqa: BLE001 - optional step, reported as such
+            onnx_error = f"{type(exc).__name__}: {str(exc)[:200]}"
+            log(f"ONNX export failed: {onnx_error}")
+        mlflow.set_tags(
+            {"hovis.onnx_exported": str(onnx_ok).lower(), "hovis.onnx_error": onnx_error}
+        )
         for f in [
             "config_qualite702.yaml",
+            "config_qualite702_onnx.yaml",
             "rapport_entrainement.md",
             "entrainement/results.csv",
             "rapport_export.md",
@@ -299,37 +346,36 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
 
         info = log_quality_model(mlflow, model_dir, KIT)
         run_id = active.info.run_id
+    shutil.copytree(out_root, published, dirs_exist_ok=True)  # kept for a registration retry
     version = register_candidate(
-        client,
-        mlflow,
-        request["registered_model"],
-        run_id,
-        info.model_uri,
-        {
-            "hovis_candidate": "true",
-            "argos_dataset_version": request["dataset_version"],
-            "argos_dataset_id": request["dataset_id"],
-            "hovis_request_id": rid,
-        },
+        client, mlflow, request["registered_model"], run_id, info.model_uri, tags_candidate
     )
     log(
         f"candidate registered: {request['registered_model']} v{version.version}"
         " (no alias, no approval)"
     )
-    return {"run_id": run_id, "model_version": str(version.version), "resumed": False}
+    return {
+        "run_id": run_id,
+        "model_version": str(version.version),
+        "onnx": onnx_ok,
+        "resumed": False,
+    }
 
 
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--request", required=True)
     p.add_argument("--code-root", default=str(HERE.parents[2]))
+    p.add_argument("--job-id", default="")
+    p.add_argument("--job-run-id", default="")
     a = p.parse_args()
     sys.path.insert(0, a.code_root)
     request = json.loads(Path(a.request).read_text(encoding="utf-8"))
-    request.setdefault("job_run_id", os.environ.get("DATABRICKS_JOB_RUN_ID", ""))
-    print(json.dumps(run(request)))
+    for key, value in (("job_id", a.job_id), ("job_run_id", a.job_run_id)):
+        request[key] = "" if "{{" in value else value  # unresolved reference -> empty
+    print("HOVIS_RESULT=" + json.dumps(run(request)))
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

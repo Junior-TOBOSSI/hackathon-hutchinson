@@ -89,7 +89,8 @@ class Kpis(BaseModel):
     failed: int
     pipelines_total: int
     pipelines_executable: int
-    candidates: int
+    candidates: int  # versions waiting for a human decision (no approval, no alias)
+    versions_produced: int = 0  # every version registered by the training pipelines
     last_training_at: str | None
     last_training_label: str | None
     unavailable: list[str] = Field(default_factory=list)
@@ -335,13 +336,14 @@ class TrainingService:
             args = json.loads(task.notebook_task.base_parameters["args"])
             flag = spec.job["dataset_argument"]
             args[args.index(flag) + 1] = f"{root}/{record.dataset_version}"
+            args += ["--request-id", record.request_id]  # exact link even if ids stay unresolved
             return {
                 "notebook_params": {**task.notebook_task.base_parameters, "args": json.dumps(args)}
             }
         sha, _ = self.resolver.manifest(record.dataset_id, record.dataset_version)
         scope = store.scope_id(record.dataset_id)
         dataset_dir = f"{store._managed(scope).dataset_root}/{record.dataset_version}"
-        base = f"{store.catalog_root.rsplit('/', 1)[0]}/runs/hovis/{record.request_id}"
+        base = f"{spec.job['runs_root']}/{record.request_id}"  # reserved runs/ folder
         summary = self.resolver.summary(record.dataset_id, record.dataset_version)
         request = {
             "request_id": record.request_id,
@@ -357,9 +359,22 @@ class TrainingService:
             "code_commit": spec.code.get("commit", ""),
             "output_dir": f"{base}/outputs",
             "split_fingerprints": summary.split_fingerprints if summary else {},
+            "registry_uri": "databricks-uc",
+            "base_weights": spec.job.get("base_weights"),
         }
         store._upload(f"{base}/request.json", json.dumps(request, indent=2).encode())
-        return {"job_parameters": {"request": f"{base}/request.json"}}
+        code_root = spec.job["code_root"]
+        args = [
+            "--request",
+            f"{base}/request.json",
+            "--code-root",
+            code_root,
+            "--job-id",
+            "{{job.id}}",
+            "--job-run-id",
+            "{{job.run_id}}",
+        ]
+        return {"notebook_params": {"script": spec.job["script"], "args": json.dumps(args)}}
 
     def cancel(self, job_run_id: int) -> None:
         if not remote_enabled():
@@ -391,12 +406,37 @@ class TrainingService:
         except DatabricksConnectorError:
             return []
 
+    def _version_states(self, spec: PipelineSpec) -> list[dict[str, Any]]:
+        """Approval tag and aliases of each version (UC search results carry no tags)."""
+        name = spec.mlflow["registered_model"]
+
+        def load() -> list[dict[str, Any]]:
+            try:
+                aliases = dict(self.c.mlflow.get_registered_model(name).aliases or {})
+            except Exception:  # noqa: BLE001 - model not created yet
+                return []
+            out = []
+            for v in self._versions(spec):
+                full = self.c.mlflow.get_model_version(name, str(v.version))
+                out.append(
+                    {
+                        "version": str(v.version),
+                        "approved": (full.tags or {}).get("argos_approval") == "approved",
+                        "aliases": [a for a, ver in aliases.items() if str(ver) == str(v.version)],
+                    }
+                )
+            return out
+
+        return self.c._cached(f"training:vstates:{spec.id}", load)
+
     def trainings(self) -> list[TrainingRow]:
         return self.c._cached("training:rows", self._trainings)
 
     def _trainings(self) -> list[TrainingRow]:
         jobs = self._jobs()
         launches = {r["job_run_id"]: r for r in self.launches.all().values() if r.get("job_run_id")}
+        # A run is linked by the databricks.job_run_id tag, or by the request id written at
+        # launch (both exact; never by dates or names).
         rows = []
         for spec in self.specs:
             job = jobs.get(spec.job.get("name"))
@@ -405,10 +445,12 @@ class TrainingService:
             mlruns = self._mlflow_runs(spec)
             versions = self._versions(spec)
             for jr in self.c.job_runs(job.job_id, 25):  # Databricks API maximum
+                request_id = launches.get(jr.run_id, {}).get("request_id")
                 linked = [
                     r
                     for r in mlruns
                     if (r.data.tags or {}).get("databricks.job_run_id") == str(jr.run_id)
+                    or (request_id and (r.data.tags or {}).get("hovis.request_id") == request_id)
                 ]
                 run_ids = [r.info.run_id for r in linked]
                 params = linked[0].data.params if linked else {}
@@ -446,7 +488,8 @@ class TrainingService:
         since = (datetime.now(UTC) - timedelta(days=30)).isoformat()
         recent = [r for r in rows if (r.started_at or "") >= since]
         views = self.pipelines()
-        candidates = sum(len(self._versions(s)) for s in self.specs)
+        states = [v for s in self.specs for v in self._version_states(s)]
+        candidates = sum(1 for v in states if not v["approved"] and not v["aliases"])
         last = rows[0] if rows else None
         return Kpis(
             trainings_30d=len(recent),
@@ -456,6 +499,7 @@ class TrainingService:
             pipelines_total=len(views),
             pipelines_executable=sum(v.executable for v in views),
             candidates=candidates,
+            versions_produced=len(states),
             last_training_at=last.started_at if last else None,
             last_training_label=f"{last.pipeline_id} · {last.dataset_version or 'dataset inconnu'}"
             if last

@@ -76,7 +76,7 @@ export default function TrainingFactory(_props: { onMessage?: (m: string) => voi
         <Kpi icon="play" label="En cours" value={k ? k.running : '…'} />
         <Kpi icon="warn" label="En échec" value={k ? k.failed : '…'} tone={k?.failed ? 'red' : undefined} />
         <Kpi icon="db" label="Pipelines disponibles" value={k ? `${k.pipelines_executable} / ${k.pipelines_total}` : '…'} hint="exécutables / déclarés" />
-        <Kpi icon="badge" label="Modèles candidats" value={k ? k.candidates : '…'} hint="versions enregistrées par les pipelines" />
+        <Kpi icon="badge" label="Candidats en attente" value={k ? k.candidates : '…'} hint={k ? `sans approbation ni alias · ${k.versions_produced} versions produites` : undefined} />
         <Kpi icon="log" label="Dernier entraînement" value={k?.last_training_at ? dt(k.last_training_at) : k ? 'aucun' : '…'} hint={k?.last_training_label ?? undefined} />
       </div>
       {summary.error && !k && <Unavailable tone="red">Indicateurs indisponibles : {summary.error}</Unavailable>}

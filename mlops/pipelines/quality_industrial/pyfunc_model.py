@@ -1,14 +1,27 @@
 """MLflow packaging of the Quality model: the group's ``Qualite702`` class does ALL the
-inference (pre-processing, model, post-processing, threshold); nothing is re-implemented."""
+inference (pre-processing, model, post-processing, threshold); nothing is re-implemented.
+
+Unity Catalog requires a signature: input = one image path per row; output = the group's
+main fields plus its complete JSON answer, unchanged, in ``resultat_json``.
+"""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 try:
     from mlflow.pyfunc import PythonModel
 except ImportError:  # local tooling without mlflow
     PythonModel = object
+
+OUTPUT_COLUMNS = [
+    ("verdict", "string"),
+    ("type_defaut", "string"),
+    ("score_nok", "double"),
+    ("latence_ms", "double"),
+    ("resultat_json", "string"),
+]
 
 
 class Qualite702Model(PythonModel):
@@ -18,8 +31,31 @@ class Qualite702Model(PythonModel):
         self.model = Qualite702(context.artifacts["config"], device="cpu")
 
     def predict(self, context, model_input, params=None):
-        """``model_input``: DataFrame with a ``path`` column (image files) -> group's JSON."""
-        return [self.model.predire(str(p)) for p in model_input["path"]]
+        import pandas as pd
+
+        rows = []
+        for path in model_input["path"]:
+            r = self.model.predire(str(path))
+            rows.append(
+                {
+                    "verdict": r["verdict"],
+                    "type_defaut": r["type_defaut"] or "",
+                    "score_nok": float(r["score_nok"]),
+                    "latence_ms": float(r["latence_ms"]),
+                    "resultat_json": json.dumps(r, ensure_ascii=False),
+                }
+            )
+        return pd.DataFrame(rows, columns=[c for c, _ in OUTPUT_COLUMNS])
+
+
+def signature():
+    from mlflow.models import ModelSignature
+    from mlflow.types import ColSpec, Schema
+
+    return ModelSignature(
+        inputs=Schema([ColSpec("string", "path")]),
+        outputs=Schema([ColSpec(t, c) for c, t in OUTPUT_COLUMNS]),
+    )
 
 
 def log_quality_model(mlflow, model_dir: Path, kit: Path):
@@ -31,5 +67,6 @@ def log_quality_model(mlflow, model_dir: Path, kit: Path):
             "weights": str(model_dir / "modele.pt"),
         },
         code_paths=[str(kit / "qualite702")],
-        pip_requirements=["ultralytics==8.4.219", "pyyaml", "numpy", "pillow"],
+        signature=signature(),
+        pip_requirements=["ultralytics==8.4.219", "pyyaml", "numpy", "pillow", "pandas"],
     )

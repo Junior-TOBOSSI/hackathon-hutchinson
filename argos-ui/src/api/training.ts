@@ -33,7 +33,7 @@ export interface TrainingRow {
 }
 export interface Kpis {
   trainings_30d: number; succeeded: number; running: number; failed: number; pipelines_total: number; pipelines_executable: number;
-  candidates: number; last_training_at: string | null; last_training_label: string | null;
+  candidates: number; versions_produced: number; last_training_at: string | null; last_training_label: string | null;
 }
 export interface MlRun { run_id: string; run_name: string | null; status: string; start_time: string | null; end_time: string | null; metrics: Record<string, number>; params: Record<string, string>; tags: Record<string, string> }
 export interface RunDetail { row: TrainingRow; pipeline: PipelineSpec; runs: MlRun[] }

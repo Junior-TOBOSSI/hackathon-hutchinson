@@ -44,6 +44,11 @@ compute:
 job:
   name: hovis-quality-industrial-training
   dataset_argument: null
+  runs_root: /Volumes/workspace/argos_poc/images/runs/hovis
+  code_root: /Volumes/workspace/argos_poc/images/runs/hovis/code
+  script: /Volumes/workspace/argos_poc/images/runs/hovis/code/mlops/pipelines/quality_industrial/run_pipeline.py
+  base_weights: /Volumes/workspace/argos_poc/images/runs/hovis/weights/yolo26n-cls.pt
+  launcher: /Shared/ARGOS-POC/run_volume_script
 entrypoints:
   train: kit/train.py
   evaluate: kit/evaluer.py (split test indépendant)

@@ -500,7 +500,9 @@ def test_quality_demo_override_keeps_the_job_definition(tmp_path, monkeypatch):
     out = s._run_arguments(spec("quality-demo"), 7, record)
     new = json.loads(out["notebook_params"]["args"])
     assert (
-        new[new.index("--dataset-dir") + 1] == "/Volumes/w/s/images/synthetic-v2" and new[-1] == "m"
+        new[new.index("--dataset-dir") + 1] == "/Volumes/w/s/images/synthetic-v2"
+        and new[new.index("--model") + 1] == "m"
+        and new[-2:] == ["--request-id", "r"]
     )
     c.w.jobs.reset.assert_not_called() and c.w.jobs.update.assert_not_called()
 
