@@ -347,9 +347,14 @@ class DatabricksConnector:
 
     def _model_versions(self, model_id: str) -> list[ModelVersionInfo]:
         managed = self.managed(model_id)
-        registered = self._call(
-            lambda: self.mlflow.get_registered_model(managed.uc_name), managed.uc_name
-        )
+        try:
+            registered = self._call(
+                lambda: self.mlflow.get_registered_model(managed.uc_name), managed.uc_name
+            )
+        except ResourceNotFoundError:
+            # SCI-03: a declared model whose first candidate is not registered yet (e.g. one
+            # Workstation section never trained) has no version; it is not an error state.
+            return []
         aliases_by_version: dict[str, list[str]] = {}
         for alias, version in (registered.aliases or {}).items():
             aliases_by_version.setdefault(str(version), []).append(alias)

@@ -59,16 +59,16 @@ export default function Deployment() {
 
   return <div className="dataset-catalog lifecycle-catalog col" style={{ gap: 14 }}>
     <header className="card dataset-hero"><div><h1 className="h2">Centre de déploiement — Parc industriel</h1>
-      <p className="muted">État des modèles sur les postes industriels, Serving Databricks et historique HOVIS.</p>
-      <span className="muted lifecycle-fresh">Lecture Serving : {dateTime(endpoints.fetchedAt)}{endpoints.cache === 'stale' ? ' · dernière valeur connue' : ''} · historique HOVIS : {dateTime(history.fetchedAt)}</span></div>
+      <p className="muted">État des modèles sur les postes industriels, Serving Databricks et historique ARGOS.</p>
+      <span className="muted lifecycle-fresh">Lecture Serving : {dateTime(endpoints.fetchedAt)}{endpoints.cache === 'stale' ? ' · dernière valeur connue' : ''} · historique ARGOS : {dateTime(history.fetchedAt)}</span></div>
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}><button className="btn btn-ghost" onClick={() => store.invalidate('endpoints', 'deployment-history', 'deployment-edge-stations')}>Actualiser</button>
         {tab === 'Databricks Serving' && <button className="btn btn-primary" disabled={LIFECYCLE_READ_ONLY} onClick={openWizard}>Nouveau déploiement Serving</button>}</div></header>
     {LIFECYCLE_READ_ONLY && <Unavailable tone="grey">Recette connectée en lecture seule : aucune mutation Serving, Registry ou Edge n’est accessible depuis cette interface.</Unavailable>}
     {tab === 'Databricks Serving' && endpoints.error && <Unavailable tone="red">Serving indisponible : {endpoints.error}</Unavailable>}
     {tab === 'Databricks Serving' && endpoints.staleError && <Unavailable>Dernière lecture Serving en échec : {endpoints.staleError}</Unavailable>}
-    {tab === 'Historique' && history.error && <Unavailable tone="red">Historique HOVIS indisponible : {history.error}</Unavailable>}
+    {tab === 'Historique' && history.error && <Unavailable tone="red">Historique ARGOS indisponible : {history.error}</Unavailable>}
     {tab === 'Databricks Serving' && <div className="dataset-kpis">
-      <Kpi icon="monitor" label="Endpoints gérés" value={endpoints.data ? cloud.length : '—'} hint="Périmètre HOVIS" />
+      <Kpi icon="monitor" label="Endpoints gérés" value={endpoints.data ? cloud.length : '—'} hint="Périmètre ARGOS" />
       <Kpi icon="check" label="Endpoints prêts" value={endpoints.data ? cloud.filter((target) => ready(target)).length : '—'} tone="green" />
       <Kpi icon="layers" label="Versions servies" value={endpoints.data ? cloud.reduce((n, target) => n + target.endpoint.served.filter((entity) => entity.version).length, 0) : '—'} />
       <Kpi icon="play" label="Opérations en cours" value={count(operations.filter((operation) => ACTIVE.includes(operation.status)).length)} />
@@ -109,8 +109,8 @@ export default function Deployment() {
         onClose={() => setSelectedId(null)} onOperation={setOperationId} onNew={openWizard}
         onRegistry={(id) => go('registry', id)} />}
     </div>}
-    {tab === 'Historique' && <section className="card col" style={{ gap: 12 }}><h2 className="h2">Opérations HOVIS enregistrées</h2>
-      {history.loading && <Loading />}{history.data?.length === 0 && <Unavailable tone="grey">Aucun déploiement ni rollback HOVIS enregistré. La présence d’un endpoint ne crée pas d’historique fictif.</Unavailable>}
+    {tab === 'Historique' && <section className="card col" style={{ gap: 12 }}><h2 className="h2">Opérations ARGOS enregistrées</h2>
+      {history.loading && <Loading />}{history.data?.length === 0 && <Unavailable tone="grey">Aucun déploiement ni rollback ARGOS enregistré. La présence d’un endpoint ne crée pas d’historique fictif.</Unavailable>}
       {history.data && history.data.length > 0 && <div className="dataset-table-wrap"><table className="dataset-table"><thead><tr>
         <th>Date</th><th>Type</th><th>Cible</th><th>Modèle</th><th>Version</th><th>Statut</th><th>Motif</th><th>Résultat</th>
       </tr></thead><tbody>{history.data.map((operation) => <tr key={operation.operation_id} tabIndex={0}

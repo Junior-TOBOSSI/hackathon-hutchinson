@@ -93,9 +93,7 @@ export default function NewTraining() {
           <SelectField label="Version du dataset" icon="none" allLabel="Choisir une version" value={version} onChange={setVersion}
             options={[...(family.data?.versions ?? [])].reverse().map((v) => [v.version, `${v.version} (${v.ref.num_samples} images)`])} />
           {spec && <Params specs={spec.parameters} values={values} onChange={setValues} />}
-          {spec && <div className="tf-box"><b>Environnement de calcul</b>
-            <span>{spec.compute.gpu ? 'GPU' : 'Databricks serverless CPU'} · job « {String(spec.job.name)} »</span>
-            <span className="muted" style={{ fontSize: 13 }}>{(spec.compute.environment as string[] | undefined)?.join(', ')}</span></div>}
+          {spec && <ComputeChoice spec={spec} />}
         </div>
         <div className="col" style={{ gap: 12, minWidth: 0 }}>
           <DatasetPreviewBox preview={preview} />
@@ -115,6 +113,33 @@ export default function NewTraining() {
       </div>
     </section>
   );
+}
+
+/* Execution environment: the pipeline's declared compute, shown as a choice card. GPU is not
+   offered when the pipeline does not declare it; the pinned dependencies are shown as chips. */
+function ComputeChoice({ spec }: { spec: PipelineSpec }) {
+  const [guard, setGuard] = useState<boolean | null>(null);
+  useEffect(() => { training.launchGuard().then((g) => setGuard(g.remote_launch_enabled)).catch(() => setGuard(null)); }, []);
+  const deps = (spec.compute.environment as string[] | undefined) ?? [];
+  const gpu = Boolean(spec.compute.gpu);
+  return <div className="tf-box"><b>Environnement d'entraînement</b>
+    <div className="tf-compute" role="radiogroup" aria-label="Environnement d'entraînement">
+      <div className={`tf-compute-option${gpu ? '' : ' selected'}`} aria-checked={!gpu} role="radio">
+        <span className="tf-compute-radio" />
+        <div><b>Databricks serverless CPU</b><small>Démarrage à la demande · facturé à l'usage</small></div>
+      </div>
+      <div className={`tf-compute-option${gpu ? ' selected' : ' disabled'}`} aria-checked={gpu} aria-disabled={!gpu} role="radio">
+        <span className="tf-compute-radio" />
+        <div><b>GPU</b><small>{gpu ? 'Déclaré par le pipeline' : 'Non déclaré par ce pipeline'}</small></div>
+      </div>
+    </div>
+    <div className="tf-compute-meta">
+      <span>Job <b>{String(spec.job.name)}</b></span>
+      <Chip tone={guard ? 'green' : guard === false ? 'amber' : 'grey'}>{guard ? 'Lancements autorisés' : guard === false ? 'Lancements désactivés' : 'Autorisation inconnue'}</Chip>
+    </div>
+    {deps.length > 0 && <details className="tf-deps"><summary>Environnement figé : {deps.length} dépendances</summary>
+      <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{deps.map((d) => <Chip key={d} tone="grey">{d}</Chip>)}</div></details>}
+  </div>;
 }
 
 function Params({ specs, values, onChange }: { specs: ParamSpec[]; values: Record<string, unknown>; onChange: (v: Record<string, unknown>) => void }) {
@@ -172,11 +197,14 @@ function Validation({ report, spec }: { report: ValidationReport; spec: Pipeline
       : <Unavailable tone="grey">Tous les contrôles indispensables sont satisfaits.</Unavailable>}
     <div className="tf-config">
       <div className="tf-box"><b>Récapitulatif</b>
-        <span>Pipeline : <b>{spec?.name}</b></span>
-        <span className="muted" style={{ fontSize: 13 }}>Code : {report.code.version ?? report.code.commit ?? '—'}</span>
-        {report.dataset && <span>Dataset : <b>{report.dataset.dataset_id}</b> version <b>{report.dataset.version}</b> ({report.dataset.num_images} images)</span>}
-        <span>Calcul : {report.compute.gpu ? 'GPU' : 'serverless CPU'} · résultats MLflow : {report.mlflow.experiment}</span>
-        <span>Modèle candidat : {report.mlflow.registered_model} (jamais approuvé, promu ni déployé automatiquement)</span>
+        <dl className="tf-summary">
+          <dt>Pipeline</dt><dd><b>{spec?.name}</b></dd>
+          <dt>Code</dt><dd>{report.code.version ?? report.code.commit ?? '—'}</dd>
+          {report.dataset && <><dt>Dataset</dt><dd><b>{report.dataset.dataset_id}</b> · version <b>{report.dataset.version}</b> · {report.dataset.num_images} images</dd></>}
+          <dt>Environnement</dt><dd>{report.compute.gpu ? 'GPU' : 'Databricks serverless CPU'}</dd>
+          <dt>Suivi MLflow</dt><dd>{report.mlflow.experiment}</dd>
+          <dt>Modèle candidat</dt><dd>{report.mlflow.registered_model}<small>jamais approuvé, promu ni déployé automatiquement</small></dd>
+        </dl>
         <b>Hyperparamètres effectifs</b>
         <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{Object.keys(report.parameters).length
           ? Object.entries(report.parameters).map(([k, v]) => <Chip key={k} tone="grey">{k} = {String(v)}</Chip>) : <span className="muted">aucun (fixés par le code)</span>}</div>
@@ -206,6 +234,12 @@ function Execute({ report, pipelineId, datasetId, version, params, onDone }: {
     } finally { setBusy(false); }
   };
   return <div className="col" style={{ gap: 12 }}>
+    <div className="tf-launch-summary">
+      <div><span>Environnement</span><b>{report.compute.gpu ? 'GPU' : 'Serverless CPU'}</b><small>Databricks</small></div>
+      <div><span>Dataset</span><b>{datasetId}</b><small>version {version}{report.dataset ? ` · ${report.dataset.num_images} images` : ''}</small></div>
+      <div><span>Modèle candidat</span><b>{report.mlflow.registered_model.split('.').pop()}</b><small>{report.mlflow.registered_model}</small></div>
+      <div><span>Paramètres</span><b>{Object.keys(params).length || 'par défaut'}</b><small>{Object.keys(params).length ? 'valeur(s) effective(s)' : 'valeurs du groupe'}</small></div>
+    </div>
     <div className="tf-box"><b>Confirmation</b>
       <span>Le job Databricks du pipeline sera déclenché avec <b>{datasetId} {version}</b>. Calcul serverless CPU facturé ; une seule exécution par confirmation.</span>
       <label className="row" style={{ gap: 8, alignItems: 'center' }}><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /> Je confirme le lancement de cet entraînement.</label>

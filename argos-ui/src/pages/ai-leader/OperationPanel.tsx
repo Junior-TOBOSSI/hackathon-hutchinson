@@ -66,7 +66,7 @@ export default function OperationPanel({ id, initial, statuses, endpoints, onClo
       <Chip tone="grey">Inférence {operation.inference_tested ? 'testée' : 'non testée'}</Chip>
       <Chip tone="blue">Alias champion inchangé par cette opération</Chip></div>
     {operation.status === 'uncertain' && <Unavailable>Résultat distant incertain : une nouvelle mutation ne doit pas être envoyée. Le suivi relit Serving jusqu’à résolution ou intervention humaine.</Unavailable>}
-    {operation.status === 'failed' && <Unavailable tone="red">Mise à jour échouée. Cela ne signifie pas qu’un rollback HOVIS a eu lieu.</Unavailable>}
+    {operation.status === 'failed' && <Unavailable tone="red">Mise à jour échouée. Cela ne signifie pas qu’un rollback ARGOS a eu lieu.</Unavailable>}
     {operation.error && <Unavailable tone="red">Erreur : {operation.error}</Unavailable>}
     <div className="col" style={{ gap: 3 }}><b>Motif</b><span>{operation.reason}</span></div>
     <div className="row dataset-detail-meta"><span>Création : <b>{dateTime(operation.created_at)}</b></span>

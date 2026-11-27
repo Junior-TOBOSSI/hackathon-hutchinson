@@ -37,7 +37,9 @@ compute:
   gpu: false
   environment: [numpy==1.26.4, scipy==1.13.1, pillow==10.3.0, torch==2.5.1,
                 torchvision==0.20.1, ultralytics==8.4.219, opencv-python==4.11.0.86,
-                mlflow==3.18.0, pyyaml]
+                mlflow==3.18.0, pyyaml,
+                # SCI-03: visionhub.config (imported by the group's code) needs pydantic-settings.
+                pydantic-settings==2.16.3]
 job:
   name: hovis-workstation-training
   dataset_argument: null
@@ -46,6 +48,12 @@ job:
   script: /Volumes/workspace/argos_poc/images/runs/hovis/code/mlops/pipelines/workstation/run_pipeline.py
   base_weights: /Volumes/workspace/argos_poc/images/runs/hovis/weights/yolo26n.pt
   launcher: /Shared/ARGOS-POC/run_volume_script
+  # SCI-03: shared modules imported by the runner and the group's kit, uploaded with it by
+  # install_job (the runner folder alone is not enough).
+  code_extra: [visionhub/__init__.py, visionhub/config.py, visionhub/contracts.py,
+               visionhub/decision.py, visionhub/analyzer.py,
+               mlops/pipelines/quality_industrial/__init__.py,
+               mlops/pipelines/quality_industrial/run_pipeline.py]
 entrypoints:
   evaluate: kit/usecases/workstation/evaluate.py
   model: kit/usecases/workstation/model.py
@@ -53,7 +61,14 @@ entrypoints:
 outputs: [results.csv, annotated, preview, normality, evaluation.json]
 mlflow:
   experiment: /Shared/HOVIS/workstation-industrial
-  registered_model: workspace.argos_poc.workstation_industrial
+  # SCI-03: one registered model per section (a section's model is never a candidate for
+  # another section: distinct references, zones and normality).
+  registered_model_by: station
+  registered_models:
+    press_cell: workspace.argos_poc.workstation_press_cell
+    machine_cell: workspace.argos_poc.workstation_machine_cell
+    machine_cell_variant: workspace.argos_poc.workstation_machine_cell_variant
+    electrical_bench: workspace.argos_poc.workstation_electrical_bench
 evaluation:
   split: cross-validation
   independent: true

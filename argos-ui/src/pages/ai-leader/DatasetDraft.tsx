@@ -191,7 +191,7 @@ function PublishPanel({ modelId, draft, index, initialVersion, resumeVersion, on
 
   const publish = async () => {
     const what = resuming ? `Reprendre la publication de « ${version} » ?` : `Publier la version « ${version} » ?`;
-    if (!window.confirm(`${what}\n\nLa version sera immuable (jamais réécrite par HOVIS) : copie des images, vérification de chaque empreinte SHA-256, puis écriture du manifeste en dernier.\nAucun entraînement ne sera lancé.`)) return;
+    if (!window.confirm(`${what}\n\nLa version sera immuable (jamais réécrite par ARGOS) : copie des images, vérification de chaque empreinte SHA-256, puis écriture du manifeste en dernier.\nAucun entraînement ne sera lancé.`)) return;
     setError('');
     try {
       follow(await mlops.publishFamilyDraft(modelId, draft.draft_id, version));

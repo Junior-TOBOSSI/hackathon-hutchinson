@@ -38,14 +38,14 @@ export default function Registry({ onMessage }: { onMessage: (message: string) =
 
   return <div className="dataset-catalog lifecycle-catalog col" style={{ gap: 14 }}>
     <header className="card dataset-hero"><div><h1 className="h2">Registre des modèles — Catalogue & versions</h1>
-      <p className="muted">Familles de modèles gérées par HOVIS · versions Unity Catalog et décisions humaines.</p>
+      <p className="muted">Familles de modèles gérées par ARGOS · versions Unity Catalog et décisions humaines.</p>
       <span className="muted lifecycle-fresh">Périmètre : {managed.data?.length ?? '—'} modèle(s) configuré(s) · lecture UC : {dateTime(statuses.fetchedAt)}{statuses.cache === 'stale' ? ' · dernière valeur connue' : ''}</span></div>
       <button className="btn btn-ghost" disabled={managed.refreshing || statuses.refreshing} onClick={() => store.invalidate('models', 'statuses')}>Actualiser</button></header>
     {managed.error && <Unavailable tone="red">Catalogue indisponible : {managed.error}</Unavailable>}
     {statuses.error && <Unavailable tone="red">Versions UC indisponibles : {statuses.error}</Unavailable>}
     {statuses.staleError && <Unavailable>Dernière lecture UC en échec : {statuses.staleError}</Unavailable>}
     <div className="dataset-kpis">
-      <Kpi icon="db" label="Modèles enregistrés" value={value(counts.models)} hint="Périmètre HOVIS" />
+      <Kpi icon="db" label="Modèles enregistrés" value={value(counts.models)} hint="Périmètre ARGOS" />
       <Kpi icon="layers" label="Versions enregistrées" value={value(counts.versions)} />
       <Kpi icon="warn" label="En attente de décision" value={value(counts.pending)} tone={counts.pending ? 'amber' : undefined} />
       <Kpi icon="check" label="Versions approuvées" value={value(counts.approved)} tone="green" />

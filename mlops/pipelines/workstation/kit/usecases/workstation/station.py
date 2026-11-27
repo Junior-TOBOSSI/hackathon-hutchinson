@@ -51,7 +51,7 @@ def labelled_photos(station: dict[str, Any]) -> list[dict[str, str]]:
     labels = station.get("dataset_dir", Path("/nonexistent")) / "labels.csv"
     if not labels.exists():
         return []
-    with labels.open(encoding="utf-8") as f:
+    with labels.open(encoding="utf-8-sig") as f:  # -sig: tolerate a BOM (Excel exports)
         rows = [_normalize(r, station.get("labels") or {}) for r in csv.DictReader(f)]
     excluded = set(station.get("exclude_from_eval") or [])
     return [r for r in rows if r["filename"] not in excluded and r["label"] != "reference"]

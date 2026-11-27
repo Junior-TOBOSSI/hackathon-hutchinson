@@ -17,6 +17,7 @@ from mlops.databricks.read_cache import BudgetExceeded, read_scope
 from mlops.retraining.models import Evaluation, PolicyInput, Proposal, RetrainPolicyConfig
 from mlops.retraining.scheduler import Scheduler
 from mlops.retraining.service import LaunchRefused, PolicyError, Providers, RetrainingService
+from mlops.training.specs import registers_into
 
 _LOCK = threading.Lock()
 SCHEDULER = None  # set by create_retraining_router (state shown on the home page)
@@ -95,7 +96,7 @@ def create_retraining_router(
                             "families": s.dataset.families,
                         }
                         for s in specs
-                        if s.mlflow.get("registered_model") == m.uc_name
+                        if registers_into(s, m.uc_name)
                     ],
                 }
                 for m in c.settings.models

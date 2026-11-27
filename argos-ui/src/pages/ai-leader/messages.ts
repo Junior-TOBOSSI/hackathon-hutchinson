@@ -10,7 +10,7 @@ const RULES: [RegExp, string | ((...m: string[]) => string)][] = [
   [/^permission denied on (.+)$/, (_, w) => `Permission refusée sur ${w}`],
   [/^unknown model id '(.+)'$/, (_, m) => `Modèle inconnu : ${m}`],
   [/^job '(.+)' already has an active run$/, (_, j) => `Le job « ${j} » a déjà une exécution en cours`],
-  [/^job '(.+)' is not triggerable from ARGOS$/, (_, j) => `Le job « ${j} » ne peut pas être lancé depuis HOVIS`],
+  [/^job '(.+)' is not triggerable from ARGOS$/, (_, j) => `Le job « ${j} » ne peut pas être lancé depuis ARGOS`],
   [/^alias must be one of/, "L'alias doit être champion ou challenger"],
   [/^no dataset configured for (.+)$/, (_, m) => `Aucun dataset configuré pour ${m}`],
   [/^dataset version (.+) not found$/, (_, v) => `Version de dataset ${v} introuvable`],

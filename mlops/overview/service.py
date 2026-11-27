@@ -124,7 +124,18 @@ def datasets(c, p: Partial) -> dict[str, Any]:
         for f in fams
     ]
     images = [r["latest_images"] for r in rows if r["latest_images"] is not None]
+    published = {r["dataset_id"] for r in rows}
+    specs = p.run("pipelines", lambda: _training(c).specs, [])
+    expected = {}
+    for s in specs:  # declared by a pipeline, not published: shown as EXPECTED, never counted
+        for fam in s.dataset.families:
+            if fam not in published:
+                expected.setdefault(
+                    fam, {"dataset_id": fam, "use_case": s.use_case, "pipelines": []}
+                )
+                expected[fam]["pipelines"].append(s.id)
     return {
+        "expected": list(expected.values()),
         "families": len(rows),
         "published_versions": sum(r["versions"] for r in rows),
         # Images of the LATEST published version of each family: never a sum over versions

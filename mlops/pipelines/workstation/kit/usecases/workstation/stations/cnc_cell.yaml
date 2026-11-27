@@ -1,0 +1,37 @@
+# Section "CNC cell" (poste_cnc_5s_11, synthetic pilot, labels to be validated).
+# White CNC machining centre seen from above, tool bench on the left, tool cart on
+# the right: the same scene as the EPI demo videos (data/raw/safety/videos).
+# Operators are ALLOWED anywhere (dataset README); the black mat in front of the
+# machine and the walkway must stay free of OBJECTS.
+#
+# Paths are relative to --data-root. Coordinates are NORMALIZED [x, y] on the reference.
+# empty_zones  : nothing new may appear there (objects, and persons unless allowed)
+# element_slots: each element must stay in its place; they are the boxes shown on photos
+name: cnc_cell
+title: CNC cell
+dataset: raw/workstation/poste_cnc_5s_11
+# Columns of labels.csv (French export): image, classe, description.
+labels: {file: image, label: classe, type: description}
+# Where each anomaly type must be found: a zone name, null (anything outside the
+# zones named here: bench, slots) or any (any finding).
+anomaly_types:
+  bac manquant: null
+  bac déplacé au sol: any
+  établi désorganisé: any
+  bac sur tapis: black_mat
+  déchet au sol: walkway
+# Analyzer parameters specific to this section.
+params:
+  zone_allowed_labels:
+    black_mat: [person]
+    walkway: [person]
+views:
+  - name: main
+    reference_image: raw/workstation/poste_cnc_5s_11/reference.png
+    empty_zones:
+      black_mat: [[0.365, 0.530], [0.575, 0.530], [0.575, 0.875], [0.365, 0.875]]
+      walkway: [[0.400, 0.600], [0.830, 0.600], [0.830, 1.000], [0.400, 1.000]]
+    element_slots:
+      bench_bin: [[0.110, 0.630], [0.235, 0.630], [0.235, 0.800], [0.110, 0.800]]
+      bench_cloth: [[0.270, 0.580], [0.360, 0.580], [0.360, 0.700], [0.270, 0.700]]
+      cart_bin: [[0.840, 0.160], [0.960, 0.160], [0.960, 0.330], [0.840, 0.330]]
