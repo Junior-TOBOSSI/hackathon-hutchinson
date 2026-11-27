@@ -1,5 +1,7 @@
 # Démo HOVIS : prise de poste, puis qualité pièce par pièce, sur 1 à 6 postes
 
+> Toutes les commandes en un coup d'œil : [COMMANDES.md](COMMANDES.md).
+
 Serveurs de démonstration qui enchaînent les cas d'usage sur les écrans d'argos-ui (opérateur et team leader). Ils reprennent la démo Safety d'EPI (`usecases/safety/notebooks/hovis_demo.py`). Ce n'est **pas** l'API de la plateforme : seulement les routes dont les écrans ont besoin, pour le pitch.
 
 ## Architecture : un serveur par poste
@@ -29,6 +31,7 @@ argos-ui (5173) ──/api──> cellule C3 (8000) ──> poste C3·P06 (8001)
 .\demo\start.ps1 -Stations 6 -NoSafety   # 6 postes, sans la webcam EPI
 .\demo\start.ps1 -Stations 3 -Mode auto  # mode NOK automatique (défaut : -Mode manuel)
 .\demo\start.ps1 -Stations 2 -Mode auto -Here   # tous les serveurs dans CE terminal (Ctrl+C arrête tout)
+.\demo\start.ps1 -Stations 2 -Workstations press_cell:nok,electrical_bench   # poste de travail de chaque poste
 .\demo\start.bat -Stations 3             # même chose par le .bat
 ```
 
@@ -105,6 +108,7 @@ equirements-lock.txt
 
 | Variable | Défaut | Rôle |
 |---|---|---|
+| `WORKSTATION` | — | poste de travail vérifié (`press_cell`, `press_cell:nok`…), fixé par `-Workstations` |
 | `STATION_ID` · `PROFILE` · `PORT` | `C3·P06` · 0 · 8001 | poste, rang (tableau ci-dessus), port — fixés par les scripts |
 | `CHECK_PERIOD` | 2.5 | secondes par photo du poste |
 | `QUALITY_PERIOD` | 3 | secondes par pièce |

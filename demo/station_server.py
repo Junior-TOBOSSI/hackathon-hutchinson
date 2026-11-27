@@ -76,6 +76,18 @@ PROFILES = [  # (section, workstation check photos, title)
     ("machine_cell_variant", ["good/good_03.png"], "Machine cell variant"),
 ]
 SECTION, CHECK_PHOTOS, TITLE = PROFILES[PROFILE % len(PROFILES)]
+# WORKSTATION chooses the workstation this station checks, instead of its profile's:
+# "press_cell" (conforming photo: OK at once) or "press_cell:nok" (object in the
+# passage: NOK, NOK, then OK). anomaly_04 gives NOK and good_04 OK on all 4 workstations.
+SECTIONS = ("machine_cell_variant", "press_cell", "electrical_bench", "machine_cell")
+if os.environ.get("WORKSTATION"):
+    SECTION, _, START = os.environ["WORKSTATION"].strip().lower().partition(":")
+    if SECTION not in SECTIONS or START not in ("", "ok", "nok"):
+        raise SystemExit(
+            f"WORKSTATION={os.environ['WORKSTATION']!r}: one of {SECTIONS}, optionally :ok / :nok"
+        )
+    CHECK_PHOTOS = CHECK_KO if START == "nok" else ["good/good_04.png"]
+    TITLE = ""  # read from the workstation file at load time
 DATA = REPO / "data"
 CHECK_PERIOD = float(os.environ.get("CHECK_PERIOD", "2.5"))
 QUALITY_PERIOD = float(os.environ.get("QUALITY_PERIOD", "3"))
@@ -124,7 +136,9 @@ def _decode(body: bytes) -> np.ndarray:
 
 
 def load_models() -> None:
+    global TITLE
     station = load_station(SECTION, DATA)
+    TITLE = TITLE or station.get("title", SECTION)
     judged = {str(station["dataset_dir"] / f) for f in CHECK_PHOTOS}
     normal = [p for p in normal_photos(station) if p not in judged]  # judged, never learned
     analyzer, thresholds = build_analyzer(station, normal, {}, detector=shared_detector({}))

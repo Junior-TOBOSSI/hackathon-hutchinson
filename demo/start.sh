@@ -6,6 +6,7 @@
 #   ./demo/start.sh 3             # 3 postes actifs : C3·P06, C3·P01, C3·P02
 #   SAFETY=0 ./demo/start.sh 3    # sans l'analyse webcam EPI (faite par C3·P06)
 #   ./demo/start.sh 3 auto        # mode NOK auto : la ligne continue (défaut : manuel)
+#   ./demo/start.sh 2 manuel press_cell:nok,electrical_bench   # poste de travail de chaque poste
 #
 # Tous les serveurs tournent dans ce terminal (logs mêlés, préfixés par le poste) ;
 # Ctrl+C arrête tout. Si un port (8000 à 8006, 5173) est pris, son processus est arrêté.
@@ -13,6 +14,7 @@ set -euo pipefail
 
 STATIONS="${1:-1}"
 MODE="${2:-manuel}"
+IFS=',' read -r -a WORKSTATIONS <<< "${3:-}"   # un poste de travail par poste actif (optionnel)
 case "$MODE" in auto) QUALITY_MODE=auto ;; manuel|manual) QUALITY_MODE=manual ;; *) echo "Mode : manuel ou auto" >&2; exit 1 ;; esac
 if ! [[ "$STATIONS" =~ ^[1-6]$ ]]; then echo "Nombre de postes : 1 à 6" >&2; exit 1; fi
 ORDER=("C3·P06" "C3·P01" "C3·P02" "C3·P03" "C3·P04" "C3·P05")
@@ -42,7 +44,7 @@ trap 'kill "${PIDS[@]}" 2>/dev/null' EXIT
 for ((k = 0; k < STATIONS; k++)); do
   safety=0
   if [ "$k" -eq 0 ]; then safety="${SAFETY:-1}"; fi   # la webcam = C3·P06
-  STATION_ID="${ORDER[$k]}" PROFILE="$k" PORT="$((8001 + k))" SAFETY="$safety" QUALITY_MODE="$QUALITY_MODE" \
+  STATION_ID="${ORDER[$k]}" PROFILE="$k" PORT="$((8001 + k))" SAFETY="$safety" QUALITY_MODE="$QUALITY_MODE" WORKSTATION="${WORKSTATIONS[$k]:-}" \
     "$PYTHON" -m uvicorn demo.station_server:app --port "$((8001 + k))" --host 127.0.0.1 &
   PIDS+=($!)
 done

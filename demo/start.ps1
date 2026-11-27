@@ -25,6 +25,12 @@ Espace AI leader (cycle de vie des modèles, Ctrl+O dans l'interface) : son serv
 avec  databricks auth login --profile ARGOS . Réglages locaux éventuels (jamais versionnés) :
 hovis.local.env à la racine, lignes CLE=VALEUR. -NoAiLeader : ne pas le démarrer.
 
+-Workstations : le poste de travail vérifié par chaque poste actif, dans l'ordre
+(C3·P06, P01, ...), séparés par des virgules : machine_cell_variant, press_cell,
+electrical_bench, machine_cell ; « :nok » = démarre avec un objet dans le passage (NOK,
+NOK puis OK), sinon OK d'emblée. Les postes non cités gardent leur poste de travail.
+    .\demo\start.ps1 -Stations 2 -Workstations press_cell:nok,electrical_bench
+
 -Here : tous les serveurs dans CE terminal (journaux mêlés, chaque ligne préfixée par le
 serveur), au lieu d'une fenêtre par serveur. Ctrl+C arrête alors tout.
     .\demo\start.ps1 -Stations 2 -Mode auto -Here
@@ -37,7 +43,8 @@ param(
     [ValidateSet("manuel", "auto")][string]$Mode = "manuel",
     [switch]$NoSafety,
     [switch]$NoAiLeader,
-    [switch]$Here
+    [switch]$Here,
+    [string[]]$Workstations = @()
 )
 
 $repo = Split-Path -Parent $PSScriptRoot
@@ -50,6 +57,17 @@ if (-not (Test-Path $python)) {
     Write-Error "Environnement Python introuvable : $python (créer le venv et faire pip install -e .)"
     exit 1
 }
+# -Workstations "a,b" ou a,b : un poste de travail par poste actif (vérifié avant tout lancement)
+$sections = @("machine_cell_variant", "press_cell", "electrical_bench", "machine_cell")
+$Workstations = @($Workstations | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+foreach ($w in $Workstations) {
+    $name, $start = $w.ToLower() -split ':', 2
+    if ($sections -notcontains $name -or ($start -and @("ok", "nok") -notcontains $start)) {
+        Write-Error "Poste de travail inconnu : '$w' (possibles : $($sections -join ', '), suivi ou non de :ok / :nok)"
+        exit 1
+    }
+}
+
 # Ports déjà pris (ancienne démo restée ouverte, autre serveur) : on arrête le processus
 # qui les occupe, puis on les réutilise.
 foreach ($port in @(8000..8006) + 8040 + 5173) {
@@ -101,6 +119,7 @@ for ($k = 0; $k -lt $Stations; $k++) {
     Start-Server "poste $station ($port)" $repo @{
         STATION_ID = $station; PROFILE = "$k"; PORT = "$port"; SAFETY = $safety
         QUALITY_MODE = $qualityMode; PYTHONIOENCODING = "utf-8"
+        WORKSTATION = $(if ($k -lt $Workstations.Count) { $Workstations[$k] } else { "" })
     } $python @("-m", "uvicorn", "demo.station_server:app", "--port", "$port", "--host", "127.0.0.1")
 }
 
