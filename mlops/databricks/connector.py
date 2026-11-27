@@ -11,6 +11,7 @@ Lakeflow Jobs, Model Serving and the monitoring Delta table.
 
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -524,7 +525,19 @@ class DatabricksConnector:
         return self._job_run(self._call(lambda: self.w.jobs.get_run(run_id), f"job run {run_id}"))
 
     def trigger_job(self, job_name: str) -> JobRunInfo:
-        """Run an EXISTING allow-listed job; refused if a run is already active (cost guard)."""
+        """Run an EXISTING allow-listed NON-training job; refused if a run is already active.
+
+        Training jobs are NEVER triggered here: they go through TrainingService.launch (checks,
+        idempotency, journal). Every remote job also needs HOVIS_TRAINING_REMOTE=1."""
+        training_jobs = {m.training_job for m in self.settings.models if m.training_job}
+        if job_name in training_jobs:
+            raise ForbiddenOperationError(
+                f"{job_name!r} is a training job: launch it through /api/mlops/training/launch"
+            )
+        if os.environ.get("HOVIS_TRAINING_REMOTE") != "1":
+            raise ForbiddenOperationError(
+                "remote job launch is not authorized (HOVIS_TRAINING_REMOTE is not 1)"
+            )
         if job_name not in self.settings.triggerable_jobs:
             raise ForbiddenOperationError(f"job {job_name!r} is not triggerable from ARGOS")
         job = next(

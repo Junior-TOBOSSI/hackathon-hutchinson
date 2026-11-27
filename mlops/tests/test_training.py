@@ -398,7 +398,11 @@ def make_service(tmp_path):
         SimpleNamespace(version="1", run_id="a"),
         SimpleNamespace(version="2", run_id="b"),
     ]
-    return svc.TrainingService(c, launches=svc.LaunchStore(tmp_path / "launches.json")), c
+    return svc.TrainingService(
+        c,
+        launches=svc.LaunchStore(tmp_path / "launches.json"),
+        audit=svc.LaunchAudit(tmp_path / "audit.jsonl"),
+    ), c
 
 
 def test_catalogue_links_job_runs_mlflow_runs_and_versions_by_tags_only(tmp_path):

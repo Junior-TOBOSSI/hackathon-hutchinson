@@ -24,6 +24,7 @@ from pydantic import BaseModel
 
 from mlops.api.monitoring_routes import create_monitoring_router
 from mlops.api.training_routes import create_training_router
+from mlops.api.training_routes import service_for as training_service_for
 from mlops.connectors.mlflow_client import ExperimentInfo, MetricPoint, ModelVersionInfo, RunSummary
 from mlops.databricks.connector import (
     ConnectionStatus,
@@ -49,7 +50,7 @@ from mlops.databricks.datasets import (
     dataset_store,
 )
 from mlops.databricks.read_cache import BudgetExceeded, read_scope
-from mlops.databricks.training import DatabricksJobBackend
+from mlops.training.service import LaunchRecord, remote_enabled
 from visionhub.contracts import UseCase
 from visionhub.integration.mlops import ModelRef, RetrainingPolicy
 
@@ -62,6 +63,17 @@ class PromoteBody(BaseModel):
 
 class AliasBody(BaseModel):
     version: str
+
+
+class LegacyRetrainBody(BaseModel):
+    """Optional body of the legacy route: without dataset, version and idempotency key the
+    request is refused (no implicit choice of training data)."""
+
+    pipeline_id: str | None = None
+    dataset_id: str | None = None
+    version: str | None = None
+    parameters: dict[str, Any] = {}
+    idempotency_key: str | None = None
 
 
 class RetrainModeBody(BaseModel):
@@ -172,8 +184,33 @@ def create_mlops_router(
 
     @router.post("/models/{model_id}/retrain", status_code=202)
     @translate
-    def retrain(model_id: str, c: Connector) -> JobRunInfo:
-        return DatabricksJobBackend(c).submit(model_id)
+    def retrain(model_id: str, c: Connector, body: LegacyRetrainBody | None = None) -> LaunchRecord:
+        """Legacy route kept for compatibility, connected to THE single launch path."""
+        svc = training_service_for(c)
+        body = body or LegacyRetrainBody()
+        if not remote_enabled():
+            svc.audit.log(
+                outcome="refused_lock", source="legacy:/models/retrain", model_id=model_id
+            )
+            raise HTTPException(
+                403, "remote training launch is not authorized (HOVIS_TRAINING_REMOTE)"
+            )
+        if not (body.dataset_id and body.version and body.idempotency_key):
+            svc.audit.log(
+                outcome="refused_incomplete", source="legacy:/models/retrain", model_id=model_id
+            )
+            raise HTTPException(
+                422, "dataset_id, version and idempotency_key are required (use Training Factory)"
+            )
+        pipeline = body.pipeline_id or svc.pipeline_for_model(model_id).id
+        return svc.launch(
+            pipeline,
+            body.dataset_id,
+            body.version,
+            body.parameters,
+            body.idempotency_key,
+            source="legacy:/models/retrain",
+        )
 
     @router.put("/models/retrain-mode", status_code=204)
     @translate
@@ -301,7 +338,22 @@ def create_mlops_router(
     @router.post("/mlops/jobs/{job_name}/run", status_code=202)
     @translate
     def trigger(job_name: str, c: Connector) -> JobRunInfo:
-        return c.trigger_job(job_name)
+        """Non-training allow-listed jobs only, behind HOVIS_TRAINING_REMOTE (journaled)."""
+        audit = training_service_for(c).audit
+        try:
+            run = c.trigger_job(job_name)
+        except DatabricksConnectorError as exc:
+            audit.log(
+                outcome="refused",
+                source="route:/mlops/jobs/run",
+                job=job_name,
+                error=str(exc)[:200],
+            )
+            raise
+        audit.log(
+            outcome="submitted", source="route:/mlops/jobs/run", job=job_name, job_run_id=run.run_id
+        )
+        return run
 
     @router.get("/mlops/job-runs/{run_id}")
     @translate

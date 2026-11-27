@@ -1,5 +1,6 @@
 """Unit tests of the DBX-01 connector, API router and inference adapter (no Databricks)."""
 
+import dataclasses
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -144,13 +145,17 @@ def test_alias_guard_and_unknown_model(connector):
     )
 
 
-def test_trigger_job_guards(connector):
+def test_trigger_job_guards(connector, monkeypatch):
+    monkeypatch.setenv("HOVIS_TRAINING_REMOTE", "1")
     with pytest.raises(ForbiddenOperationError):
         connector.trigger_job("other-job")
+    with pytest.raises(ForbiddenOperationError):  # training job: TrainingService.launch only
+        connector.trigger_job("train-q")
+    connector.settings = dataclasses.replace(connector.settings, extra_triggerable_jobs=("x",))
     connector.w.jobs.list.return_value = [SimpleNamespace(job_id=7)]
     connector.w.jobs.list_runs.return_value = [SimpleNamespace(run_id=1)]
     with pytest.raises(ConflictError):  # an active run already exists
-        connector.trigger_job("train-q")
+        connector.trigger_job("x")
     connector.w.jobs.run_now.assert_not_called()
 
 
