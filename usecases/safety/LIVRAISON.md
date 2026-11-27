@@ -101,6 +101,8 @@ station_live["checks"].update(station_checks(station_live["issues"]))
 | État des EPI du poste, champ facultatif `safetyPpe` (casque, lunettes, gants, chaussures) | `api/types.ts`, `api/mock.ts` |
 | Démo locale seulement : bouton « simuler une pièce NOK », visible quand le modèle qualité est « simulé » | `pages/Operateur.tsx`, `api/client.ts` |
 | Graphique « Production de la cellule » : corrigé pour un shift qui passe minuit (shift C, 21 h → 5 h : axe 21 h … 5 h, plus de courbe qui repart en arrière) | `components/charts.tsx` |
+| Team leader : postes en **cartes** (une par poste : état, rythme, pièces NOK), détail au clic (avancement, alertes en cours, écran du poste, historique) ; champ poste : taper **ou choisir dans une liste** | `pages/TeamLeader.tsx` |
+| Vocabulaire : **NOK** au lieu de KO dans tous les textes affichés (la valeur technique `verdict: 'KO'` ne change pas) | `pages/*.tsx`, `components/*`, `api/mock.ts` |
 | Démo locale seulement : sélecteur de vue « Opérateur | Team leader » (sans se déconnecter), visible en mode démo ou avec `VITE_DEMO_VIEWS=true` | `App.tsx`, `vite-env.d.ts` |
 
 Côté serveur, la démo `notebooks/hovis_demo.py` fournit ces routes, et aussi celles de la vue manager : vue de la cellule (`/cells/{id}/overview`, poste C3·P06 réel, les 11 autres simulés et signalés comme tels), alertes (problèmes Safety du poste, signalements de l'opérateur, pièces requalifiées à confirmer), acquittement, décision, historique du poste (`/stations/{id}/detail`, épisodes Safety réels du shift). Une photo de pièce NOK peut être placée dans `argos-ui/public/img/piece-nok.jpg` pour la démo : **image industrielle, à ne jamais versionner**.

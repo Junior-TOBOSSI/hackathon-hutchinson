@@ -80,6 +80,19 @@ index 5921591..d78ad0e 100644
    /* ---------------- Team leader et écran TV de la cellule ---------------- */
    /** GET /api/cells/{cellId}/overview -> CellOverview (postes de la cellule, production heure par heure) */
    cellOverview(cellId: string): Promise<CellOverview> {
+diff --git a/argos-ui/src/api/mock.ts b/argos-ui/src/api/mock.ts
+index 73a3eb4..d21976e 100644
+--- a/argos-ui/src/api/mock.ts
++++ b/argos-ui/src/api/mock.ts
+@@ -82,7 +82,7 @@ export const mockAlerts: Alert[] = [
+   { id: 'a1', cellId: 'C3', stationId: 'C3·P06', category: 'SECURITE_EPI', title: 'Lunettes absentes · main près de la presse', detail: 'EPI : lunettes de sécurité non portées (2 fois) · comportement : main dans la zone de la presse (1 fois)', shift: 'B', when: '16:38, 16:41 et 16:51', priority: true, action: 'NONE' },
+   { id: 'a2', cellId: 'C3', stationId: 'C3·P05', category: 'SECURITE_EPI', title: 'Flaque d’huile près de la presse', detail: 'Signalé par l’opérateur avec le bouton Signaler', shift: 'B', when: '16:40', priority: true, action: 'MAINTENANCE', reportedByOperator: true },
+   { id: 'a3', cellId: 'C3', stationId: 'C3·P09', category: 'POSTE', title: 'Téléphone posé sur le poste', detail: 'Poste de travail : objet étranger dans la zone de travail', shift: 'B', when: '16:37 · rangé après 40 s', priority: false, action: 'NONE' },
+-  { id: 'a4', cellId: 'C3', stationId: 'C3·P03', category: 'QUALITE', title: '41 KO depuis 13 h', detail: 'Surtout des joints absents : réglage machine à vérifier', shift: 'B', when: 'depuis 13 h', priority: false, action: 'VALIDATE' },
++  { id: 'a4', cellId: 'C3', stationId: 'C3·P03', category: 'QUALITE', title: '41 NOK depuis 13 h', detail: 'Surtout des joints absents : réglage machine à vérifier', shift: 'B', when: 'depuis 13 h', priority: false, action: 'VALIDATE' },
+   { id: 'a5', cellId: 'C3', stationId: 'C3·P07', category: 'RYTHME', title: 'Retard de 18 pièces', detail: 'Rythme 112 / h depuis 15 h (objectif 125 / h)', shift: 'B', when: 'depuis 15 h', priority: false, action: 'VALIDATE' },
+   { id: 'a6', cellId: 'C3', stationId: 'C3·P04', category: 'EQUIPEMENT', title: 'Caméra pièce hors ligne', detail: 'Le poste tourne sans contrôle qualité automatique', shift: 'B', when: 'depuis 16:07', priority: false, action: 'MAINTENANCE' },
+ ];
 diff --git a/argos-ui/src/api/types.ts b/argos-ui/src/api/types.ts
 index c1b98d8..40728ee 100644
 --- a/argos-ui/src/api/types.ts
@@ -94,7 +107,7 @@ index c1b98d8..40728ee 100644
  }
  
 diff --git a/argos-ui/src/components/charts.tsx b/argos-ui/src/components/charts.tsx
-index cfed526..6a8ff07 100644
+index cfed526..bfbaee4 100644
 --- a/argos-ui/src/components/charts.tsx
 +++ b/argos-ui/src/components/charts.tsx
 @@ -1,5 +1,5 @@
@@ -222,8 +235,74 @@ index cfed526..6a8ff07 100644
  /** Barres par heure avec ligne d'objectif (team leader, production de la cellule). */
  export function HourlyBars({ hours, perHour, currentHour, barMax = 120 }: { hours: { hour: number; good: number | null; ko: number }[]; perHour: number; currentHour: number; barMax?: number }) {
    return (
+@@ -237,7 +204,7 @@ export function HourlyBars({ hours, perHour, currentHour, barMax = 120 }: { hour
+           {h.good === null
+             ? <div style={{ width: '100%', height: barMax, border: '2px dashed var(--line-strong)', borderRadius: '8px 8px 3px 3px' }} />
+             : <div style={{ width: '100%', height: Math.round((h.good / perHour) * barMax), borderRadius: '8px 8px 3px 3px', background: h.hour === currentHour ? 'var(--green-light)' : 'var(--green)' }} />}
+-          <span style={{ fontSize: 13, fontWeight: 700, height: 16, color: h.ko ? 'var(--red-text)' : 'transparent' }}>{h.ko ? `${h.ko} KO` : ''}</span>
++          <span style={{ fontSize: 13, fontWeight: 700, height: 16, color: h.ko ? 'var(--red-text)' : 'transparent' }}>{h.ko ? `${h.ko} NOK` : ''}</span>
+           <span className="muted" style={{ fontSize: 13, height: 16 }}>{h.hour} h</span>
+         </div>
+       ))}
+diff --git a/argos-ui/src/components/priority.ts b/argos-ui/src/components/priority.ts
+index 099578c..99d8863 100644
+--- a/argos-ui/src/components/priority.ts
++++ b/argos-ui/src/components/priority.ts
+@@ -25,7 +25,7 @@ export function operatorActions(live: StationLive): OperatorAction[] {
+     key: i.id, title: i.instruction, subtitle: SUB[i.category], strong: RANK[i.category] <= 2, rank: RANK[i.category],
+   }));
+   if (live.part.verdict === 'KO') {
+-    list.push({ key: 'piece', title: 'Pièce KO au bac rebuts', subtitle: 'Qualité · voir l’image de la pièce', strong: true, rank: 2 });
++    list.push({ key: 'piece', title: 'Pièce NOK au bac rebuts', subtitle: 'Qualité · voir l’image de la pièce', strong: true, rank: 2 });
+   }
+   return list.sort((a, b) => a.rank - b.rank);
+ }
+diff --git a/argos-ui/src/pages/AiLeader.tsx b/argos-ui/src/pages/AiLeader.tsx
+index aad30a9..e30d345 100644
+--- a/argos-ui/src/pages/AiLeader.tsx
++++ b/argos-ui/src/pages/AiLeader.tsx
+@@ -68,7 +68,7 @@ export default function AiLeader() {
+         <div className="card col" style={{ gap: 6, overflowX: 'auto' }}>
+           <div className="between"><h2 className="h2">Modèles déployés · par poste et groupe de postes</h2><span className="muted" style={{ fontSize: 14 }}>triés par santé</span></div>
+           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760, fontSize: 15 }}>
+-            <thead><tr className="muted" style={{ fontSize: 13, textAlign: 'left', letterSpacing: '0.06em' }}><th style={{ padding: '6px 0' }}>MODÈLE</th><th>CAS</th><th>POSTES</th><th>VERSION</th><th style={{ width: 220 }}>SANTÉ</th><th>RAPPEL KO</th><th /></tr></thead>
++            <thead><tr className="muted" style={{ fontSize: 13, textAlign: 'left', letterSpacing: '0.06em' }}><th style={{ padding: '6px 0' }}>MODÈLE</th><th>CAS</th><th>POSTES</th><th>VERSION</th><th style={{ width: 220 }}>SANTÉ</th><th>RAPPEL NOK</th><th /></tr></thead>
+             <tbody>
+               {[...ai.models].sort((a, b) => a.healthPct - b.healthPct).map((m) => {
+                 const [c, t] = tone(m.healthPct, ai.threshold);
+@@ -98,7 +98,7 @@ export default function AiLeader() {
+             })}
+           </div>
+           <div className="row stack-mobile" style={{ gap: 28, flexWrap: 'wrap' }}>
+-            <span>Rappel KO <b className="num" style={{ fontSize: 24, color: 'var(--green-text)' }}>{tr.recallKoPct} %</b> <span className="muted">(avant : {tr.previousRecallKoPct} %)</span></span>
++            <span>Rappel NOK <b className="num" style={{ fontSize: 24, color: 'var(--green-text)' }}>{tr.recallKoPct} %</b> <span className="muted">(avant : {tr.previousRecallKoPct} %)</span></span>
+             <span>Joints absents arrêtés <b className="num" style={{ fontSize: 24 }}>{tr.absentStoppedPct} %</b></span>
+             <span>Doubles joints arrêtés <b className="num" style={{ fontSize: 24 }}>{tr.doubleStoppedPct} %</b></span>
+             <span style={{ flex: 1 }} />
+diff --git a/argos-ui/src/pages/CelluleTV.tsx b/argos-ui/src/pages/CelluleTV.tsx
+index 0129f23..d1f9a41 100644
+--- a/argos-ui/src/pages/CelluleTV.tsx
++++ b/argos-ui/src/pages/CelluleTV.tsx
+@@ -64,7 +64,7 @@ export default function CelluleTV() {
+           <span style={{ color: 'var(--on-navy-muted)', fontSize: 16 }}>Trait blanc : où la cellule devrait être maintenant ({fmt(expected)} pièces)</span>
+         </div>
+         <Big label="Rythme" value={deltaText(delta, true)} color={t.text} />
+-        <Big label="Pièces KO" value={fmt(ko)} sub={`taux ${((ko / (good + ko)) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`} />
++        <Big label="Pièces NOK" value={fmt(ko)} sub={`taux ${((ko / (good + ko)) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`} />
+       </div>
+ 
+       {/* Les postes, dans leur ordre physique */}
+@@ -109,7 +109,7 @@ function StationTile({ s }: { s: StationSummary }) {
+         <div style={{ position: 'absolute', left: `${(s.expectedNow / s.target) * 100}%`, top: -5, bottom: -5, width: 4, borderRadius: 2, background: t.fg, opacity: 0.6 }} />
+       </div>
+       <span className="num" style={{ fontSize: 32 }}>{deltaText(delta, true)}</span>
+-      <span style={{ fontSize: 19, fontWeight: 500 }}>{s.good} bonnes · {s.ko} KO</span>
++      <span style={{ fontSize: 19, fontWeight: 500 }}>{s.good} bonnes · {s.ko} NOK</span>
+     </div>
+   );
+ }
 diff --git a/argos-ui/src/pages/Operateur.tsx b/argos-ui/src/pages/Operateur.tsx
-index 6f36356..6fdd57a 100644
+index 6f36356..41590e7 100644
 --- a/argos-ui/src/pages/Operateur.tsx
 +++ b/argos-ui/src/pages/Operateur.tsx
 @@ -24,12 +24,18 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
@@ -256,6 +335,24 @@ index 6f36356..6fdd57a 100644
          </section>
  
          <section className="col grow" style={{ gap: 18 }}>
+@@ -81,7 +87,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
+                   </div>
+                   <div className="row">
+                     <MiniStat value={deltaText(live.counters.good - live.objective.expectedNow, true)} tone={live.counters.good >= live.objective.expectedNow ? 'green' : 'red'} />
+-                    <MiniStat value={`${live.counters.ko} pièces KO`} tone={ko ? 'red' : 'grey'} />
++                    <MiniStat value={`${live.counters.ko} pièces NOK`} tone={ko ? 'red' : 'grey'} />
+                   </div>
+                   <span className="muted" style={{ fontSize: 14 }}>Trait noir (anneau et barre) : où vous devriez être maintenant ({live.objective.expectedNow})</span>
+                 </div>
+@@ -93,7 +99,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
+           <div className="grid-3">
+             <StatusTile ok={live.checks.securite} icon={live.checks.securite ? ICONS.shield : ICONS.shieldAlert} okTitle="Sécurité OK" okSub="EPI portés" koTitle="Sécurité" koSub={envIssues.find((i) => i.category !== 'POSTE')?.label ?? ''} />
+             <StatusTile ok={live.checks.poste} icon={ICONS.grid} okTitle="Poste rangé" okSub="Rien qui traîne" koTitle="Poste" koSub={envIssues.find((i) => i.category === 'POSTE')?.label ?? ''} />
+-            <StatusTile ok icon={ICONS.check} okTitle={ko ? 'Qualité' : 'Qualité OK'} okSub={`Taux KO ${live.checks.koRatePct.toLocaleString('fr-FR')} %`} koTitle="" koSub="" />
++            <StatusTile ok icon={ICONS.check} okTitle={ko ? 'Qualité' : 'Qualité OK'} okSub={`Taux NOK ${live.checks.koRatePct.toLocaleString('fr-FR')} %`} koTitle="" koSub="" />
+           </div>
+ 
+           {!consult && (
 @@ -106,7 +112,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
        </main>
  
@@ -277,9 +374,12 @@ index 6f36356..6fdd57a 100644
    return (
      <>
        <span className="label-caps" style={{ textAlign: 'center', fontSize: 18 }}>Pièce en cours · n° {live.part.number}</span>
-@@ -171,9 +178,20 @@ function PartPanel({ live }: { live: StationLive }) {
+@@ -169,11 +176,22 @@ function PartPanel({ live }: { live: StationLive }) {
+         <img src={live.part.imageUrl} alt={ko ? `Pièce non conforme : ${live.part.jointsDetected} joints détectés, zone en défaut entourée de rouge` : 'Pièce conforme : un seul joint détecté'} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+       </div>
        <div style={{ flex: 1, minHeight: 120, borderRadius: 20, background: c, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 22, padding: '0 20px' }}>
-         <span className="num" style={{ fontSize: 96, lineHeight: 0.9 }}>{ko ? 'KO' : 'OK'}</span>
+-        <span className="num" style={{ fontSize: 96, lineHeight: 0.9 }}>{ko ? 'KO' : 'OK'}</span>
++        <span className="num" style={{ fontSize: 96, lineHeight: 0.9 }}>{ko ? 'NOK' : 'OK'}</span>
          <span style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.3 }}>
 -          {ko ? <>{live.part.jointsDetected === 0 ? 'Joint absent' : `${live.part.jointsDetected} joints détectés`}<br />Posez la pièce dans le bac rebuts</> : <>1 joint bleu détecté<br />Le cycle est parti</>}
 +          {ko ? <>{live.part.jointsDetected === 0 ? 'Joint absent' : `${live.part.jointsDetected} joints détectés`}<br />Posez la pièce dans le bac rebuts</> : live.part.requalified ? <>Revérifiée par l'opérateur<br />Requalifiée OK</> : <>1 joint bleu détecté<br />Le cycle est parti</>}
@@ -299,19 +399,265 @@ index 6f36356..6fdd57a 100644
      </>
    );
  }
+@@ -245,7 +263,7 @@ function StatusTile({ ok, icon, okTitle, okSub, koTitle, koSub }: { ok: boolean;
+ }
+ 
+ function ScenarioSwitcher({ value, onChange }: { value: Scenario; onChange: (s: Scenario) => void }) {
+-  const opts: [Scenario, string][] = [['ok', 'Tout va bien'], ['ko', 'Pièce KO'], ['epi', 'EPI manquant'], ['multi', 'Plusieurs problèmes']];
++  const opts: [Scenario, string][] = [['ok', 'Tout va bien'], ['ko', 'Pièce NOK'], ['epi', 'EPI manquant'], ['multi', 'Plusieurs problèmes']];
+   return (
+     <div style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 4, background: 'var(--navy)', color: '#fff', borderRadius: 12, padding: 4, display: 'flex', gap: 4, boxShadow: '0 8px 24px rgba(0,0,0,.3)', fontSize: 12 }}>
+       <span style={{ alignSelf: 'center', padding: '0 6px', color: 'var(--on-navy-muted)' }}>Démo</span>
+diff --git a/argos-ui/src/pages/PosteDetail.tsx b/argos-ui/src/pages/PosteDetail.tsx
+index 89edae1..b5a1523 100644
+--- a/argos-ui/src/pages/PosteDetail.tsx
++++ b/argos-ui/src/pages/PosteDetail.tsx
+@@ -32,8 +32,8 @@ export default function PosteDetail() {
+         <div className="grid-5">
+           <Kpi label="Efficience" value={`${d.efficiencyPct.toLocaleString('fr-FR')} %`} sub={`${d.good} pièces bonnes / ${d.expectedNow} attendues`} />
+           <Kpi label="Rythme" value={deltaText(d.delta, true)} valueStyle={{ fontSize: 30, color: d.delta < 0 ? 'var(--red-text)' : 'var(--green-text)' }} sub={`${d.ratePerHour} pièces / h depuis 15 h`} />
+-          <Kpi label="Pièces KO" value={d.ko} sub={`joint absent ${d.koByDefect.absent} · double joint ${d.koByDefect.double}`} />
+-          <Kpi label="Taux de KO" value={`${d.koRatePct.toLocaleString('fr-FR')} %`} sub="moyenne cellule 1,7 %" />
++          <Kpi label="Pièces NOK" value={d.ko} sub={`joint absent ${d.koByDefect.absent} · double joint ${d.koByDefect.double}`} />
++          <Kpi label="Taux de NOK" value={`${d.koRatePct.toLocaleString('fr-FR')} %`} sub="moyenne cellule 1,7 %" />
+           <Kpi label="Événements sécurité" value={d.events.filter((e) => e.category !== 'POSTE').length} valueStyle={{ color: 'var(--red)' }} sub={d.epiCounts.filter((e) => e.count).map((e) => `${e.label.toLowerCase()} ${e.count}`).join(' · ')} />
+         </div>
+ 
 diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
-index 1642809..20abf5f 100644
+index 1642809..b320daf 100644
 --- a/argos-ui/src/pages/TeamLeader.tsx
 +++ b/argos-ui/src/pages/TeamLeader.tsx
-@@ -97,7 +97,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
+@@ -88,7 +88,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
+       <div className="grid-5">
+         <Kpi label="Pièces bonnes · shift" value={fmt(good)} sub={`sur ${fmt(target)} · ${Math.round((good / target) * 100)} % de l’objectif`} />
+         <Kpi label="Rythme de la cellule" value={deltaText(good - expected, true)} valueStyle={{ fontSize: 30, color: good >= expected ? 'var(--green-text)' : 'var(--red-text)' }} sub={`${fmt(expected)} pièces attendues à cette heure`} />
+-        <Kpi label="Pièces KO · shift" value={fmt(ko)} sub={`taux de KO ${koRate.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} % · objectif < 2 %`} />
++        <Kpi label="Pièces NOK · shift" value={fmt(ko)} sub={`taux de NOK ${koRate.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} % · objectif < 2 %`} />
+         <button onClick={openAlerts} style={{ all: 'unset', cursor: 'pointer', display: 'grid' }}>
+           <Kpi label="Alertes ouvertes" value={alerts.length} sub={`${alerts.filter((a) => a.priority).length} prioritaires · voir les alertes`} valueStyle={{ color: 'var(--red)' }} />
+         </button>
+@@ -97,8 +97,8 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
  
        <div className="card col" style={{ gap: 8 }}>
          <div className="between">
 -          <h2 className="h2">Postes de la {cell.cell.name.toLowerCase()}</h2>
+-          <span className="muted hide-mobile" style={{ fontSize: 13 }}>Cliquez sur un poste pour voir son écran · trait noir = attendu maintenant</span>
 +          <h2 className="h2">Postes</h2>
-           <span className="muted hide-mobile" style={{ fontSize: 13 }}>Cliquez sur un poste pour voir son écran · trait noir = attendu maintenant</span>
++          <span className="muted hide-mobile" style={{ fontSize: 13 }}>Cliquez sur un poste pour voir son détail</span>
          </div>
          <StationTable stations={cell.stations} alerts={alerts} />
+       </div>
+@@ -119,128 +119,117 @@ const DOT: Record<StationStatus, string> = {
+   OK: 'var(--green)', SECURITE: 'var(--red)', QUALITE: 'var(--red)', RYTHME: 'var(--amber)', CAMERA: 'var(--amber)', OBJET: 'var(--amber)',
+ };
+ 
+-const PAGE_SIZE = 6;
+-
+ /**
+- * Tableau des postes : une ligne par poste, dans l'ordre physique de la cellule, 6 par page.
++ * Postes en cartes : une carte par poste, dans l'ordre physique de la cellule, avec 3 infos
++ * seulement (état, rythme, pièces NOK). Un clic ouvre le détail du poste sous la grille.
+  * Filtres : état du poste et recherche par nom (« P06 », « 6 »…).
+- * Toute la ligne ouvre l'écran du poste (clic ou Entrée) ; l'icône ouvre l'historique.
+  */
+ function StationTable({ stations, alerts }: { stations: StationSummary[]; alerts: Alert[] }) {
+   const nav = useNavigate();
+   const [status, setStatus] = useState<StationStatus | 'ALL'>('ALL');
+   const [query, setQuery] = useState('');
+-  const [page, setPage] = useState(0);
++  const [selected, setSelected] = useState<string | null>(null);
+ 
+   const q = query.trim().toUpperCase().replace(/^P0?/, '');
+   const filtered = stations.filter((s) =>
+     (status === 'ALL' || s.status === status) && (!q || shortId(s.id).replace(/^P0?/, '').startsWith(q)));
+-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+-  const current = Math.min(page, pages - 1);
+-  const shown = filtered.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE);
+-  // Un filtre qui change ramène à la première page.
+-  const onStatus = (v: StationStatus | 'ALL') => { setStatus(v); setPage(0); };
+-  const onQuery = (v: string) => { setQuery(v); setPage(0); };
+   const present = (Object.keys(STATUS) as StationStatus[]).filter((k) => stations.some((s) => s.status === k));
++  const detail = stations.find((s) => s.id === selected);
+ 
+-  const th = { padding: '8px 10px', fontSize: 12, letterSpacing: '0.08em', fontWeight: 600, textAlign: 'left' as const };
+   return (
+-    <div className="col" style={{ gap: 10 }}>
++    <div className="col" style={{ gap: 12 }}>
+       <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
++        {/* Taper un poste OU le choisir dans la liste (datalist : liste déroulante native) ;
++            choisir un poste ouvre aussi son détail. */}
+         <input
+-          aria-label="Rechercher un poste"
+-          placeholder="Poste (ex. P06)"
++          aria-label="Rechercher ou choisir un poste"
++          placeholder="Poste (taper ou choisir)"
++          list="cell-stations"
+           value={query}
+-          onChange={(e) => onQuery(e.target.value)}
+-          style={{ height: 38, width: 170, borderRadius: 10, border: '2px solid var(--line-strong)', padding: '0 12px', fontFamily: 'var(--font)', fontSize: 15 }}
++          onChange={(e) => {
++            const v = e.target.value;
++            setQuery(v);
++            const hit = stations.find((s) => shortId(s.id) === v.trim().toUpperCase());
++            if (hit) setSelected(hit.id);
++          }}
++          style={{ height: 38, width: 220, borderRadius: 10, border: '2px solid var(--line-strong)', padding: '0 12px', fontFamily: 'var(--font)', fontSize: 15 }}
+         />
+-        <FilterChip active={status === 'ALL'} onClick={() => onStatus('ALL')}>Tous · {stations.length}</FilterChip>
++        <datalist id="cell-stations">
++          {stations.map((s) => <option key={s.id} value={shortId(s.id)}>{STATUS[s.status][0]}</option>)}
++        </datalist>
++        {query && <button className="icon-btn" onClick={() => { setQuery(''); setSelected(null); }} aria-label="Effacer le poste" title="Effacer">✕</button>}
++        <FilterChip active={status === 'ALL'} onClick={() => setStatus('ALL')}>Tous · {stations.length}</FilterChip>
+         {present.map((k) => (
+-          <FilterChip key={k} active={status === k} onClick={() => onStatus(k)}>
++          <FilterChip key={k} active={status === k} onClick={() => setStatus(k)}>
+             <span style={{ width: 9, height: 9, borderRadius: 5, background: DOT[k] }} />
+             {STATUS[k][0]} · {stations.filter((s) => s.status === k).length}
+           </FilterChip>
+         ))}
+       </div>
+ 
+-    <div style={{ overflowX: 'auto' }}>
+-      <table className="station-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
+-        <thead>
+-          <tr className="muted">
+-            <th style={th}>POSTE</th>
+-            <th style={th}>ÉTAT</th>
+-            <th style={{ ...th, width: '26%' }}>AVANCEMENT DU SHIFT</th>
+-            <th style={th}>RYTHME</th>
+-            <th style={{ ...th, textAlign: 'right' }}>KO</th>
+-            <th style={th}>ALERTE EN COURS</th>
+-            <th style={th}><span className="sr-only">Actions</span></th>
+-          </tr>
+-        </thead>
+-        <tbody>
+-          {shown.map((s) => {
+-            const delta = s.good - s.expectedNow;
+-            const stAlerts = alerts.filter((a) => a.stationId === s.id);
+-            const hot = s.status === 'SECURITE' || s.status === 'QUALITE';
+-            const open = () => nav(stationScreenUrl(s.id, s.status));
+-            return (
+-              <tr
+-                key={s.id}
+-                tabIndex={0}
+-                onClick={open}
+-                onKeyDown={(e) => { if (e.key === 'Enter') open(); }}
+-                aria-label={`Poste ${shortId(s.id)} : ${STATUS[s.status][0]}, ${deltaText(delta, true)}. Ouvrir l’écran du poste`}
+-                style={{ boxShadow: hot ? 'inset 4px 0 0 var(--red)' : undefined }}
+-              >
+-                <td style={{ padding: '12px 10px' }}><span className="cond" style={{ fontWeight: 700, fontSize: 22 }}>{shortId(s.id)}</span></td>
+-                <td>
+-                  <span className="row" style={{ gap: 8, fontWeight: 600, fontSize: 14 }}>
+-                    <span style={{ width: 10, height: 10, borderRadius: 5, background: DOT[s.status], flexShrink: 0 }} />{STATUS[s.status][0]}
+-                  </span>
+-                </td>
+-                <td>
+-                  <div className="row" style={{ gap: 10 }}>
+-                    <div className="track grow" style={{ height: 10, overflow: 'visible' }}>
+-                      <div className="fill" style={{ width: `${(s.good / s.target) * 100}%`, background: delta >= 0 ? 'var(--green)' : 'var(--amber)' }} />
+-                      <div style={{ position: 'absolute', left: `${(s.expectedNow / s.target) * 100}%`, top: -4, width: 3, height: 18, borderRadius: 2, background: 'var(--navy)' }} />
+-                    </div>
+-                    <span className="muted" style={{ fontSize: 13, width: 78, textAlign: 'right', whiteSpace: 'nowrap' }}>{s.good} / {fmt(s.target)}</span>
+-                  </div>
+-                </td>
+-                <td style={{ fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap', color: delta < 0 ? 'var(--red-text)' : 'var(--green-text)' }}>{deltaText(delta, true)}</td>
+-                <td style={{ textAlign: 'right', fontWeight: 600 }}>{s.ko}</td>
+-                <td style={{ fontSize: 14, maxWidth: 260 }}>
+-                  {stAlerts.length
+-                    ? <span style={{ display: 'block', fontWeight: 600, color: 'var(--red-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={stAlerts.map((a) => a.title).join(' · ')}>{stAlerts[0].title}{stAlerts.length > 1 ? ` (+${stAlerts.length - 1})` : ''}</span>
+-                    : <span className="muted">–</span>}
+-                </td>
+-                <td style={{ textAlign: 'right', whiteSpace: 'nowrap', paddingRight: 6 }}>
+-                  <Link to={stationHistoryUrl(s.id)} onClick={(e) => e.stopPropagation()} className="icon-btn" title="Historique du shift" aria-label={`Historique du poste ${shortId(s.id)}`}>
+-                    <Icon d={ICONS.log} size={18} />
+-                  </Link>
+-                  <span className="muted" aria-hidden="true" style={{ fontSize: 22, marginLeft: 10 }}>›</span>
+-                </td>
+-              </tr>
+-            );
+-          })}
+-        </tbody>
+-      </table>
+-      {!shown.length && <div className="muted" style={{ padding: '18px 10px' }}>Aucun poste ne correspond au filtre.</div>}
++      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12 }}>
++        {filtered.map((s) => {
++          const delta = s.good - s.expectedNow;
++          const hot = s.status === 'SECURITE' || s.status === 'QUALITE';
++          const isSel = s.id === selected;
++          return (
++            <button
++              key={s.id}
++              onClick={() => setSelected(isSel ? null : s.id)}
++              aria-expanded={isSel}
++              aria-label={`Poste ${shortId(s.id)} : ${STATUS[s.status][0]}, ${deltaText(delta, true)}, ${s.ko} pièces NOK. Voir le détail`}
++              className="col"
++              style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px', borderRadius: 16, background: '#fff',
++                border: isSel ? '2px solid var(--navy)' : hot ? '2px solid var(--red)' : '1px solid var(--line)' }}
++            >
++              <span className="cond" style={{ fontWeight: 700, fontSize: 26, lineHeight: 1 }}>{shortId(s.id)}</span>
++              <span className="row" style={{ gap: 8, fontWeight: 600, fontSize: 15 }}>
++                <span style={{ width: 10, height: 10, borderRadius: 5, background: DOT[s.status], flexShrink: 0 }} />{STATUS[s.status][0]}
++              </span>
++              <span style={{ fontWeight: 700, fontSize: 17, color: delta < 0 ? 'var(--red-text)' : 'var(--green-text)' }}>{deltaText(delta, true)}</span>
++              <span className="muted" style={{ fontSize: 14 }}><b style={{ color: 'var(--ink)', fontSize: 16 }}>{s.ko}</b> pièces NOK</span>
++            </button>
++          );
++        })}
++      </div>
++      {!filtered.length && <div className="muted" style={{ padding: '18px 10px' }}>Aucun poste ne correspond au filtre.</div>}
++
++      {detail && <StationDetailPanel s={detail} alerts={alerts.filter((a) => a.stationId === detail.id)} onClose={() => setSelected(null)} onScreen={() => nav(stationScreenUrl(detail.id, detail.status))} />}
+     </div>
++  );
++}
+ 
++/** Détail d'un poste, ouvert d'un clic sur sa carte. */
++function StationDetailPanel({ s, alerts, onClose, onScreen }: { s: StationSummary; alerts: Alert[]; onClose: () => void; onScreen: () => void }) {
++  const delta = s.good - s.expectedNow;
++  return (
++    <div className="col" style={{ gap: 14, border: '2px solid var(--navy)', borderRadius: 16, padding: '16px 20px', background: '#fff' }}>
+       <div className="between" style={{ alignItems: 'center' }}>
+-        <span className="muted" style={{ fontSize: 13 }}>
+-          {filtered.length ? `Postes ${current * PAGE_SIZE + 1} à ${current * PAGE_SIZE + shown.length} sur ${filtered.length}` : ''}
+-          {filtered.length !== stations.length ? ` (filtre actif sur ${stations.length})` : ''}
++        <span className="row" style={{ gap: 14 }}>
++          <span className="cond" style={{ fontWeight: 700, fontSize: 26 }}>Poste {shortId(s.id)}</span>
++          <span className="row" style={{ gap: 8, fontWeight: 600 }}><span style={{ width: 10, height: 10, borderRadius: 5, background: DOT[s.status] }} />{STATUS[s.status][0]}</span>
++          <span className="muted" style={{ fontSize: 14 }}>{s.product}</span>
+         </span>
+-        {pages > 1 && (
+-          <nav className="row" aria-label="Pages du tableau" style={{ gap: 6 }}>
+-            <button className="page-btn" disabled={current === 0} onClick={() => setPage(current - 1)} aria-label="Page précédente">‹</button>
+-            {Array.from({ length: pages }, (_, i) => (
+-              <button key={i} className="page-btn" aria-current={i === current ? 'page' : undefined} onClick={() => setPage(i)}>{i + 1}</button>
+-            ))}
+-            <button className="page-btn" disabled={current === pages - 1} onClick={() => setPage(current + 1)} aria-label="Page suivante">›</button>
+-          </nav>
+-        )}
++        <button onClick={onClose} className="icon-btn" aria-label="Fermer le détail" title="Fermer">✕</button>
++      </div>
++      <div className="col" style={{ gap: 6 }}>
++        <div className="between"><span className="muted" style={{ fontSize: 14 }}>Avancement du shift · trait noir = attendu maintenant ({fmt(s.expectedNow)})</span><span style={{ fontWeight: 700 }}>{fmt(s.good)} / {fmt(s.target)}</span></div>
++        <div className="track" style={{ height: 12, overflow: 'visible' }}>
++          <div className="fill" style={{ width: `${(s.good / s.target) * 100}%`, background: delta >= 0 ? 'var(--green)' : 'var(--amber)' }} />
++          <div style={{ position: 'absolute', left: `${(s.expectedNow / s.target) * 100}%`, top: -4, width: 3, height: 20, borderRadius: 2, background: 'var(--navy)' }} />
++        </div>
++      </div>
++      <div className="row" style={{ gap: 28, flexWrap: 'wrap' }}>
++        <span><span className="muted" style={{ fontSize: 14 }}>Rythme </span><b style={{ color: delta < 0 ? 'var(--red-text)' : 'var(--green-text)' }}>{deltaText(delta, true)}</b></span>
++        <span><span className="muted" style={{ fontSize: 14 }}>Pièces NOK </span><b>{s.ko}</b> <span className="muted" style={{ fontSize: 14 }}>({((s.ko / Math.max(1, s.good + s.ko)) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %)</span></span>
++      </div>
++      <div className="col" style={{ gap: 4 }}>
++        <span className="muted" style={{ fontSize: 14 }}>Alertes en cours</span>
++        {alerts.length ? alerts.map((a) => <span key={a.id} style={{ fontWeight: 600, color: 'var(--red-text)' }}>{a.title} <span className="muted" style={{ fontWeight: 400 }}>· {a.when}</span></span>) : <span className="muted">Aucune</span>}
++      </div>
++      <div className="row" style={{ gap: 10 }}>
++        <button className="btn btn-dark" onClick={onScreen} style={{ padding: '10px 18px', borderRadius: 12 }}>Voir l’écran du poste</button>
++        <Link to={stationHistoryUrl(s.id)} className="btn btn-ghost" style={{ padding: '10px 18px', borderRadius: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Historique du shift</Link>
+       </div>
+     </div>
+   );
 diff --git a/argos-ui/src/vite-env.d.ts b/argos-ui/src/vite-env.d.ts
 index 73d2b55..f3b517c 100644
 --- a/argos-ui/src/vite-env.d.ts
