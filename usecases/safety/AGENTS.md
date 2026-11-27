@@ -19,9 +19,17 @@ Faux analyseur (`analyzer.py:FakeSafetyAnalyzer`) : résultats aléatoires mais 
 
 ## Décisions prises
 <!-- Une ligne par décision : AAAA-MM-JJ HH:MM — décision — raison. -->
+- 2026-11-26 — EPI suivis : casque, lunettes, gants, chaussures (pas de gilet) — besoin du binôme.
+- 2026-11-26 — Données d'entraînement : SH17 (8 099 images, licence CC BY-NC-SA 4.0, usage non commercial, citer Ahmad & Rahimi 2024) — Hutchinson ne fournit pas de vidéos.
+- 2026-11-26 — Ordre des classes SH17 = celui des poids officiels, pas celui du README — vérifié sur les annotations VOC.
+- 2026-11-26 — Classes du modèle : person, face, helmet, glasses, gloves, shoes, head, hands, foot — person pour le contrat, face pour masquer les visages, head/hands/foot comme preuve d'absence d'un EPI.
+- 2026-11-26 — Réentraînement depuis yolov8s COCO sur GPU (école), arrêt sur la validation SH17 — les poids SH17 officiels ratent 60 % des gants (rappel 0,40), même en baissant le seuil ; partir de COCO évite de réentraîner sur les mêmes images.
+- 2026-11-26 — Visages toujours pixellisés avant affichage ou sauvegarde — RGPD.
 
 ## Questions ouvertes
 <!-- Questions sur le besoin métier ou les données, à poser à l'équipe ou à Hutchinson. -->
+- Chaussures / gants / lunettes **de sécurité** ou n'importe lesquels ? SH17 ne fait pas la différence (à traiter plus tard).
+- Ajouter `shoes` au contrat `PersonPPE` (`visionhub/contracts.py`) : accord de l'équipe nécessaire.
 
 ## Résultats
 <!-- À remplir : jeu de test utilisé (data/test/safety, nombre d'images), seuils retenus (low / high) et pourquoi,
