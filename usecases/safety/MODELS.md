@@ -24,7 +24,7 @@ Pour la production : réentraîner sur les images de l'usine (le levier de préc
 - Comparaison : les poids officiels des auteurs de SH17 (YOLOv8) détectent environ 0,30 sur les gants.
 - Le casque (70 exemples en validation) et le pied (75) ont peu d'exemples : leurs chiffres sont incertains.
 - **À compléter** : les mêmes mesures sur le **jeu de test** (810 images jamais utilisées), chiffres définitifs.
-- Vitesse mesurée : ≈ 80 ms par image sur un ordinateur portable (YOLOv8s + modèle téléphone). À mesurer : YOLO26 sur l'ordinateur et sur le boîtier.
+- Vitesse mesurée au processeur d'un ordinateur portable (Mac, 50 images de validation, temps médian, pendant que la démo tournait : valeurs absolues un peu hautes, comparaison juste) : YOLOv8n 57 ms, **YOLO26s 96 ms**, YOLOv8s 115 ms, modèle téléphone 58 ms. YOLO26s est donc plus précis **et** environ 17 % plus rapide que YOLOv8s. Démo complète (EPI + téléphone + floutage + vidéo) : 80 à 100 ms par image. À mesurer sur le boîtier.
 
 ## 3. Ce que les modèles détectent
 
