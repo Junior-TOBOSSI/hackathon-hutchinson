@@ -171,3 +171,13 @@ def test_idle_phone_is_one_touching_no_hand_and_no_head():
     held = Det("cell phone", 0.6, (0.33, 0.48, 0.37, 0.53))
     on_bench = Det("cell phone", 0.6, (0.8, 0.9, 0.85, 0.95))
     assert idle_phones([PERSON, hand], [held, on_bench], P) == [on_bench]
+
+
+def test_unsure_face_is_still_hidden_but_ignored_by_the_rules():
+    """A face at 0.15 is too weak for the glasses rule, but must still be pixelated."""
+    unsure_face = Det("face", 0.15, (0.3, 0.1, 0.4, 0.2))
+    analyzer = make_analyzer([[PERSON, unsure_face]])
+    result = analyzer.analyze(IMAGE, meta(0))
+    assert unsure_face in analyzer.last_privacy
+    assert unsure_face not in analyzer.last_detections
+    assert result.details.persons[0].glasses == PPEState.UNCERTAIN

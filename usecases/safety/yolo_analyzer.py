@@ -47,6 +47,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PPE_ITEMS = ("helmet", "glasses", "gloves", "shoes")
 PHONE_CLASS = "cell phone"
 PHONE_ZONE = ("hands", "gloves", "head")  # a phone touching one of these is "in use"
+PRIVACY_CLASSES = ("face", "head", "person")  # boxes used to hide faces before display
 
 DEFAULTS: dict[str, Any] = {
     "weights": "data/models/safety/sh17_yolov8n.pt",
@@ -61,6 +62,7 @@ DEFAULTS: dict[str, Any] = {
     "shoes_absent_score": 0.5,
     "full_body_bottom": 0.97,  # person box ending above this (normalized y) = feet in view
     "phone_margin": 0.5,
+    "privacy_conf": 0.10,  # faces, heads, persons kept from this confidence on, for hiding
 }
 
 
@@ -209,10 +211,13 @@ class YoloSafetyAnalyzer(Analyzer):
 
     def analyze(self, image: np.ndarray, meta: FrameMeta) -> AnalysisResult:
         class_conf = self.p["class_conf"]
-        low = min([self.p["conf"], *class_conf.values()])
-        dets = [
-            d for d in self._predict(self.model, image, low)
-            if d.conf >= class_conf.get(d.name, self.p["conf"])
+        low = min([self.p["conf"], *class_conf.values(), self.p["privacy_conf"]])
+        raw = self._predict(self.model, image, low)
+        dets = [d for d in raw if d.conf >= class_conf.get(d.name, self.p["conf"])]
+        # Privacy: faces must be hidden even when the model is unsure, so the boxes used
+        # for hiding keep a much lower threshold than the business rules (one inference).
+        self.last_privacy = [
+            d for d in raw if d.name in PRIVACY_CLASSES and d.conf >= self.p["privacy_conf"]
         ]  # fmt: skip
         phones = []
         if self.phone_model is not None:
