@@ -91,7 +91,7 @@ export function Donut({ items, centerLabel = 'images', size = 168 }: { items: { 
   );
 }
 
-export const SPLIT_BLUES = ['var(--navy)', 'var(--primary)', '#8fb4e8'];
+export const SPLIT_BLUES = ['#0b2545', '#2f6fd6', '#9cc3f0']; // train, validation, test: three distinct blues
 
 /** Barre horizontale empilée unique (ex. train / validation / test). */
 export function StackedBar({ items }: { items: { label: string; count: number; color: string }[] }) {
@@ -117,7 +117,8 @@ export function StackedBar({ items }: { items: { label: string; count: number; c
 
 const FR: Record<string, string> = {
   random: 'aléatoire', 'random (stratified, seeded)': 'aléatoire (stratifié, graine fixe)', by_sequence: 'par séquence',
-  by_time: 'par période', by_station: 'par poste', by_burst: 'par rafale',
+  by_time: 'par période', by_station: 'par poste', by_burst: 'par rafale', 'by_burst (group)': 'par rafale (groupe)',
+  manual: 'manuel (split choisi à l’import)', by_source: 'par source',
   validated: 'validées', corrected: 'corrigées', excluded: 'exclues', imported: 'importées',
   quality: 'Qualité', workstation: 'Poste de travail / 5S', safety: 'Sécurité',
   classification: 'classification', detection: 'détection', none: 'non revue',

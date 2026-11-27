@@ -47,8 +47,7 @@ export default function Datasets() {
   return <div className="dataset-catalog col" style={{ gap: 14 }}>
     <header className="card dataset-hero">
       <div><h1 className="h2">Datasets — Catalogue & versions</h1>
-        <p className="muted">Gérez vos données d’entraînement, leurs annotations, leurs versions et leur traçabilité.</p>
-        <span className="muted" style={{ fontSize: 13 }}>Dernière synchronisation : {catalog.fetchedAt ? new Date(catalog.fetchedAt).toLocaleString('fr-FR') : 'indisponible'} · {catalog.cache === 'stale' ? 'dernière valeur connue' : catalog.cache === 'hit' ? 'cache serveur' : 'lecture directe'}</span></div>
+        <p className="muted">Gérez vos données d’entraînement, leurs annotations, leurs versions et leur traçabilité.</p></div>
       <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
         <button className="btn btn-ghost" onClick={() => store.invalidate('dataset-catalog')}>Actualiser</button>
         <Badge tone={health.error ? 'red' : health.data?.ok ? 'green' : 'amber'}>{health.error ? 'Databricks indisponible' : health.data?.ok ? 'Databricks connecté' : 'Connexion en cours'}</Badge>
