@@ -22,6 +22,7 @@ import json
 import math
 import uuid
 from collections import Counter, defaultdict
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -34,6 +35,7 @@ DECISIONS_CORE = ["conforme", "a_verifier", "anomalie"]
 # Offline evaluation decisions of the Quality group (evaluer.py) mapped to the platform ones.
 OFFLINE_DECISION = {"OK": "conforme", "A_VERIFIER": "a_verifier", "NOK": "anomalie"}
 MAX_STORED_SCORES = 5000
+MAX_ITEMS = 500
 
 
 def now_iso() -> str:
@@ -76,18 +78,41 @@ def observations(snap: CoreSnapshot) -> tuple[list[dict], list[dict], list[dict]
                     "simulated": simulated,
                     # not carried by inference events yet (coordination request)
                     "package_sha256": None,
+                    "inner_event_id": ev.get("event_id"),
                 }
             )
+            inferences[-1]["model_key"] = model_key(inferences[-1])
         elif kind == "part.corrected":
             c = payload.get("correction") or {}
             cid = c.get("correction_id") or e["event_id"]
             corrections[cid] = {**c, "station_id": e["station_id"], "simulated": simulated}
+    by_inner = {i["inner_event_id"]: i for i in inferences if i.get("inner_event_id")}
     parts, seen_parts = [], set()
     for p in snap.parts:
         if p["part_id"] in seen_parts:
             continue
         seen_parts.add(p["part_id"])
-        parts.append({**p, "simulated": simulated_station.get(p["station_id"], False)})
+        pred = p.get("prediction") or {}
+        # Exact link part -> inference through the inference event id (never by names).
+        inf = by_inner.get(pred.get("event_id")) if pred else None
+        parts.append(
+            {
+                **p,
+                "simulated": simulated_station.get(p["station_id"], False),
+                "model_key": inf["model_key"] if inf else None,
+                "use_case": inf["use_case"] if inf else None,
+                "model_version": str(pred["model_version"]) if pred.get("model_version") else None,
+            }
+        )
+    by_part = {p["part_id"]: p for p in parts}
+    for c in corrections.values():
+        p = by_part.get(c.get("part_id")) or {}
+        c.update(
+            model_key=p.get("model_key"),
+            use_case=p.get("use_case"),
+            model_version=p.get("model_version"),
+            ai_initial=p.get("predicted_verdict"),
+        )
     return inferences, parts, list(corrections.values())
 
 
@@ -105,6 +130,7 @@ def select(
     end: datetime | None = None,
     key: str | None = None,
     version: str | None = None,
+    use_case: str | None = None,
     time_field: str = "occurred_at",
 ) -> list[dict]:
     out = []
@@ -120,7 +146,9 @@ def select(
             continue
         if end and (t is None or t >= end):
             continue
-        if key and model_key(r) != key:
+        if key and r.get("model_key") != key:
+            continue
+        if use_case and r.get("use_case") != use_case:
             continue
         if version and r.get("model_version") != version:
             continue
@@ -198,6 +226,28 @@ def human(parts: list[dict], corrections: list[dict]) -> dict[str, Any]:
         "not confirmations without "
         "correction, so the number of verified parts (denominator) is unknown",
         "warning": "Observed disagreements are NOT a production accuracy.",
+        "items": [
+            {
+                k: c.get(k)
+                for k in (
+                    "correction_id",
+                    "at",
+                    "station_id",
+                    "part_id",
+                    "sequence",
+                    "model_key",
+                    "model_version",
+                    "ai_initial",
+                    "previous_verdict",
+                    "new_verdict",
+                    "reason",
+                    "physical_inspection",
+                    "actor_role",
+                    "simulated",
+                )
+            }
+            for c in sorted(corrections, key=lambda c: str(c.get("at")), reverse=True)[:MAX_ITEMS]
+        ],
     }
 
 
@@ -237,30 +287,32 @@ class MonitoringService:
     # ------------------------------------------------------------------ operational
 
     def operational(
-        self, *, data_kind="all", station=None, key=None, version=None, start=None, end=None
+        self,
+        *,
+        data_kind="all",
+        station=None,
+        key=None,
+        version=None,
+        start=None,
+        end=None,
+        use_case=None,
     ) -> dict[str, Any]:
         snap = self._snapshot()
         infs, parts, corrections = observations(snap)
-        sel = select(
-            infs,
-            data_kind=data_kind,
-            station=station,
-            key=key,
-            version=version,
-            start=start,
-            end=end,
-        )
+        f = {
+            "data_kind": data_kind,
+            "station": station,
+            "key": key,
+            "version": version,
+            "use_case": use_case,
+            "start": start,
+            "end": end,
+        }
+        sel = select(infs, **f)
         groups: dict[tuple, list[dict]] = defaultdict(list)
         for i in sel:
             groups[(model_key(i), i["model_version"], i["station_id"])].append(i)
-        sel_parts = select(
-            parts,
-            data_kind=data_kind,
-            station=station,
-            start=start,
-            end=end,
-            time_field="created_at",
-        )
+        sel_parts = select(parts, **f, time_field="created_at")
         errors = Counter((p.get("error") or {}).get("code") for p in sel_parts if p.get("error"))
         return {
             "status": "unavailable"
@@ -284,7 +336,8 @@ class MonitoringService:
                 "with_inference_error": sum(errors.values()),
                 "error_codes": dict(errors),
                 "note": "errors observed on parts (Core parts API); "
-                "errors without a part are not reported by the Core",
+                "errors without a part are not reported by the Core; with a model filter, "
+                "only parts linked to an inference of that model are counted",
             },
             "model_states": [
                 {
@@ -303,10 +356,7 @@ class MonitoringService:
                 for s in snap.stations
                 if not station or s["station_id"] == station
             ],
-            "human": human(
-                select(parts, data_kind=data_kind, station=station),
-                select(corrections, data_kind=data_kind, station=station, time_field="at"),
-            ),
+            "human": human(sel_parts, select(corrections, **f, time_field="at")),
         }
 
     # ------------------------------------------------------------------ offline (MLflow)
@@ -495,8 +545,13 @@ class MonitoringService:
             reasons.append("synthetic / simulated data compared with real data")
         base = {
             "reference_id": reference["reference_id"],
+            "reference_source": reference.get("source"),
+            "reference_representative": reference.get("representative"),
+            "reference_warnings": reference.get("warnings", []),
             "n_reference": reference["n"],
             "n_current": len(population),
+            "thresholds": asdict(self.t),
+            "histogram": _histograms(reference, population),
         }
         if reasons:
             return {**base, "status": "incompatible", "reasons": reasons}
@@ -660,53 +715,116 @@ class MonitoringService:
 
     # ------------------------------------------------------------------ catalogue / summary
 
-    def models(self, data_kind: str = "all") -> list[dict[str, Any]]:
-        op = self.operational(data_kind=data_kind)
+    def drift_status(self, key: str, version: str, rows: list[dict]) -> dict[str, Any]:
+        """Monitoring state of one (model key, version) against its latest stored reference,
+        WITHOUT writing anything. Distinguishes absent / insufficient / incompatible / levels."""
+        refs = [r for r in self.store.references(key) if str(r["model_version"]) == str(version)]
+        if not refs:
+            return {"status": "reference_absent", "version": version}
+        kinds = {bool(r.get("simulated")) for r in rows}
+        if len(kinds) > 1:
+            return {
+                "status": "mixed_data",
+                "version": version,
+                "reason": "filter real or simulated data to evaluate the drift",
+            }
+        result = self.drift(
+            refs[-1], rows, key, version, kinds == {True}, f"{key}: Core inference score"
+        )
+        if result["status"] != "available":
+            return {
+                "status": result["status"],
+                "version": version,
+                "reasons": result.get("reasons", []),
+                "reference_id": result["reference_id"],
+                "n_reference": result["n_reference"],
+                "n_current": result["n_current"],
+            }
+        levels = [
+            m["level"] for m in result["measures"] if m.get("level") in ("alert", "watch", "stable")
+        ]
+        level = "alert" if "alert" in levels else "watch" if "watch" in levels else "stable"
+        return {
+            "status": level,
+            "version": version,
+            "reference_id": result["reference_id"],
+            "n_reference": result["n_reference"],
+            "n_current": result["n_current"],
+        }
+
+    def models(
+        self, data_kind: str = "all", *, use_case=None, station=None, start=None, end=None
+    ) -> list[dict[str, Any]]:
+        """Catalogue: operational keys observed in the Core (NOT associated with the registry)
+        and registered models (no inference associated until an exact package reference)."""
+        snap = self._snapshot()
+        infs, parts, corrections = observations(snap)
+        f = {
+            "data_kind": data_kind,
+            "station": station,
+            "use_case": use_case,
+            "start": start,
+            "end": end,
+        }
+        sel = select(infs, **f)
+        sel_corr = select(corrections, **f, time_field="at")
         alerts = self.store.alerts("open")
-        rows: dict[str, dict] = {}
-        for g in op["groups"]:
-            r = rows.setdefault(
-                g["model_key"],
+        rows: list[dict] = []
+        for key, group in sorted(_group(sel, lambda i: i["model_key"]).items()):
+            agg = aggregate(group, start, end)
+            by_version = _group(group, lambda i: i["model_version"])
+            latest = max(by_version, key=lambda v: max(i["occurred_at"] for i in by_version[v]))
+            rows.append(
                 {
-                    "model_key": g["model_key"],
-                    "registry_link": g["registry_link"],
-                    "versions": set(),
-                    "stations": set(),
-                    "n_inferences": 0,
-                    "simulated": set(),
-                },
-            )
-            r["versions"].add(g["model_version"])
-            r["stations"].add(g["station_id"])
-            r["n_inferences"] += g["n_inferences"]
-            r["simulated"].update(g["simulated"])
-        if self.c is not None:
-            for m in self.c.settings.models:
-                rows.setdefault(
-                    f"registry:{m.id}",
-                    {
-                        "model_key": f"registry:{m.id}",
-                        "registry_link": m.uc_name,
-                        "versions": set(),
-                        "stations": set(),
-                        "n_inferences": 0,
-                        "simulated": set(),
-                        "note": "no production inference associated with this registered model",
-                    },
-                )
-        out = []
-        for r in rows.values():
-            out.append(
-                {
-                    **r,
-                    "versions": sorted(r["versions"]),
-                    "stations": sorted(r["stations"]),
-                    "simulated": sorted(r["simulated"]),
-                    "open_alerts": sum(1 for a in alerts if a["model_key"] == r["model_key"]),
-                    "references": len(self.store.references(r["model_key"])),
+                    "model_key": key,
+                    "source": "operational",
+                    "name": group[0]["model_name"],
+                    "use_case": group[0]["use_case"],
+                    "registry_link": "not associated with the registry",
+                    "versions": sorted(by_version),
+                    "stations": sorted({i["station_id"] for i in group}),
+                    "n_inferences": agg["n_inferences"],
+                    "n_parts": agg["n_parts"],
+                    "latency_p95": agg["latency_ms"]["p95"],
+                    "last_activity": agg["last_activity"],
+                    "simulated": agg["simulated"],
+                    "corrections": sum(1 for c in sel_corr if c.get("model_key") == key),
+                    "drift": self.drift_status(key, latest, by_version[latest]),
                 }
             )
-        return sorted(out, key=lambda r: r["model_key"])
+        if self.c is not None:
+            for m in self.c.settings.models:
+                if use_case and m.argos_use_case != use_case:
+                    continue
+                rows.append(
+                    {
+                        "model_key": f"registry:{m.id}",
+                        "source": "registry",
+                        "name": m.display_name,
+                        "use_case": m.argos_use_case,
+                        "registry_link": m.uc_name,
+                        "model_id": m.id,
+                        "versions": [],
+                        "stations": [],
+                        "n_inferences": 0,
+                        "n_parts": 0,
+                        "latency_p95": None,
+                        "last_activity": None,
+                        "simulated": [],
+                        "corrections": 0,
+                        "synthetic": m.synthetic,
+                        "drift": {"status": "no_production_data"},
+                        "note": "no production inference associated with this registered model",
+                    }
+                )
+        for r in rows:
+            r["open_alerts"] = sum(1 for a in alerts if a["model_key"] == r["model_key"])
+            r["references"] = len(self.store.references(r["model_key"]))
+            r["needs_investigation"] = bool(r["open_alerts"]) or r["drift"]["status"] in (
+                "alert",
+                "watch",
+            )
+        return rows
 
     def summary(self, data_kind: str = "all") -> dict[str, Any]:
         op = self.operational(data_kind=data_kind)
@@ -726,6 +844,7 @@ class MonitoringService:
             "availability_alerts": sum(1 for a in alerts if a.get("kind") == "availability"),
             "last_collection": last[0]["at"] if last else None,
             "simulated_only": op["total"]["simulated"] == [True],
+            "latency_p95": op["total"]["latency_ms"]["p95"],
         }
 
     # ------------------------------------------------------------------ DBX-08 signals (read-only)
@@ -816,6 +935,26 @@ def _representativeness(n_test: float | None, minimum: int) -> dict[str, Any]:
             "warnings": [f"test of {int(n_test)} images (< {minimum}): not representative"],
         }
     return {"representative": True, "warnings": []}
+
+
+def _histograms(reference: dict, population: list[dict]) -> dict[str, Any] | None:
+    """Reference and current score distributions on the SAME reference edges (proportions)."""
+    if not reference.get("edges") or not reference.get("scores"):
+        return None
+    edges = [
+        (-math.inf if i == 0 else math.inf) if e is None else e
+        for i, e in enumerate(reference["edges"])
+    ]
+    cur = [float(p["score"]) for p in population if p.get("score") is not None]
+    ref_counts = stats.histogram(reference["scores"], edges)
+    cur_counts = stats.histogram(cur, edges)
+    return {
+        "edges": reference["edges"],
+        "reference_counts": ref_counts,
+        "current_counts": cur_counts,
+        "reference": [c / len(reference["scores"]) for c in ref_counts],
+        "current": [c / len(cur) for c in cur_counts] if cur else None,
+    }
 
 
 def _group(rows: list[dict], key) -> dict:

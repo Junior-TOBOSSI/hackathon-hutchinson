@@ -518,3 +518,89 @@ def test_offline_performance_of_a_tiny_test_is_flagged_not_representative():
     assert _representativeness(18, 100)["representative"] is False
     assert _representativeness(None, 100)["representative"] is None
     assert _representativeness(400, 100)["representative"] is True
+
+
+# ------------------------------------------------------------- DBX-07C additions (catalogue)
+
+
+def linked_part(pid, inner_event_id, predicted="NOK", version="1"):
+    return {
+        **part(pid, predicted),
+        "prediction": {
+            "event_id": inner_event_id,
+            "model_name": "argos-demo-quality",
+            "model_version": version,
+        },
+    }
+
+
+def test_parts_and_corrections_are_linked_to_a_model_only_by_exact_event_id(tmp_path):
+    inf = inference(1, 0.9)
+    inf["payload"]["event"]["event_id"] = "inner-1"
+    parts = [linked_part("p1", "inner-1"), linked_part("p2", "unknown-event")]
+    corr = correction("p1", 1, "OK")
+    corr["payload"]["correction"].update(reason="bavure visible", previous_verdict="NOK")
+    s = svc(tmp_path, FakeCore([inf, corr], parts))
+    _, ps, cs = observations(s.core.snapshot())
+    assert {p["part_id"]: p["model_key"] for p in ps} == {"p1": KEY, "p2": None}
+    h = s.operational(key=KEY)["human"]
+    assert h["corrections"] == 1 and h["items"][0]["reason"] == "bavure visible"
+    assert h["items"][0]["model_key"] == KEY and h["items"][0]["ai_initial"] == "NOK"
+    assert cs[0]["model_version"] == "1"
+
+
+def test_catalogue_separates_registry_and_operational_models_and_drift_states(tmp_path):
+    s = svc(tmp_path, FakeCore([inference(i, 0.2) for i in range(5)]))
+    s.c = SimpleNamespace(
+        settings=SimpleNamespace(
+            models=[
+                SimpleNamespace(
+                    id="quality-industrial",
+                    display_name="Qualité 702",
+                    argos_use_case="quality",
+                    uc_name="workspace.argos_poc.quality_industrial",
+                    synthetic=True,
+                )
+            ]
+        ),
+        _cached=lambda k, f, ttl=None: f(),
+    )
+    rows = {r["model_key"]: r for r in s.models("simulated")}
+    op, reg = rows[KEY], rows["registry:quality-industrial"]
+    assert (
+        op["source"] == "operational" and op["registry_link"] == "not associated with the registry"
+    )
+    assert (
+        reg["source"] == "registry"
+        and reg["n_inferences"] == 0
+        and reg["drift"]["status"] == "no_production_data"
+    )
+    assert op["drift"]["status"] == "reference_absent" and not op["needs_investigation"]
+    op_reference(s, n=40, day=3)
+    assert {r["model_key"]: r for r in s.models("simulated")}[KEY]["drift"][
+        "status"
+    ] == "insufficient_reference"
+    assert {r["model_key"]: r for r in s.models("all", use_case="safety")} == {}
+
+
+def test_catalogue_flags_a_drifting_model_for_investigation_without_writing(tmp_path):
+    s = svc(tmp_path, FakeCore())
+    op_reference(s, n=300, mu=0.2)
+    s.core.events = [
+        inference(1000 + i, x, at=T0 + timedelta(days=1, seconds=i))
+        for i, x in enumerate(scores(300, 0.7, seed=4))
+    ]
+    row = s.models("simulated")[0]
+    assert row["drift"]["status"] == "alert" and row["needs_investigation"]
+    assert s.store.alerts() == [] and s.store.snapshots() == []  # evaluation only
+
+
+def test_drift_reports_thresholds_and_histograms_on_reference_edges(tmp_path):
+    s = svc(tmp_path, FakeCore())
+    ref = op_reference(s, n=150)
+    pop = select(observations(s.core.snapshot())[0], key=KEY)
+    out = s.drift(ref, pop, KEY, "1", True, ref["score_definition"])
+    assert out["thresholds"]["psi_alert"] == 0.2 and out["thresholds"]["min_reference"] == 100
+    h = out["histogram"]
+    assert len(h["reference"]) == len(h["edges"]) - 1 == len(h["current"])
+    assert sum(h["reference_counts"]) == 150 and abs(sum(h["current"]) - 1) < 1e-9

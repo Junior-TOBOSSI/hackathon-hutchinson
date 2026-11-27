@@ -81,11 +81,44 @@ def create_monitoring_router(
     ) -> dict[str, Any]:
         return call(c, response, fresh, lambda: get_service(c).summary(data_kind))
 
+    def filters(
+        data_kind: Kind = "all",
+        station: str | None = None,
+        model_key: str | None = None,
+        version: str | None = None,
+        use_case: str | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "data_kind": data_kind,
+            "station": station,
+            "key": model_key,
+            "version": version,
+            "use_case": use_case,
+            "start": start,
+            "end": end,
+        }
+
+    Filters = Annotated[dict[str, Any], Depends(filters)]
+
     @router.get(f"{p}/models")
     def models(
-        c: Connector, response: Response, data_kind: Kind = "all", fresh: bool = False
+        c: Connector, response: Response, f: Filters, fresh: bool = False
     ) -> list[dict[str, Any]]:
-        return call(c, response, fresh, lambda: get_service(c).models(data_kind))
+        """Catalogue (filters: data_kind, use_case, station, start, end)."""
+        return call(
+            c,
+            response,
+            fresh,
+            lambda: get_service(c).models(
+                f["data_kind"],
+                use_case=f["use_case"],
+                station=f["station"],
+                start=f["start"],
+                end=f["end"],
+            ),
+        )
 
     @router.get(f"{p}/models/{{model_key:path}}")
     def model(
@@ -100,15 +133,12 @@ def create_monitoring_router(
             row = next((m for m in svc.models(data_kind) if m["model_key"] == model_key), None)
             if row is None:
                 raise LookupError(f"unknown monitoring model key {model_key}")
-            op = (
-                svc.operational(data_kind=data_kind, key=model_key)
-                if model_key.startswith("unassociated:")
-                else None
-            )
             return {
                 **row,
-                "operational": op,
-                "references": svc.store.references(model_key),
+                "references": [
+                    {k: v for k, v in r.items() if k not in ("scores", "latencies")}
+                    for r in svc.store.references(model_key)
+                ],
                 "alerts": [a for a in svc.store.alerts() if a["model_key"] == model_key],
             }
 
@@ -116,45 +146,19 @@ def create_monitoring_router(
 
     @router.get(f"{p}/inferences")
     def inferences(
-        c: Connector,
-        response: Response,
-        data_kind: Kind = "all",
-        station: str | None = None,
-        model_key: str | None = None,
-        version: str | None = None,
-        start: datetime | None = None,
-        end: datetime | None = None,
-        fresh: bool = False,
+        c: Connector, response: Response, f: Filters, fresh: bool = False
     ) -> dict[str, Any]:
         """Operational aggregates per model / version / station over the window."""
-        return call(
-            c,
-            response,
-            fresh,
-            lambda: get_service(c).operational(
-                data_kind=data_kind,
-                station=station,
-                key=model_key,
-                version=version,
-                start=start,
-                end=end,
-            ),
-        )
+        return call(c, response, fresh, lambda: get_service(c).operational(**f))
 
     @router.get(f"{p}/human")
-    def human(
-        c: Connector,
-        response: Response,
-        data_kind: Kind = "all",
-        station: str | None = None,
-        fresh: bool = False,
-    ) -> dict[str, Any]:
+    def human(c: Connector, response: Response, f: Filters, fresh: bool = False) -> dict[str, Any]:
         def load() -> dict[str, Any]:
-            op = get_service(c).operational(data_kind=data_kind, station=station)
+            op = get_service(c).operational(**f)
             return {
                 "status": op["status"],
                 "sources": op["sources"],
-                "data_kind": data_kind,
+                "data_kind": f["data_kind"],
                 **op["human"],
             }
 
