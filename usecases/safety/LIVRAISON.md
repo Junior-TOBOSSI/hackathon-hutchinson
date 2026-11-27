@@ -9,8 +9,8 @@
 | `usecases/safety/yolo_analyzer.py` | Analyseur réel `YoloSafetyAnalyzer` (interface `Analyzer`, contrat `SafetyDetails` respecté) |
 | `usecases/safety/hovis.py` | Traduction d'un résultat Safety en problèmes HOVIS (`StationIssue` d'argos-ui) |
 | `usecases/safety/config.yaml` | Réglages (modèles, EPI obligatoires, seuils, lissage). Le faux analyseur reste par défaut |
-| `usecases/safety/tests/test_yolo_logic.py` | 16 tests des règles métier, sans modèle |
-| `usecases/safety/tests/test_hovis.py` | 9 tests de la traduction vers HOVIS |
+| `usecases/safety/tests/test_yolo_logic.py` | 18 tests des règles métier, sans modèle |
+| `usecases/safety/tests/test_hovis.py` | 11 tests de la traduction vers HOVIS |
 | `usecases/safety/notebooks/` | Préparation des données, entraînement, évaluation, aperçu webcam (outils, hors plateforme) |
 | `usecases/safety/AGENTS.md` | Décisions prises et questions ouvertes |
 
@@ -73,6 +73,12 @@ Exemple de sortie :
 | `uncertain` (partie du corps non visible) | aucun problème affiché |
 
 Règles appliquées : rien n'est affiché si l'image est « conforme » (score lissé < 0,4) ; un seul problème par type pour le poste ; `since` garde l'heure de début tant que le problème dure ; aucune personne n'est identifiée.
+
+**Cases de l'écran opérateur** (`checks` de `StationLive`) :
+- `checks.securite = false` dès qu'il y a un problème `SECURITE_EPI` **ou** `COMPORTEMENT` : argos-ui classe le téléphone en main en « Sécurité · comportement » ;
+- `checks.poste = false` dès qu'il y a un problème `POSTE` (téléphone posé).
+
+**Délai d'affichage** : l'analyse prend ~0,1 s par image et le lissage ~0,5 s (à 4 images/s). Le délai visible vient surtout du rafraîchissement d'argos-ui : `Operateur.tsx` interroge le serveur toutes les **2 s**. Proposition : garder 2 s pour la production, mais **pousser** les problèmes Safety (WebSocket ou SSE), ou à défaut rafraîchir toutes les 0,5 s (~62 Ko/s par écran, mesuré). Testé en démo locale à 0,5 s : détection inchangée, alerte affichée en moins de 1,2 s.
 
 ## 5. Logique de décision (résumé)
 
