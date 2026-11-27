@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from usecases.safety.hovis import StationIssueTracker, current_problems, station_checks
+from usecases.safety.hovis import StationIssueTracker, current_problems, station_checks, station_ppe
 from visionhub.contracts import AnalysisResult, PersonPPE, PPEState, SafetyDetails, UseCase
 
 A, P, U = PPEState.ABSENT, PPEState.PRESENT, PPEState.UNCERTAIN
@@ -119,3 +119,33 @@ def test_problem_ends_after_the_hold_time():
     tracker = StationIssueTracker("P1", hold_s=5)
     tracker.update(result(0.9, [person(gloves=A)]), T0)
     assert tracker.update(result(0.1, [person()]), T0 + timedelta(seconds=6)) == []
+
+
+def test_station_ppe_agrees_with_the_issues():
+    worn = {"helmet": P, "glasses": A, "gloves": P, "shoes": U}
+    issues = StationIssueTracker("P1").update(result(0.9, [person(glasses=A)]), T0)
+    assert station_ppe([worn], issues) == {
+        "helmet": "present", "glasses": "absent", "gloves": "present", "shoes": "uncertain",
+    }  # fmt: skip
+    # Absent on this frame but smoothed away (no issue): not shown as a fault.
+    assert station_ppe([worn], [])["glasses"] == "uncertain"
+    # One person without it is enough to lose "present"; no one in view: nothing known.
+    assert station_ppe([worn, {**worn, "helmet": U}], [])["helmet"] == "uncertain"
+    assert set(station_ppe([], []).values()) == {"uncertain"}
+
+
+def test_shoes_raise_an_issue_from_the_analyzer_states_without_contract_change():
+    states = [{"helmet": P, "glasses": P, "gloves": P, "shoes": A}]
+    tracker = StationIssueTracker("P1")
+    issues = tracker.update(result(0.5, [person()]), T0, person_states=states)
+    assert [(i["category"], i["label"]) for i in issues] == [
+        ("SECURITE_EPI", "Chaussures de sécurité non détectées")
+    ]
+    assert station_ppe(states, issues)["shoes"] == "absent"
+
+
+def test_clear_forgets_problems_at_once():
+    tracker = StationIssueTracker("P1", hold_s=5)
+    tracker.update(result(0.9, [person(gloves=A)]), T0)
+    tracker.clear()
+    assert tracker.update(result(0.1, []), T0 + timedelta(seconds=1)) == []

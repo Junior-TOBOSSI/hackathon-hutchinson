@@ -9,8 +9,8 @@
 | `usecases/safety/yolo_analyzer.py` | Analyseur réel `YoloSafetyAnalyzer` (interface `Analyzer`, contrat `SafetyDetails` respecté) |
 | `usecases/safety/hovis.py` | Traduction d'un résultat Safety en problèmes HOVIS (`StationIssue` d'argos-ui) |
 | `usecases/safety/config.yaml` | Réglages (modèles, EPI obligatoires, seuils, lissage). Le faux analyseur reste par défaut |
-| `usecases/safety/tests/test_yolo_logic.py` | 18 tests des règles métier, sans modèle |
-| `usecases/safety/tests/test_hovis.py` | 14 tests de la traduction vers HOVIS |
+| `usecases/safety/tests/test_yolo_logic.py` | 21 tests des règles métier, sans modèle |
+| `usecases/safety/tests/test_hovis.py` | 17 tests de la traduction vers HOVIS |
 | `usecases/safety/notebooks/` | Préparation des données, entraînement, évaluation, aperçu webcam (outils, hors plateforme) |
 | `usecases/safety/notebooks/hovis_demo.py` | Démo locale : webcam + vrai modèle -> écran opérateur argos-ui (flux vidéo floutée, production simulée) |
 | `usecases/safety/AGENTS.md` | Décisions prises et questions ouvertes |
@@ -52,7 +52,8 @@ from usecases.safety.hovis import StationIssueTracker
 
 tracker = StationIssueTracker(station_id="C3·P06")   # un par poste, gardé en mémoire
 issues = tracker.update(safety_result,                # AnalysisResult du dernier passage
-                        idle_phone=bool(analyzer.last_idle_phones))
+                        idle_phone=bool(analyzer.last_idle_phones),
+                        person_states=analyzer.last_states)  # chaussures comprises
 station_live["issues"] += issues
 ```
 
@@ -83,9 +84,31 @@ Règles appliquées : rien n'est affiché si l'image est « conforme » (score l
 station_live["checks"].update(station_checks(station_live["issues"]))
 ```
 
+**Pictogrammes des EPI** (proposition pour argos-ui) : `station_ppe(analyzer.last_states, issues)` renvoie l'état de chaque EPI obligatoire du poste, `{"helmet": "absent" | "present" | "uncertain", ...}`, chaussures comprises. « absent » seulement s'il y a un problème en cours, donc toujours d'accord avec la liste. Envoyé par la démo dans un champ facultatif `safetyPpe` : l'écran opérateur affiche alors 4 pictogrammes (rouge manquant, vert porté, gris non visible) au lieu du seul texte.
+
 **Délai d'affichage et anti-spam** : l'analyse prend ~0,1 s par image et le lissage ~0,5 s (à 4 images/s). argos-ui interroge le serveur toutes les **2 s**, volontairement, pour ne pas faire clignoter les alertes : on garde ce réglage. L'image caméra peut être un flux MJPEG (adresse fixe dans `frontSnapshotUrl`), fluide quel que soit ce rafraîchissement. Délai total d'une alerte : 1 à 3 s.
 
 **Image affichée (si HOVIS montre la caméra)** : pixelliser les visages **avant** tout encodage, avec `analyzer.last_privacy` (visages, têtes, personnes dès 0,10 de confiance) et non `last_detections` (0,25, réservé aux règles). Aucune image ne doit être enregistrée.
+
+## 4 bis. Écran opérateur (argos-ui) : patch proposé
+
+`usecases/safety/integration/argos-ui-operateur.patch` contient les modifications de l'écran opérateur testées en démo. Il s'applique sur la branche `interface` : `git apply usecases/safety/integration/argos-ui-operateur.patch`. À relire et valider par l'équipe interface avant de l'appliquer.
+
+| Changement | Fichiers |
+|---|---|
+| Jauge du shift : une seule barre (verte dans les temps, rouge en retard), heures en dessous, sans trait ni légende | `components/charts.tsx` |
+| Revérification d'une pièce KO : bouton « Revérifier la pièce », confirmation, pièce requalifiée OK et tracée (`POST /stations/{id}/parts/{n}/requalify`) | `pages/Operateur.tsx`, `api/client.ts`, `api/types.ts` (`PartResult.requalified`) |
+| État des EPI du poste, champ facultatif `safetyPpe` (casque, lunettes, gants, chaussures) | `api/types.ts`, `api/mock.ts` |
+| Démo locale seulement : bouton « simuler une pièce NOK », visible quand le modèle qualité est « simulé » | `pages/Operateur.tsx`, `api/client.ts` |
+| Graphique « Production de la cellule » : corrigé pour un shift qui passe minuit (shift C, 21 h → 5 h : axe 21 h … 5 h, plus de courbe qui repart en arrière) | `components/charts.tsx` |
+| Team leader : postes en **cartes** (une par poste : sécurité OK/NOK, rythme, pièces OK, pièces NOK ; fond et contour selon l'état), détail au clic (avancement, alertes en cours, écran du poste, historique) ; champ poste : taper **ou choisir dans une liste** | `pages/TeamLeader.tsx` |
+| Vocabulaire : **NOK** au lieu de KO dans tous les textes affichés (la valeur technique `verdict: 'KO'` ne change pas) | `pages/*.tsx`, `components/*`, `api/mock.ts` |
+| Historique d'un poste : tout sur le **shift en cours** (plus de « shift B », « 13 h → 21 h », « depuis 15 h », « moyenne 1,7 % » écrits en dur), 3 cases sans doublon (production, NOK, sécurité), une seule liste des événements ; champs facultatifs `shift` et `elapsedMin` dans `StationDetail` | `pages/PosteDetail.tsx`, `api/types.ts` |
+| Démo locale seulement : sélecteur de vue « Opérateur | Team leader » (sans se déconnecter), visible en mode démo ou avec `VITE_DEMO_VIEWS=true` | `App.tsx`, `vite-env.d.ts` |
+
+Côté serveur, la démo `notebooks/hovis_demo.py` fournit ces routes, et aussi celles de la vue manager : vue de la cellule (`/cells/{id}/overview`, poste C3·P06 réel, les 11 autres simulés et signalés comme tels), alertes (problèmes Safety du poste, signalements de l'opérateur, pièces requalifiées à confirmer), acquittement, décision, historique du poste (`/stations/{id}/detail`, épisodes Safety réels du shift). Une photo de pièce NOK peut être placée dans `argos-ui/public/img/piece-nok.jpg` pour la démo : **image industrielle, à ne jamais versionner**.
+
+**Caméra masquée** : une main sur l'objectif (image sombre, uniforme, floue) signifie « personne au poste » ; les alertes Safety s'effacent et l'écran montre la pièce. Recommandation pour la production : alerter le team leader si la caméra reste masquée plus de 10 à 20 s.
 
 ## 5. Logique de décision (résumé)
 
@@ -97,7 +120,7 @@ station_live["checks"].update(station_checks(station_live["issues"]))
 
 ## 6. Demandes à l'intégration
 
-1. **Contrat** : ajouter `shoes: PPEState = PPEState.UNCERTAIN` à `PersonPPE` (`visionhub/contracts.py`). Rétrocompatible. Tant que ce n'est pas fait, les chaussures comptent dans le score mais ne sont ni transmises au Core ni affichées.
+1. **Contrat** : ajouter `shoes: PPEState = PPEState.UNCERTAIN` à `PersonPPE` (`visionhub/contracts.py`). Rétrocompatible. Tant que ce n'est pas fait, les chaussures comptent dans le score et **s'affichent dans HOVIS** (via `person_states=analyzer.last_states`), mais ne sont pas enregistrées par le Core.
 2. **Téléphone** : la branche `detection-telephone` contient un autre modèle de téléphone. Décider lequel garder pour éviter deux détections concurrentes. Le téléphone posé sur le poste relève normalement du groupe Workstation : se mettre d'accord pour ne pas le signaler deux fois.
 3. **Remontée au Core** : vérifier que les inférences Safety continues sont bien transmises (point ouvert du document de passation, section 16).
 
