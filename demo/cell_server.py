@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import threading
 from pathlib import Path
 from urllib.parse import quote
 
@@ -37,6 +38,13 @@ N_ACTIVE = max(1, min(len(ORDER), int(os.environ.get("ACTIVE_STATIONS", "1"))))
 FIRST_PORT = int(os.environ.get("FIRST_STATION_PORT", "8001"))
 PORTS = {sid: FIRST_PORT + k for k, sid in enumerate(ORDER[:N_ACTIVE])}  # active stations
 CAMERA_STATION = ORDER[0]  # the station EPI's webcam watches (if its server has SAFETY=1)
+
+KO_MAX = int(os.environ.get("KO_MAX", "2"))  # at most KO_MAX KO...
+KO_WINDOW = int(os.environ.get("KO_WINDOW", "200"))  # ...in any KO_WINDOW consecutive parts
+FIRST_KO_AT = int(os.environ.get("FIRST_KO_AT", "4"))  # a station's part n° 4: the first KO
+# parts of the cell so far (all stations), cell numbers of the KO parts, first KO still due
+parts: dict = {"count": 0, "ko": [], "first_due": True}
+parts_lock = threading.Lock()  # sync routes run in parallel threads: one part number each
 
 app = FastAPI(title="HOVIS cell C3")
 client = httpx.AsyncClient(timeout=10)
@@ -201,17 +209,57 @@ async def requalify(station_id: str, number: int) -> Response:
 
 
 @app.post("/api/scenario/restart", status_code=204)
-async def restart() -> Response:
-    """The HOVIS logo: every active station starts (again) its workstation check."""
-    for sid in PORTS:
+async def restart(station: str = "") -> Response:
+    """The HOVIS logo of a station's screen: THAT station starts (again) its workstation
+    check; the others wait for their own logo. Without ``station``: every active station
+    (and the cell's alerts and part count start afresh)."""
+    targets = [station] if station else list(PORTS)
+    for sid in targets:
+        if sid not in PORTS:
+            continue  # no activity: nothing to start
         try:
             await client.post(url(sid, "/api/scenario/restart"))
+            log.info("%s : simulation lancée", sid)
         except httpx.HTTPError:
             log.warning("%s : serveur du poste injoignable (encore en chargement ?)", sid)
-    epi.ACK.clear()
-    epi.DONE.clear()
-    log.info("simulation lancée sur %s", ", ".join(PORTS))
+    if not station:
+        epi.ACK.clear()
+        epi.DONE.clear()
+        with parts_lock:
+            parts.update(count=0, ko=[])
+    with parts_lock:
+        parts["first_due"] = True  # the next station to reach its part n° 4 gets the first KO
     return Response(status_code=204)
+
+
+@app.post("/api/cell/next-part")
+def next_part(station: str = "", index: int = 0) -> dict:
+    """Each station asks before each part (``index`` = its part number - 1): a good part or
+    a KO one? The cell numbers the parts of ALL its stations and keeps the rule:
+    - at most KO_MAX (2) KO in any KO_WINDOW (200) consecutive parts of the cell;
+    - the first KO comes early, on the part n° FIRST_KO_AT (4) of the first station that
+      gets there (after its 3 first parts), so that the demo shows one;
+    - then one KO every KO_WINDOW / KO_MAX (100) parts of the cell."""
+    with parts_lock:
+        return _next_part(station, index)
+
+
+def _next_part(station: str, index: int) -> dict:
+    n = parts["count"]
+    parts["count"] += 1
+    recent = [k for k in parts["ko"] if k > n - KO_WINDOW]  # KO among the last parts
+    spacing = KO_WINDOW // KO_MAX
+    due = (parts["first_due"] and index == FIRST_KO_AT - 1) or (
+        bool(parts["ko"]) and n - parts["ko"][-1] >= spacing
+    )
+    ko = due and len(recent) < KO_MAX
+    if ko:
+        parts["ko"].append(n)
+        parts["first_due"] = False
+        log.info(
+            "pièce n° %d de la cellule : KO, pour %s (sa pièce n° %d)", n + 1, station, index + 1
+        )
+    return {"index": n, "ko": ko}
 
 
 @app.get("/api/safety-demo/stream.mjpg")

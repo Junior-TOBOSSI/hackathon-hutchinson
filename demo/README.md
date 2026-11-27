@@ -32,7 +32,7 @@ argos-ui (5173) ──/api──> cellule C3 (8000) ──> poste C3·P06 (8001)
 
 Une fenêtre par poste actif, une pour la cellule, une pour l'interface, puis le navigateur sur http://localhost:5173 (modèles prêts en ~20 s). Fermer les fenêtres pour arrêter. Les ports déjà pris (8000 à 8006, 5173) sont libérés d'abord. Git Bash, Linux ou cluster : `./demo/start.sh 3` (ou `SAFETY=0 ./demo/start.sh 3`) ; tout tourne alors dans le même terminal.
 
-Se connecter avec n'importe quel identifiant : opérateur du poste C3·P06. **Le scénario attend un clic sur le logo HOVIS** (en haut à gauche, rien ne le signale) : un clic démarre la simulation sur **tous** les postes actifs, un autre la relance (équivalent : `curl -X POST http://localhost:8000/api/scenario/restart`).
+Se connecter avec n'importe quel identifiant : opérateur du poste C3·P06. **Chaque poste attend qu'on le lance soi-même** : un clic sur le logo HOVIS (en haut à gauche, rien ne le signale) démarre la simulation **du poste affiché**, un autre clic la relance. Les autres postes restent « En attente de la prise de poste » jusqu'à ce qu'on ouvre leur écran (Ctrl+P) et qu'on clique sur leur logo. Tout lancer d'un coup : `curl -X POST http://localhost:8000/api/scenario/restart` (sans `?station=`).
 
 ## Les postes
 
@@ -47,7 +47,9 @@ Activés dans cet ordre (`-Stations N` = les N premiers) ; les autres affichent 
 | 5 | C3·P04 | Machine cell (vue de dessus) | `good_01` : OK d'emblée |
 | 6 | C3·P05 | Machine cell variant | `good_03` : OK d'emblée |
 
-Dès 3 postes actifs, au moins un a donc un poste de travail différent et démarre sans problème. Les pièces KO des postes sont décalées (elles n'arrivent pas en même temps) et chaque poste voit d'autres photos.
+Dès 3 postes actifs, au moins un a donc un poste de travail différent et démarre sans problème. Chaque poste voit d'autres photos.
+
+**Pièces KO, tous postes confondus** : avant chaque pièce, le poste demande à la cellule (`POST /api/cell/next-part`) si c'est une bonne pièce ou une KO. La cellule numérote les pièces de tous ses postes : **au plus 2 KO sur 200 pièces consécutives de la cellule**, quel que soit le nombre de postes. Le premier KO arrive tôt, sur la **4e pièce** du premier poste qui y arrive (après ses 3 premières pièces), pour que la démo en montre un ; ensuite un KO toutes les 100 pièces de la cellule. Le modèle classe correctement toutes les photos de validation (0 erreur sur 103 OK / 67 NOK) : une photo de bonne pièce donne OK, une photo NOK donne KO.
 
 ## Le scénario d'un poste
 
@@ -56,7 +58,7 @@ Dès 3 postes actifs, au moins un a donc un poste de travail différent et déma
 | 0. En attente | « En attente de la prise de poste », jusqu'au clic sur le logo | — |
 | 1. Prise de poste | photo du poste à la place de la pièce, **OK** ou **KO** (bandeau « Dégagez le passage », tuile Poste rouge) ; une photo toutes les 2,5 s jusqu'à un OK | workstation |
 | 2. Poste validé | « Poste validé : l'activité commence » ; la vérification n'est faite **qu'une fois** | workstation |
-| 3. Activité | une pièce toutes les 2 s, **un défaut toutes les 10 pièces** | quality (`qualite702 v1`) |
+| 3. Activité | une pièce toutes les 3 s ; KO décidés par la cellule (4e pièce, puis 2 au plus sur 200 pièces, tous postes) | quality (`qualite702 v1`) |
 | 4. Pièce KO | le défilement **s'arrête** : **CONFIRMER** (pièce au rebut) ou **LAISSER PASSER** (erreur modèle : la pièce compte comme bonne, le team leader reçoit une alerte à valider) | quality |
 
 ## Ce qui est réel et ce qui ne l'est pas
@@ -78,12 +80,12 @@ Dès 3 postes actifs, au moins un a donc un poste de travail différent et déma
 |---|---|---|
 | `STATION_ID` · `PROFILE` · `PORT` | `C3·P06` · 0 · 8001 | poste, rang (tableau ci-dessus), port — fixés par les scripts |
 | `CHECK_PERIOD` | 2.5 | secondes par photo du poste |
-| `QUALITY_PERIOD` | 2 | secondes par pièce |
+| `QUALITY_PERIOD` | 3 | secondes par pièce |
 | `VALIDATED_HOLD` | 3 | secondes d'affichage de « Poste validé » |
-| `QUALITY_PATTERN` | `9:1` | blocs « OK:KO » répétés : 9 bonnes puis 1 KO |
+| `CELL_URL` | `http://127.0.0.1:8000` | serveur de cellule qui décide des KO (sans lui : même règle, pour le poste seul) |
 | `SAFETY` | 0 | 1 = analyse webcam EPI (le script la met sur C3·P06) |
 
-Serveur de cellule : `ACTIVE_STATIONS` (1 à 6), `FIRST_STATION_PORT` (8001).
+Serveur de cellule : `ACTIVE_STATIONS` (1 à 6), `FIRST_STATION_PORT` (8001), `KO_MAX` (2) KO au plus sur `KO_WINDOW` (200) pièces, `FIRST_KO_AT` (4) : la pièce du premier KO.
 
 ## Données attendues (jamais versionnées)
 
@@ -103,6 +105,7 @@ data/models/workstation/yolo26n.pt                # détecteur de personnes
 | poste | `GET /api/station/summary` · `/api/station/alerts` | carte et alertes du poste, lues par la cellule |
 | les deux | `GET /api/stations/{id}/live` | écran du poste (`StationLive`, avec `startup` et `part.awaitingConfirmation`) |
 | les deux | `POST /api/stations/{id}/parts/confirm` · `/release` | CONFIRMER · LAISSER PASSER |
-| les deux | `POST /api/scenario/restart` | démarrer / relancer (la cellule relaie à tous les postes) |
+| les deux | `POST /api/scenario/restart?station={id}` | démarrer / relancer ce poste (sans `station` : tous) |
+| cellule | `POST /api/cell/next-part?station={id}` | bonne pièce ou KO ? (budget de KO de la cellule) |
 | cellule | `GET /api/cells/C3/overview` · `/alerts` | vue team leader |
 | cellule | `GET /api/scenario/status` | postes actifs et leurs ports (débogage) |

@@ -48,7 +48,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
   const startup = live.startup && live.startup.phase !== 'RUNNING' ? live.startup : null;
   const confirm = async () => { await api.confirmPart(stationId); reload(); };
   const release = async () => { await api.releasePart(stationId); reload(); };
-  const restartDemo = async () => { await api.restartScenario(); reload(); };
+  const restartDemo = async () => { await api.restartScenario(stationId); reload(); };
 
   const report = async () => { await api.reportProblem(stationId); setReported(true); setTimeout(() => setReported(false), 4000); };
   const stationAlerts = (cellAlerts ?? []).filter((a) => a.stationId === stationId);

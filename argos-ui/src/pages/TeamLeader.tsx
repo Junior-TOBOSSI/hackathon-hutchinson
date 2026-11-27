@@ -184,22 +184,32 @@ function StationTable({ stations, alerts }: { stations: StationSummary[]; alerts
           const delta = s.good - s.expectedNow;
           const isSel = s.id === selected;
           const safe = s.status !== 'SECURITE';
+          const off = s.status === 'ARRET'; // pas d'activité : ni sécurité, ni rythme, ni pièces
           return (
             <button
               key={s.id}
               onClick={() => setSelected(isSel ? null : s.id)}
               aria-expanded={isSel}
-              aria-label={`Poste ${shortId(s.id)} : sécurité ${safe ? 'OK' : 'NOK'}, ${deltaText(delta, true)}, ${s.good} pièces OK, ${s.ko} pièces NOK. Voir le détail`}
+              aria-label={off ? `Poste ${shortId(s.id)} : pas d'activité. Voir le détail` : `Poste ${shortId(s.id)} : sécurité ${safe ? 'OK' : 'NOK'}, ${deltaText(delta, true)}, ${s.good} pièces OK, ${s.ko} pièces NOK. Voir le détail`}
               className="col"
               style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 7, padding: '14px 16px', borderRadius: 16, background: TINT[s.status],
                 border: isSel ? '2px solid var(--navy)' : `2px solid ${EDGE[s.status]}`,
                 animation: (s.status === 'SECURITE' || s.status === 'QUALITE') && !REDUCED_MOTION ? 'station-alert 0.8s ease-in-out infinite' : undefined }}
             >
               <span className="cond" style={{ fontWeight: 700, fontSize: 26, lineHeight: 1 }}>{shortId(s.id)}</span>
-              <CardLine label="Sécurité" value={safe ? 'OK' : 'NOK'} tone={safe ? 'ok' : 'bad'} />
-              <CardLine label="Rythme" value={deltaText(delta, true)} tone={delta < 0 ? 'bad' : 'ok'} />
-              <CardLine label="Pièces OK" value={fmt(s.good)} />
-              <CardLine label="Pièces NOK" value={fmt(s.ko)} />
+              {off ? (
+                <span className="col" style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 4, minHeight: 96, color: '#4b5563' }}>
+                  <b style={{ fontSize: 19 }}>Pas d'activité</b>
+                  <span style={{ fontSize: 14 }}>Poste à l'arrêt</span>
+                </span>
+              ) : (
+                <>
+                  <CardLine label="Sécurité" value={safe ? 'OK' : 'NOK'} tone={safe ? 'ok' : 'bad'} />
+                  <CardLine label="Rythme" value={deltaText(delta, true)} tone={delta < 0 ? 'bad' : 'ok'} />
+                  <CardLine label="Pièces OK" value={fmt(s.good)} />
+                  <CardLine label="Pièces NOK" value={fmt(s.ko)} />
+                </>
+              )}
             </button>
           );
         })}
@@ -234,6 +244,9 @@ function StationDetailPanel({ s, alerts, onClose, onScreen }: { s: StationSummar
         </span>
         <button onClick={onClose} className="icon-btn" aria-label="Fermer le détail" title="Fermer">✕</button>
       </div>
+      {s.status === 'ARRET' ? (
+        <span style={{ fontSize: 17, fontWeight: 600, color: '#4b5563' }}>Pas d'activité : ce poste est à l'arrêt, aucune pièce produite.</span>
+      ) : (<>
       <div className="col" style={{ gap: 6 }}>
         <div className="between"><span className="muted" style={{ fontSize: 14 }}>Avancement du shift · attendu maintenant : {fmt(s.expectedNow)}</span><span style={{ fontWeight: 700 }}>{fmt(s.good)} / {fmt(s.target)}</span></div>
         <div className="track" style={{ height: 12, overflow: 'visible' }}>
@@ -244,6 +257,7 @@ function StationDetailPanel({ s, alerts, onClose, onScreen }: { s: StationSummar
         <span><span className="muted" style={{ fontSize: 14 }}>Rythme </span><b style={{ color: delta < 0 ? 'var(--red-text)' : 'var(--green-text)' }}>{deltaText(delta, true)}</b></span>
         <span><span className="muted" style={{ fontSize: 14 }}>Pièces NOK </span><b>{s.ko}</b> <span className="muted" style={{ fontSize: 14 }}>({((s.ko / Math.max(1, s.good + s.ko)) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %)</span></span>
       </div>
+      </>)}
       <div className="col" style={{ gap: 4 }}>
         <span className="muted" style={{ fontSize: 14 }}>Alertes en cours</span>
         {alerts.length ? alerts.map((a) => <span key={a.id} style={{ fontWeight: 600, color: 'var(--red-text)' }}>{a.title} <span className="muted" style={{ fontWeight: 400 }}>· {a.when}</span></span>) : <span className="muted">Aucune</span>}

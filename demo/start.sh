@@ -50,5 +50,5 @@ cd "$REPO/argos-ui"
 [ -d node_modules ] || npm install --no-audit --no-fund
 echo "Postes actifs : ${ORDER[*]:0:$STATIONS} ; les autres : pas d'activité."
 echo "Interface : http://localhost:5173 (les serveurs des postes mettent environ 20 s à charger les modèles)"
-echo "Clic sur le logo HOVIS = lancer / relancer la simulation ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant."
+echo "Clic sur le logo HOVIS = lancer / relancer le poste affiché (chaque poste se lance à la main) ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant."
 VITE_USE_MOCK=false npx vite --port 5173 --host 127.0.0.1

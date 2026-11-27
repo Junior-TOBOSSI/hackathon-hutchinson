@@ -51,10 +51,10 @@ export const api = {
     if (USE_MOCK) return later(undefined);
     return http(`/stations/${encodeURIComponent(stationId)}/parts/release`, { method: 'POST' });
   },
-  /** POST /api/scenario/restart -> 204. Démo : démarre (ou relance) la simulation. */
-  restartScenario(): Promise<void> {
+  /** POST /api/scenario/restart?station={id} -> 204. Démo : démarre (ou relance) la simulation de CE poste. */
+  restartScenario(stationId: string): Promise<void> {
     if (USE_MOCK) return later(undefined);
-    return http('/scenario/restart', { method: 'POST' });
+    return http(`/scenario/restart?station=${encodeURIComponent(stationId)}`, { method: 'POST' });
   },
   /** POST /api/stations/{id}/report -> 204. Crée une alerte SIGNALEMENT chez le team leader de la cellule. */
   reportProblem(stationId: string): Promise<void> {

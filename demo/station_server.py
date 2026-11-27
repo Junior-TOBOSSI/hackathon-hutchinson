@@ -13,15 +13,18 @@ and the station's screen (``/api/stations/{id}/live``, CONFIRMER, LAISSER PASSER
 ``/api/station/summary`` and ``/api/station/alerts`` read by the cell server.
 
 Scenario of the station (``PROFILE`` = its rank among the active stations, 0-5):
-0. IDLE until POST /api/scenario/restart (the HOVIS logo, through the cell server).
+0. IDLE until POST /api/scenario/restart (the HOVIS logo of THIS station's screen,
+   through the cell server): each station is started by hand, on its own.
 1. WORKSTATION CHECK, done ONCE, one photo every ``CHECK_PERIOD`` s (2.5), each photo sent
    to the workstation model: profiles 0-1 (Machine cell variant) anomaly_04 -> KO, the
    same photo -> KO, good_04 -> OK; profile 2 (Press cell, ANOTHER workstation), 3
    (Electrical bench), 4 (Machine cell), 5 (Machine cell variant, another photo): a
    conforming photo, OK at once.
-2. QUALITY: one part every ``QUALITY_PERIOD`` s (2) sent to the quality model,
-   validation-burst photos only; a defect every 10 parts (``QUALITY_PATTERN`` "9:1"),
-   offset per station. A KO part WAITS: CONFIRMER, or LAISSER PASSER (model error).
+2. QUALITY: one part every ``QUALITY_PERIOD`` s (3) sent to the quality model,
+   validation-burst photos only. Good part or KO part: the CELL decides for all its
+   stations (``CELL_URL``, at most 2 KO in any 200
+   consecutive parts of the cell, the first on the part n° 4 of the first station).
+   A KO part WAITS: CONFIRMER, or LAISSER PASSER (model error).
 3. SAFETY (``SAFETY=1``, the station EPI's webcam watches): EPI's live analysis.
 
 Counters: the shift so far (EPI's simulation) frozen when the activity starts, plus the
@@ -73,9 +76,9 @@ PROFILES = [  # (section, workstation check photos, title)
 SECTION, CHECK_PHOTOS, TITLE = PROFILES[PROFILE % len(PROFILES)]
 DATA = REPO / "data"
 CHECK_PERIOD = float(os.environ.get("CHECK_PERIOD", "2.5"))
-QUALITY_PERIOD = float(os.environ.get("QUALITY_PERIOD", "2"))
+QUALITY_PERIOD = float(os.environ.get("QUALITY_PERIOD", "3"))
 VALIDATED_HOLD = float(os.environ.get("VALIDATED_HOLD", "3"))
-QUALITY_PATTERN = os.environ.get("QUALITY_PATTERN", "9:1")  # repeated: a defect every 10
+CELL_URL = os.environ.get("CELL_URL", "http://127.0.0.1:8000")  # decides the KO parts
 VAL_BURSTS = {"R08", "R12", "R14", "R21", "R26", "R27"}  # qualite702 v1 report
 
 log = logging.getLogger(f"poste {STATION}")
@@ -187,24 +190,26 @@ def quality_photos() -> tuple[list[Path], list[Path]]:
     return ok, nok
 
 
-def pattern() -> list[bool]:
-    """One period of QUALITY_PATTERN: True = KO part. "9:1" -> 9 False then 1 True."""
-    out: list[bool] = []
-    for block in QUALITY_PATTERN.split(","):
-        n_ok, n_ko = (int(v) for v in block.split(":"))
-        out += [False] * n_ok + [True] * n_ko
-    return out
+def next_is_ko(cell: httpx.Client, index: int) -> bool:
+    """Good part or KO part? The CELL decides, for all its stations together: at most 2 KO
+    in any 200 consecutive parts of the cell, the first one on the part n° 4 of the first
+    station there. Without a cell server (station run alone): the same rule, alone."""
+    try:
+        params = {"station": STATION, "index": index}
+        return bool(cell.post("/api/cell/next-part", params=params).json()["ko"])
+    except httpx.HTTPError:
+        return index % 100 == 3
 
 
-def photo_at(index: int, ok: list[Path], nok: list[Path]) -> Path:
-    """Photo of part n° index + 1. The station's profile offsets the pattern: KO parts of
-    different stations do not come together, and each station gets other photos."""
-    shift = 3 * PROFILE
-    period, i = pattern(), index + 3 * PROFILE
-    pos, laps = i % len(period), i // len(period)
-    if period[pos]:
-        return nok[(sum(period[:pos]) + laps * period.count(True) + shift) % len(nok)]
-    return ok[(pos - sum(period[:pos]) + laps * period.count(False) + 7 * shift) % len(ok)]
+def pick_photo(ko: bool, ok: list[Path], nok: list[Path]) -> Path:
+    """Next photo of the right kind; each station starts at another place in the lists.
+    The model classifies every validation photo right (0 error on 103 OK / 67 NOK), so a
+    good photo gives an OK verdict and a NOK photo a KO verdict."""
+    key, photos = ("n_nok", nok) if ko else ("n_ok", ok)
+    with lock:
+        i = state[key]
+        state[key] += 1
+    return photos[(i + 11 * PROFILE) % len(photos)]
 
 
 def reset() -> None:
@@ -227,6 +232,8 @@ def reset() -> None:
             active_s=0.0,
             base=None,
             events=[],
+            n_ok=0,
+            n_nok=0,
         )
 
 
@@ -248,6 +255,7 @@ def base_production() -> dict:
 def loop() -> None:
     """The station's scenario. Every photo goes through the model API (see the log)."""
     client = httpx.Client(base_url=SELF, timeout=30)
+    cell = httpx.Client(base_url=CELL_URL, timeout=5)
     ok_photos, nok_photos = quality_photos()
     workstation = models["workstation"][2]["dataset_dir"]
     last = time.monotonic()
@@ -297,7 +305,7 @@ def loop() -> None:
             if state["awaiting"] or now - since < QUALITY_PERIOD:
                 continue
             index = state["good"] + state["ko"]
-        path = photo_at(index, ok_photos, nok_photos)
+        path = pick_photo(next_is_ko(cell, index), ok_photos, nok_photos)
         res = client.post(
             f"/api/models/quality/classify?name={path.name}", content=path.read_bytes()
         ).json()
@@ -385,7 +393,7 @@ def _start() -> None:
     load_models()
     reset()
     threading.Thread(target=loop, daemon=True).start()
-    log.info("ready: workstation %s, check %s, quality %s", TITLE, CHECK_PHOTOS, QUALITY_PATTERN)
+    log.info("ready: workstation %s, check %s", TITLE, CHECK_PHOTOS)
     weights = REPO / epi.WEIGHTS
     if os.environ.get("SAFETY", "0") == "1" and weights.exists():
         threading.Thread(target=epi.loop, daemon=True).start()
