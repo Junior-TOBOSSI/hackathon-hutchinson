@@ -228,6 +228,8 @@ class YoloSafetyAnalyzer(Analyzer):
         # Phones touching nobody's hand or head: lying on the station (workstation tidiness).
         self.last_idle_phones = idle_phones(dets, phones, self.p)
         assessed, raw_score = assess_frame(dets, phones, self.p)
+        # PPE states of each person, shoes included even before the contract has them.
+        self.last_states = [dict(a.states) for a in assessed]
         self.recent.append(raw_score)
         # Smoothing: median of the window. While the window is not full yet (start-up),
         # no alert: one frame alone is never enough.

@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from usecases.safety.hovis import StationIssueTracker, current_problems, station_checks
+from usecases.safety.hovis import StationIssueTracker, current_problems, station_checks, station_ppe
 from visionhub.contracts import AnalysisResult, PersonPPE, PPEState, SafetyDetails, UseCase
 
 A, P, U = PPEState.ABSENT, PPEState.PRESENT, PPEState.UNCERTAIN
@@ -119,3 +119,16 @@ def test_problem_ends_after_the_hold_time():
     tracker = StationIssueTracker("P1", hold_s=5)
     tracker.update(result(0.9, [person(gloves=A)]), T0)
     assert tracker.update(result(0.1, [person()]), T0 + timedelta(seconds=6)) == []
+
+
+def test_station_ppe_agrees_with_the_issues():
+    worn = {"helmet": P, "glasses": A, "gloves": P, "shoes": U}
+    issues = StationIssueTracker("P1").update(result(0.9, [person(glasses=A)]), T0)
+    assert station_ppe([worn], issues) == {
+        "helmet": "present", "glasses": "absent", "gloves": "present", "shoes": "uncertain",
+    }  # fmt: skip
+    # Absent on this frame but smoothed away (no issue): not shown as a fault.
+    assert station_ppe([worn], [])["glasses"] == "uncertain"
+    # One person without it is enough to lose "present"; no one in view: nothing known.
+    assert station_ppe([worn, {**worn, "helmet": U}], [])["helmet"] == "uncertain"
+    assert set(station_ppe([], []).values()) == {"uncertain"}

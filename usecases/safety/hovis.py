@@ -135,3 +135,28 @@ def station_checks(issues: list[dict]) -> dict[str, bool]:
         "securite": not categories & {"SECURITE_EPI", "COMPORTEMENT"},
         "poste": "POSTE" not in categories,
     }
+
+
+def station_ppe(
+    person_states: list[dict[str, PPEState]],
+    issues: list[dict],
+    required: tuple[str, ...] = DEFAULT_REQUIRED,
+) -> dict[str, str]:
+    """State of each mandatory PPE for the station, for pictograms on the operator screen.
+
+    ``person_states``: the analyzer's ``last_states`` (one dict per person).
+    - "absent": there is an issue for it (so the pictogram and the issue list always agree,
+      smoothing and hold time included);
+    - "present": every person seen wears it;
+    - "uncertain": not visible, or no one in view. Never shown as a fault.
+    """
+    flagged = {issue["id"].rsplit(":", 1)[-1] for issue in issues}
+    states = {}
+    for item in required:
+        if item in flagged:
+            states[item] = "absent"
+        elif person_states and all(p.get(item) == PPEState.PRESENT for p in person_states):
+            states[item] = "present"
+        else:
+            states[item] = "uncertain"
+    return states

@@ -32,7 +32,7 @@ from fastapi.responses import StreamingResponse
 REPO = Path(__file__).resolve().parents[3]
 sys.path[:0] = [str(REPO), str(Path(__file__).parent)]
 
-from usecases.safety.hovis import StationIssueTracker, station_checks  # noqa: E402
+from usecases.safety.hovis import StationIssueTracker, station_checks, station_ppe  # noqa: E402
 from usecases.safety.yolo_analyzer import YoloSafetyAnalyzer  # noqa: E402
 from visionhub.contracts import FrameMeta  # noqa: E402
 from webcam_preview import draw, hide_faces  # noqa: E402
@@ -42,7 +42,7 @@ CAMERA = int(os.environ.get("CAMERA", "0"))
 WEIGHTS = os.environ.get("WEIGHTS", "data/models/safety/sh17_ours_yolov8s_640.pt")
 PERIOD = 1 / float(os.environ.get("FPS", "4"))  # analyses per second
 
-state = {"issues": [], "jpeg": None, "n": 0, "error": None}
+state = {"issues": [], "ppe": {}, "jpeg": None, "n": 0, "error": None}
 lock = threading.Lock()
 
 
@@ -93,7 +93,8 @@ def loop() -> None:
         jpeg = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 75])[1].tobytes()
         n += 1
         with lock:
-            state.update(issues=issues, jpeg=jpeg, n=n, error=None,
+            ppe = station_ppe(analyzer.last_states, issues)
+            state.update(issues=issues, ppe=ppe, jpeg=jpeg, n=n, error=None,
                          ms=round((time.perf_counter() - start) * 1000))
         time.sleep(max(0.0, PERIOD - (time.perf_counter() - start)))
 
@@ -152,7 +153,7 @@ def simulated_production(local: datetime, hours: list[int]) -> dict:
 @app.get("/api/stations/{station_id}/live")
 def live(station_id: str) -> dict:
     with lock:
-        issues, n = list(state["issues"]), state["n"]
+        issues, ppe, n = list(state["issues"]), dict(state["ppe"]), state["n"]
     local = datetime.now().astimezone()  # the station's local time
     now = local.isoformat()
     shift, hours = current_shift(local)
@@ -168,6 +169,7 @@ def live(station_id: str) -> dict:
         "objective": {"shiftTarget": prod["shiftTarget"], "expectedNow": prod["expectedNow"], "perHour": PER_HOUR},
         "hourly": prod["hourly"],  # SIMULATED
         "issues": issues,
+        "safetyPpe": ppe,  # helmet/glasses/gloves/shoes: absent | present | uncertain
         "frontSnapshotUrl": "/api/safety-demo/stream.mjpg" if n else None,  # same URL: the stream stays open
         "checks": {**station_checks(issues), "qualite": True, "koRatePct": round(100 * prod["ko"] / max(1, prod["good"] + prod["ko"]), 1)},
         "qualityModelVersion": "simulé",

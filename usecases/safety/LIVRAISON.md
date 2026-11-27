@@ -10,7 +10,7 @@
 | `usecases/safety/hovis.py` | Traduction d'un résultat Safety en problèmes HOVIS (`StationIssue` d'argos-ui) |
 | `usecases/safety/config.yaml` | Réglages (modèles, EPI obligatoires, seuils, lissage). Le faux analyseur reste par défaut |
 | `usecases/safety/tests/test_yolo_logic.py` | 18 tests des règles métier, sans modèle |
-| `usecases/safety/tests/test_hovis.py` | 14 tests de la traduction vers HOVIS |
+| `usecases/safety/tests/test_hovis.py` | 15 tests de la traduction vers HOVIS |
 | `usecases/safety/notebooks/` | Préparation des données, entraînement, évaluation, aperçu webcam (outils, hors plateforme) |
 | `usecases/safety/notebooks/hovis_demo.py` | Démo locale : webcam + vrai modèle -> écran opérateur argos-ui (flux vidéo floutée, production simulée) |
 | `usecases/safety/AGENTS.md` | Décisions prises et questions ouvertes |
@@ -82,6 +82,8 @@ Règles appliquées : rien n'est affiché si l'image est « conforme » (score l
 ```python
 station_live["checks"].update(station_checks(station_live["issues"]))
 ```
+
+**Pictogrammes des EPI** (proposition pour argos-ui) : `station_ppe(analyzer.last_states, issues)` renvoie l'état de chaque EPI obligatoire du poste, `{"helmet": "absent" | "present" | "uncertain", ...}`, chaussures comprises. « absent » seulement s'il y a un problème en cours, donc toujours d'accord avec la liste. Envoyé par la démo dans un champ facultatif `safetyPpe` : l'écran opérateur affiche alors 4 pictogrammes (rouge manquant, vert porté, gris non visible) au lieu du seul texte.
 
 **Délai d'affichage et anti-spam** : l'analyse prend ~0,1 s par image et le lissage ~0,5 s (à 4 images/s). argos-ui interroge le serveur toutes les **2 s**, volontairement, pour ne pas faire clignoter les alertes : on garde ce réglage. L'image caméra peut être un flux MJPEG (adresse fixe dans `frontSnapshotUrl`), fluide quel que soit ce rafraîchissement. Délai total d'une alerte : 1 à 3 s.
 
