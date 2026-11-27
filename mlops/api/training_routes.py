@@ -21,6 +21,7 @@ from mlops.training.service import (
     TrainingRow,
     TrainingService,
     ValidationReport,
+    launch_guard,
 )
 from mlops.training.specs import PipelineView
 
@@ -94,6 +95,15 @@ def create_training_router(get_connector: Callable[[], DatabricksConnector]) -> 
                 body.pipeline_id, body.dataset_id, body.version, body.parameters
             ),
         )
+
+    @router.get("/launch-guard")
+    def guard() -> dict[str, Any]:
+        """Effective authorization state of THIS gateway process (no remote call)."""
+        return launch_guard()
+
+    @router.get("/launch-audit")
+    def audit(c: Connector, limit: int = Query(100, ge=1, le=1000)) -> list[dict[str, Any]]:
+        return service_for(c).audit.tail(limit)
 
     @router.post("/launch", status_code=202)
     def launch(body: LaunchBody, c: Connector) -> LaunchRecord:

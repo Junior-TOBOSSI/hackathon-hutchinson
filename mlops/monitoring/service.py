@@ -664,6 +664,29 @@ class MonitoringService:
                         kind == "simulated",
                         f"{key}: Core inference score",
                     )
+                    levels = [m.get("level") for m in result.get("measures", [])]
+                    self.store.upsert_drift_window(
+                        key,
+                        version,
+                        kind,
+                        last_day,
+                        at,
+                        {
+                            "status": result["status"],
+                            "level": "alert"
+                            if "alert" in levels
+                            else "watch"
+                            if "watch" in levels
+                            else "stable"
+                            if levels
+                            else None,
+                            "reference_id": ref["reference_id"],
+                            "representative": bool(ref.get("representative")),
+                            "n_reference": result["n_reference"],
+                            "n_current": result["n_current"],
+                            "reasons": result.get("reasons", []),
+                        },
+                    )
                     for m in result.get("measures", []):
                         if m.get("level") == "alert":
                             akey = f"{key}|{version}|*|{kind}|{m['indicator']}|{m['method']}"

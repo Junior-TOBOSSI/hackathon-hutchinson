@@ -34,12 +34,13 @@ class DatabricksJobBackend:
         self.connector = connector
 
     def submit(self, model_id: str) -> JobRunInfo:
-        managed = self.connector.managed(model_id)
-        if not managed.training_job:
-            from mlops.databricks.connector import ResourceNotFoundError
+        """Removed launch path (DBX-08A): it bypassed the checks and the authorization lock."""
+        from mlops.databricks.connector import ForbiddenOperationError
 
-            raise ResourceNotFoundError(f"model {model_id!r} has no training job declared")
-        return self.connector.trigger_job(managed.training_job)
+        raise ForbiddenOperationError(
+            "direct job submission is disabled: use TrainingService.launch "
+            "(/api/mlops/training/launch)"
+        )
 
     def status(self, run_id: int) -> JobRunInfo:
         return self.connector.get_job_run(run_id)

@@ -1,0 +1,24 @@
+/* Politiques de réentraînement (DBX-08B) — réutilise training.css (tf-*) et ui.css (hv-*). */
+.pol-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.pol-h3 { margin: 4px 0 0; font-size: 17px; }
+.pol-note { padding: 10px 14px; border-radius: 12px; background: var(--primary-soft); color: var(--ink); font-size: 13px; font-weight: 600; }
+.pol-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.pol-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); min-width: 0; }
+.pol-check { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); cursor: pointer; }
+.pol-cond { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; }
+.pol-cond.on { border-color: var(--primary-light); background: var(--surface-soft); }
+.pol-cond label:not(.pol-check) { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.pol-cond input[type="number"], .pol-cond input:not([type]) { width: 96px; height: 34px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 9px; font: inherit; color: var(--ink); }
+.pol-comment { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.pol-comment input { height: 38px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 10px; font: inherit; color: var(--ink); }
+.pol-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 14px; }
+.pol-kv dt { color: var(--muted); font-weight: 600; }
+.pol-kv dd { margin: 0; overflow-wrap: anywhere; }
+.pol-reasons { margin: 0; padding-left: 18px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.pol-prop-link { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 8px 12px; font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.pol-prop-link:hover { background: var(--surface-soft); }
+.tf-views { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tf-views button { border: 0; border-bottom: 3px solid transparent; background: transparent; padding: 10px 14px; font: inherit; font-weight: 700; color: var(--muted); cursor: pointer; }
+.tf-views button.active { color: var(--ink); border-bottom-color: var(--red); }
+@media (max-width: 1300px) { .pol-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .pol-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS refs (reference_id TEXT PRIMARY KEY, model_key TEXT N
 CREATE TABLE IF NOT EXISTS alerts (alert_key TEXT PRIMARY KEY, model_key TEXT NOT NULL,
   state TEXT NOT NULL, first_detected TEXT NOT NULL, last_detected TEXT NOT NULL,
   resolved_at TEXT, payload TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS drift_windows (model_key TEXT NOT NULL, model_version TEXT NOT NULL,
+  data_kind TEXT NOT NULL, window_day TEXT NOT NULL, computed_at TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  PRIMARY KEY (model_key, model_version, data_kind, window_day));
 CREATE TABLE IF NOT EXISTS collections (collection_id TEXT PRIMARY KEY, at TEXT NOT NULL,
   payload TEXT NOT NULL);
 """
@@ -167,6 +171,38 @@ class MonitoringStore:
                 "last_detected": r[4],
                 "resolved_at": r[5],
                 **json.loads(r[6]),
+            }
+            for r in rows
+        ]
+
+    # ------------------------------------------------------------------ drift windows
+
+    def upsert_drift_window(
+        self, key: str, version: str, kind: str, day: str, at: str, payload: dict
+    ) -> None:
+        """ONE row per distinct daily window: re-collecting a window replaces its result, so
+        several collections of the same window are never several independent detections."""
+        with self._lock, self._conn() as c:
+            c.execute(
+                "INSERT OR REPLACE INTO drift_windows VALUES (?,?,?,?,?,?)",
+                (key, version, kind, day, at, json.dumps(payload)),
+            )
+
+    def drift_windows(self, key: str) -> list[dict]:
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT model_version, data_kind, window_day, computed_at, payload "
+                "FROM drift_windows "
+                "WHERE model_key=? ORDER BY window_day",
+                (key,),
+            ).fetchall()
+        return [
+            {
+                "model_version": r[0],
+                "data_kind": r[1],
+                "window_day": r[2],
+                "computed_at": r[3],
+                **json.loads(r[4]),
             }
             for r in rows
         ]

@@ -143,14 +143,48 @@ class LaunchStore:
             self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
+class LaunchAudit:
+    """Append-only journal of EVERY launch attempt (accepted, refused, replayed, failed),
+    whatever its origin (Training Factory, legacy route, retraining policy)."""
+
+    def __init__(self, path: Path | None = None) -> None:
+        self.path = path or HOME / "training" / "launch_audit.jsonl"
+        self.lock = threading.Lock()
+
+    def log(self, **event: Any) -> None:
+        line = json.dumps({"at": datetime.now(UTC).isoformat(timespec="seconds"), **event})
+        with self.lock:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+
+    def tail(self, limit: int = 200) -> list[dict[str, Any]]:
+        if not self.path.is_file():
+            return []
+        lines = self.path.read_text(encoding="utf-8").splitlines()[-limit:]
+        return [json.loads(x) for x in reversed(lines) if x.strip()]
+
+
+def launch_guard() -> dict[str, Any]:
+    """Effective authorization state of the gateway process (read-only)."""
+    return {
+        "remote_launch_enabled": remote_enabled(),
+        "variable": "HOVIS_TRAINING_REMOTE",
+        "value_required": "1",
+        "single_launch_path": "TrainingService.launch (/api/mlops/training/launch)",
+    }
+
+
 class TrainingService:
     def __init__(
         self,
         connector,
         specs: list[PipelineSpec] | None = None,
         launches: LaunchStore | None = None,
+        audit: LaunchAudit | None = None,
     ) -> None:
         self.c = connector
+        self.audit = audit or LaunchAudit()
         self.specs = specs if specs is not None else load_specs()
         self.launches = launches or LaunchStore()
         self.resolver = DatasetResolver(dataset_store(connector))
@@ -275,22 +309,51 @@ class TrainingService:
 
     # ------------------------------------------------------------------ launch / cancel
 
+    def pipeline_for_model(self, model_id: str) -> PipelineSpec:
+        """The ONE pipeline registering into this managed model (no guess when ambiguous)."""
+        uc_name = self.c.managed(model_id).uc_name
+        found = [s for s in self.specs if s.mlflow.get("registered_model") == uc_name]
+        if len(found) != 1:
+            raise ConflictError(
+                f"{len(found)} pipelines register into {uc_name}: choose one in Training Factory"
+            )
+        return found[0]
+
     def launch(
-        self, pipeline_id: str, dataset_id: str, version: str, overrides: dict[str, Any], key: str
+        self,
+        pipeline_id: str,
+        dataset_id: str,
+        version: str,
+        overrides: dict[str, Any],
+        key: str,
+        source: str = "training_factory",
     ) -> LaunchRecord:
+        """THE single launch path of a training (UI, legacy route, retraining policies):
+        idempotency, authorization lock, pipeline / dataset / compatibility checks, journal."""
+        ctx = {
+            "source": source,
+            "pipeline_id": pipeline_id,
+            "dataset_id": dataset_id,
+            "dataset_version": version,
+            "idempotency_key": key,
+        }
         if not key or len(key) > 64:
+            self.audit.log(outcome="refused_invalid_key", **ctx)
             raise InvalidDatasetRequest("idempotency key required (1-64 characters)")
         previous = self.launches.get(key)
         if previous and previous.status == "submitted":
+            self.audit.log(outcome="replayed", job_run_id=previous.job_run_id, **ctx)
             return previous  # double click / retry: same answer, no second run
-        report = self.validate(pipeline_id, dataset_id, version, overrides)
-        if not remote_enabled():
-            raise ForbiddenOperationError("remote training launch is not authorized yet")
-        if not report.launchable:
-            raise ConflictError(
-                "blocking checks failed: "
-                + ", ".join(c.label for c in report.checks if c.status == "error")
+        if not remote_enabled():  # checked BEFORE any other work
+            self.audit.log(outcome="refused_lock", **ctx)
+            raise ForbiddenOperationError(
+                "remote training launch is not authorized (HOVIS_TRAINING_REMOTE is not 1)"
             )
+        report = self.validate(pipeline_id, dataset_id, version, overrides)
+        if not report.launchable:
+            failed = [c.label for c in report.checks if c.status == "error"]
+            self.audit.log(outcome="refused_checks", failed=failed, **ctx)
+            raise ConflictError("blocking checks failed: " + ", ".join(failed))
         spec = self.spec(pipeline_id)
         job = self._jobs()[spec.job["name"]]
         record = LaunchRecord(
@@ -315,9 +378,11 @@ class TrainingService:
         except DatabricksConnectorError as exc:
             record.error = str(exc)
             self.launches.put(record)  # stays "uncertain": the UI must not send a NEW key
+            self.audit.log(outcome="uncertain", error=str(exc)[:300], **ctx)
             raise
         record.status, record.job_run_id = "submitted", run_id
         self.launches.put(record)
+        self.audit.log(outcome="submitted", job_run_id=run_id, request_id=record.request_id, **ctx)
         self.c.reads.invalidate("jobs", "jobruns:", "training:")
         return record
 
@@ -372,7 +437,9 @@ class TrainingService:
 
     def cancel(self, job_run_id: int) -> None:
         if not remote_enabled():
+            self.audit.log(outcome="refused_lock", action="cancel", job_run_id=job_run_id)
             raise ForbiddenOperationError("remote job cancellation is not authorized yet")
+        self.audit.log(outcome="cancel_requested", action="cancel", job_run_id=job_run_id)
         self.c._call(lambda: self.c.w.jobs.cancel_run(job_run_id), "job run")
         self.c.reads.invalidate("jobruns:", "training:")
 

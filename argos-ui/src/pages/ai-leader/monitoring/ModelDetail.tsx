@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { monitoring, type Alert, type CatalogRow, type DataKind, type Measure, type PerfVersion, type Reference } from '../../../api/monitoring';
 import { Loading, Unavailable } from '../common';
 import { errText, useStore } from '../data';
@@ -397,12 +398,17 @@ function AlertsTab({ m }: { m: CatalogRow }) {
   const alerts = useAlerts();
   const signals = useSignals(m.source === 'registry' ? m.model_id ?? null : null);
   const mine = (alerts.data ?? []).filter((a) => a.model_key === m.model_key);
+  const [, setParams] = useSearchParams();
   return (
     <div className="col" style={{ gap: 14 }}>
       {alerts.loading ? <Loading /> : alerts.error ? <Unavailable tone="red">Alertes indisponibles : {alerts.error}</Unavailable>
         : mine.length ? <AlertTable alerts={mine} /> : <div className="mon-empty">Aucune alerte persistée pour ce modèle. {m.drift.status === 'reference_absent' ? 'Sans référence, aucune dérive ne peut être détectée.' : m.drift.status.startsWith('insufficient') ? 'Les effectifs sont insuffisants pour une alerte fiable.' : ''}</div>}
       <span className="muted" style={{ fontSize: 13 }}>Les alertes sont évaluées uniquement lors d’une collecte explicite (bouton « Collecter maintenant ») ; l’ouverture de la page n’écrit rien.</span>
-      <h3 style={{ margin: 0, fontSize: 17 }}>Signaux de réentraînement (lecture seule)</h3>
+      <div className="between" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <h3 style={{ margin: 0, fontSize: 17 }}>Signaux de réentraînement (lecture seule)</h3>
+        {m.source === 'registry' && m.model_id && <button className="btn btn-ghost" style={{ height: 34 }}
+          onClick={() => setParams(new URLSearchParams({ section: 'training', view: 'policies', model: m.model_id as string }))}>Voir les politiques de ce modèle</button>}
+      </div>
       {m.source !== 'registry' ? <Unavailable tone="grey">Signaux disponibles pour les modèles du registre uniquement.</Unavailable>
         : signals.loading ? <Loading /> : signals.error ? <Unavailable tone="red">Signaux indisponibles : {signals.error}</Unavailable> : signals.data && (
           <>

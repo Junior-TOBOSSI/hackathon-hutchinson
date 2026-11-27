@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Icon, ICONS } from '../../../components/ui';
 import { Badge, Loading, Unavailable } from '../common';
 import { useHealth, useStore } from '../data';
 import { Chip, Kpi, SearchField, SelectField } from '../ui';
 import NewTraining from './NewTraining';
+import PoliciesView from './policies/PoliciesView';
 import RunDetail from './RunDetail';
 import { dt, duration, StatusChip, useTfParams, useTrainingRuns, useTrainingSummary } from './shared';
 import './training.css';
@@ -19,6 +21,8 @@ export default function TrainingFactory(_props: { onMessage?: (m: string) => voi
   const runs = useTrainingRuns();
   const summary = useTrainingSummary();
   const nav = useTfParams();
+  const [params, setParams] = useSearchParams();
+  const view = params.get('view') === 'policies' ? 'policies' : 'runs';
   const [query, setQuery] = useState('');
   const [pipeline, setPipeline] = useState('');
   const [dataset, setDataset] = useState('');
@@ -68,6 +72,11 @@ export default function TrainingFactory(_props: { onMessage?: (m: string) => voi
           <button className="btn btn-ghost" disabled={runs.refreshing} onClick={() => store.invalidate('training:')}>Actualiser</button>
         </div>
       </header>
+      <div className="tf-views" role="tablist">
+        <button role="tab" aria-selected={view === 'runs'} className={view === 'runs' ? 'active' : ''} onClick={() => setParams(new URLSearchParams({ section: 'training' }))}>Entraînements</button>
+        <button role="tab" aria-selected={view === 'policies'} className={view === 'policies' ? 'active' : ''} onClick={() => setParams(new URLSearchParams({ section: 'training', view: 'policies' }))}>Politiques de réentraînement</button>
+      </div>
+      {view === 'policies' ? <PoliciesView /> : <>
       {runs.staleError && <Unavailable>Dernière actualisation en échec : {runs.staleError}</Unavailable>}
 
       <div className="tf-kpis">
@@ -123,6 +132,7 @@ export default function TrainingFactory(_props: { onMessage?: (m: string) => voi
         {nav.isNew && <NewTraining key={`${nav.pipeline}:${nav.dataset}:${nav.dsversion}`} />}
         {!nav.isNew && nav.run != null && <RunDetail key={nav.run} jobRunId={nav.run} />}
       </div>
+      </>}
     </div>
   );
 }
