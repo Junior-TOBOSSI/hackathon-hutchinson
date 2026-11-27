@@ -15,34 +15,33 @@ Vérifier que le poste est configuré comme la référence : objets attendus pr�
   ```
 
 ## État actuel
-**Jeu de référence : `presse_5S_20`** (depuis le 2026-11-26 au soir). Les jeux précédents (`dataset_5S`, `poste1` / `poste2`) sont supprimés. Analyseur `model.py:ZoneWorkstationAnalyzer` v0.3.0 : alignement sur la meilleure vue (planche / pilote), normalité apprise sur les photos conformes et la référence, zones `red_zone` et `workbench`, emplacements des outils, YOLO26 pour nommer les personnes. Résultat : 15/15 anomalies, 0/4 fausse alerte (démonstration, pas un chiffre de performance). Détails dans [README.md](README.md).
+**Quatre sections** (27/11) : un poste par jeu `poste_*_5s_11`, un fichier de poste annoté en anglais par section dans `stations/`. Les jeux précédents sont supprimés. Analyseur `model.py:ZoneWorkstationAnalyzer` : alignement, normalité apprise, zones à garder libres, éléments à leur place, personnes autorisées par zone ou partout. Démo Streamlit avec choix de la section et de la photo. Résultat : 19/20 anomalies, 1/20 fausse alerte (démonstration, pas un chiffre de performance). Détails dans [README.md](README.md).
 
 ## Décisions prises
 <!-- Une ligne par décision : AAAA-MM-JJ HH:MM — décision — raison. -->
 - 2026-11-26 — Une **photo** au début de la prise de poste, comparée à la référence ; persistance 1.
-- 2026-11-26 — `presse_5S_20` fait foi ; le moteur générique est gardé, les données et fichiers de poste précédents sont supprimés.
-- 2026-11-26 — **Deux vues** : « planche » (référence `good_002`, exclue de la mesure) couvre 19 photos sur 20 ; « pilote » (`reference.png`) ne couvre que `good_001`. La vue retenue est celle qui a le plus de correspondances (faux alignements : 47 à 80 ; bons : 97 et plus).
-- 2026-11-26 — **Normalité apprise** (moyenne + dispersion par pixel) sur les photos conformes **et la référence elle-même** ; au moins 2 photos par vue, sinon comparaison à la référence seule.
-- 2026-11-26 — L'arrière-plan de l'atelier (personnes, machines au loin) n'est jamais jugé : seules les zones et les emplacements comptent.
-- 2026-11-26 — Le détecteur ne fait que **nommer** un changement ; YOLO26 COCO activé par défaut, car il nomme les personnes dans la zone rouge (sécurité) et la latence (0,8 s) est sans enjeu pour une photo par prise de poste.
-- 2026-11-26 — Mesure en **validation croisée** : une photo conforme mise de côté à chaque fois (4 photos conformes seulement).
-- 2026-11-26 — Boîtes sur tous les éléments du poste (bacs, outils, poubelles, presse, coffret) redessinées **sur la photo d'origine** par l'homographie inverse ; pas d'emplacement pour l'étau (posé sur l'établi, il était signalé « absent » dès qu'un objet arrivait à côté).
-- 2026-11-26 — Démo Streamlit propre au binôme (`demo_app.py`, port 8502) : 12 photos traitées correctement et précisément, défilement automatique, une photo conforme n'est jamais jugée par un modèle qui l'a apprise.
+- 2026-11-27 — **Une section = un poste = un fichier de poste** ; quatre sections (`press_cell`, `machine_cell`, `machine_cell_variant`, `electrical_bench`) sur les jeux `poste_*_5s_11`. Noms des zones et éléments en **anglais**.
+- 2026-11-27 — Règles par section, d'après les README des jeux : tapis bleu interdit (press cell) ; passage central libre, tapis opérateur autorisé (machine cells) ; opérateur autorisé partout (electrical bench).
+- 2026-11-27 — Personnes autorisées : `zone_allowed_labels` (une zone) ou `ignore_labels` (partout) ; boîte agrandie de 15 % (le tabouret sous l'opérateur assis était signalé).
+- 2026-11-27 — Taille minimale d'un changement plafonnée à 150 pixels : un petit outil au sol passait sous le seuil de 1 % d'une grande zone.
+- 2026-11-27 — Le zone « floor » du poste électrique exclut l'emplacement du tabouret, qui bouge quand l'opérateur s'assoit.
+- 2026-11-27 — Seules les détections utiles sont dessinées (objets inconnus, personnes, objets en cause) : YOLO voyait la presse comme une « tv ».
+- 2026-11-26 — **Normalité apprise** (moyenne + dispersion par pixel) sur les photos conformes et la référence ; mesure en **validation croisée** (une photo conforme mise de côté à chaque fois).
+- 2026-11-26 — Le détecteur ne fait que **nommer** un changement, il ne déclenche jamais d'alerte seul.
 - 2026-11-26 — Différence en **couleur**, luminosité compensée ; alignement SIFT + RANSAC ; aucune modification du contrat (`"<label>@<zone>"` dans `misplaced`).
 
 ## Questions ouvertes
 <!-- Questions sur le besoin métier ou les données, à poser à l'équipe ou à Hutchinson. -->
-- **Lot pilote** : aucune photo conforme dans le cadrage « planche ». Ses anomalies sont détectées, mais avec des signalements en trop (pictogramme dans la zone rouge, bacs différents). Il faut des photos conformes de ce lot.
-- Le pictogramme peint dans la zone rouge fait-il partie du poste normal, ou est-ce une variante de rendu ?
-- Les étiquettes sont « indicatives » : à faire confirmer avant de citer les chiffres.
-- En production : combien de photos conformes par caméra le client peut-il fournir pour apprendre la normalité ?
+- Machine cell `anomaly_01` : quel est l'objet manquant ? Le seul écart visible avec la référence est aussi présent sur toutes les photos conformes.
+- Electrical bench : un document posé sur l'établi est-il autorisé (`good_03`) ?
+- Press cell : le tapis bleu est-il bien interdit pendant le contrôle de prise de poste (« hypothèse à valider » selon le README) ?
+- Les étiquettes sont indicatives : à faire confirmer avant de citer les chiffres.
+- En production : une référence et quelques photos conformes par caméra.
 - Contrat : un champ `foreign: list[str]` serait plus clair que `misplaced` (modification de `contracts.py`, à décider en équipe).
 - Racine du dépôt : extra `workstation` à passer à `ultralytics>=8.4` ; ajouter `*.ts` au `.gitignore`.
 
 ## Résultats
-`presse_5S_20`, validation croisée (une photo conforme mise de côté à chaque fois), seuils 0,4 / 0,7, CPU :
-- anomalies : 15/15 alertes pour la bonne raison (7 désordres, 4 objets et 4 personnes en zone rouge) ;
-- photos conformes : 0/4 fausse alerte (`good_001` sur la vue pilote, `good_003` à `005` sur la planche) ;
-- personnes nommées par YOLO26 : 2/4 (`anomaly_014` et `015`) ;
-- alignement : 0 échec ; latence ≈ 0,4 s sans détecteur, ≈ 0,8 s avec.
-- Ce n'est **pas** un chiffre de performance : 20 images, à présenter image par image.
+Jeux `poste_*_5s_11`, validation croisée, YOLO26 COCO, seuils 0,4 / 0,7, CPU :
+- press_cell 5/5 anomalies, 0/5 fausse alerte ; machine_cell 4/5, 0/5 ; machine_cell_variant 5/5, 0/5 ; electrical_bench 5/5, 1/5 ;
+- total : 19/20 anomalies, 1/20 fausse alerte ; alignement : 0 échec ; ≈ 0,3 s par photo.
+- Ce n'est **pas** un chiffre de performance : 10 photos synthétiques par section.

@@ -1,0 +1,35 @@
+# Section "Electrical bench" (poste_electrique_5s_11, synthetic pilot, labels indicative).
+# Electrical cabinet and workbench. An operator at work is NORMAL here (3 of the
+# 5 conforming photos show one): persons are never judged, and the parts of the
+# photo they hide are left out of the comparison.
+#
+# Paths are relative to --data-root. Coordinates are NORMALIZED [x, y] on the reference.
+# empty_zones  : nothing new may appear there (objects, and persons unless allowed)
+# element_slots: each element must stay in its place; they are the boxes shown on photos
+name: electrical_bench
+title: Electrical bench
+dataset: raw/workstation/poste_electrique_5s_11
+# Columns of labels.csv: file path, class (reference / good / anomaly), anomaly type.
+labels: {file: image, label: classe, type: type}
+# Where each anomaly type must be found: a zone name, null (anything outside the
+# zones named here: bench, slots) or any (any finding).
+anomaly_types:
+  objet_manquant: null
+  cable_deplace: any
+  etabli_desorganise: workbench
+  bac_au_sol: floor
+  dechet_au_sol: floor
+# Analyzer parameters specific to this section.
+params:
+  ignore_labels: [person]
+views:
+  - name: main
+    reference_image: raw/workstation/poste_electrique_5s_11/reference.png
+    empty_zones:
+      floor: [[0.101, 0.738], [0.363, 0.631], [0.540, 0.609], [0.556, 0.874], [0.736, 0.874], [0.776, 0.769], [0.847, 0.738], [0.887, 1.000], [0.121, 1.000]]
+      workbench: [[0.575, 0.431], [0.746, 0.234], [0.968, 0.283], [0.964, 0.714], [0.827, 0.646]]
+    element_slots:
+      tool_tray: [[0.730, 0.240], [0.806, 0.240], [0.806, 0.363], [0.730, 0.363]]
+      screwdrivers: [[0.736, 0.394], [0.817, 0.394], [0.817, 0.468], [0.736, 0.468]]
+      blue_bins: [[0.857, 0.240], [1.000, 0.240], [1.000, 0.554], [0.857, 0.554]]
+      cable_coil: [[0.806, 0.508], [0.897, 0.508], [0.897, 0.646], [0.806, 0.646]]

@@ -52,21 +52,26 @@ def labelled_photos(station: dict[str, Any]) -> list[dict[str, str]]:
     if not labels.exists():
         return []
     with labels.open(encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
+        rows = [_normalize(r, station.get("labels") or {}) for r in csv.DictReader(f)]
     excluded = set(station.get("exclude_from_eval") or [])
-    return [_normalize(r) for r in rows if r["filename"] not in excluded]
+    return [r for r in rows if r["filename"] not in excluded and r["label"] != "reference"]
 
 
-def _normalize(row: dict[str, str]) -> dict[str, str]:
-    """Add ``kind`` (good or the anomaly type) whatever the labels.csv layout:
-    either ``label`` = good / anomalies + ``anomaly_type_indicative``, or ``label`` = the
-    type itself (good, disorder, zone_object, zone_person...)."""
-    label = row.get("label", "").strip()
+def _normalize(row: dict[str, str], columns: dict[str, str]) -> dict[str, str]:
+    """Common fields ``filename``, ``label`` and ``kind`` (good or the anomaly type),
+    whatever the labels.csv layout. ``columns`` (station ``labels``) names the columns
+    holding the file, the class and the anomaly type; without it, the usual names are
+    tried (filename / label / anomaly_type_indicative)."""
+    filename = row.get(columns.get("file", "filename")) or row.get("filename") or ""
+    label = (row.get(columns.get("label", "label")) or "").strip()
+    anomaly = (row.get(columns.get("type", "anomaly_type_indicative")) or "").strip()
     if label == "good":
         kind = "good"
+    elif label == "reference":
+        kind = "reference"
     else:
-        kind = (row.get("anomaly_type_indicative") or "").strip() or label
-    return {**row, "kind": kind}
+        kind = anomaly if anomaly and anomaly not in ("none", "aucune") else label
+    return {**row, "filename": filename.strip(), "label": label, "kind": kind}
 
 
 def normal_photos(station: dict[str, Any]) -> list[str]:
@@ -91,4 +96,5 @@ def analyzer_params(station: dict[str, Any], normal_images: list[str] | None = N
             for v in station["views"]
         ],
         "normal_images": normal_photos(station) if normal_images is None else normal_images,
+        **(station.get("params") or {}),  # section-specific settings (e.g. allowed persons)
     }

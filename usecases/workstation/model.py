@@ -100,9 +100,19 @@ class ZoneWorkstationAnalyzer(Analyzer):
         self.expected: list[str] = list(config.get("expected_objects") or [])
         # Labels never judged in zones. Empty by default: a person IS a violation.
         self.ignore_labels: set[str] = set(config.get("ignore_labels") or [])
+        # Labels allowed in one zone only (e.g. the operator on his mat, not in the walkway).
+        self.zone_allowed: dict[str, set[str]] = {
+            zone: set(labels) for zone, labels in (config.get("zone_allowed_labels") or {}).items()
+        }
         self.min_overlap = float(config.get("min_overlap", 0.15))
         self.diff_threshold = float(config.get("diff_threshold", 35))
         self.min_blob_area = float(config.get("min_blob_area", 0.01))
+        # ...but never more than this many pixels: in a LARGE zone, 1 % can be bigger
+        # than a small tool lying on the floor.
+        self.min_blob_pixels = int(config.get("min_blob_pixels", 150))
+        # Allowed / ignored persons: their box is grown by this share of its size, so that
+        # what they touch (the stool they sit on, their shadow) is ignored with them.
+        self.ignore_box_margin = float(config.get("ignore_box_margin", 0.15))
         self.full_blob_area = float(config.get("full_blob_area", 0.05))
         self.unknown_min_score = float(config.get("unknown_min_score", 0.45))
         self.slot_min_change = float(config.get("slot_min_change", 0.25))
@@ -233,7 +243,7 @@ class ZoneWorkstationAnalyzer(Analyzer):
         masks = self._region_masks(view, (h, w))
         ignored = [d for d in detections if d.label in self.ignore_labels]
         if ignored:
-            changed &= ~boxes_mask([d.box for d in ignored], (h, w))
+            changed &= ~boxes_mask([self._grow(d.box) for d in ignored], (h, w))
         objects = [d for d in detections if d.label not in self.ignore_labels]
         usable = valid if valid is not None else np.ones((h, w), dtype=bool)
 
@@ -311,7 +321,14 @@ class ZoneWorkstationAnalyzer(Analyzer):
     ) -> Problems:
         problems: Problems = {}
         zone_area = max(int(mask.sum()), 1)
-        blobs = blobs_in(changed & mask, max(1, int(self.min_blob_area * zone_area)))
+        allowed = self.zone_allowed.get(zone, set())
+        if allowed:  # what is allowed here is neither named nor counted as a change
+            here = [d for d in objects if d.label in allowed]
+            objects = [d for d in objects if d.label not in allowed]
+            if here:
+                changed = changed & ~boxes_mask([self._grow(d.box) for d in here], changed.shape)
+        min_area = max(1, min(int(self.min_blob_area * zone_area), self.min_blob_pixels))
+        blobs = blobs_in(changed & mask, min_area)
 
         def change_score(area: int) -> float:
             # Client rule "no element in the zone": any change above the noise floor is
@@ -347,6 +364,11 @@ class ZoneWorkstationAnalyzer(Analyzer):
             obj = _to_contract(UNKNOWN, confidence, biggest.box, w, h)
             problems[f"{UNKNOWN}@{zone}"] = (confidence, obj)
         return problems
+
+    def _grow(self, box: Box) -> Box:
+        x1, y1, x2, y2 = box
+        dx, dy = int((x2 - x1) * self.ignore_box_margin), int((y2 - y1) * self.ignore_box_margin)
+        return (x1 - dx, y1 - dy, x2 + dx, y2 + dy)
 
     def _confirm(self, candidates: Problems) -> Problems:
         """Keep only the problems seen on ``persistence_frames`` consecutive frames."""

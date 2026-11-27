@@ -1,0 +1,33 @@
+# Section "Machine cell (top view)" (poste_bleu_5s_11, synthetic pilot, labels indicative).
+# VCRS machine seen from above. The operator is ALLOWED on the blue operator mat
+# (no object there); the central walkway must stay clear of objects and persons.
+#
+# Paths are relative to --data-root. Coordinates are NORMALIZED [x, y] on the reference.
+# empty_zones  : nothing new may appear there (objects, and persons unless allowed)
+# element_slots: each element must stay in its place; they are the boxes shown on photos
+name: machine_cell
+title: Machine cell (top view)
+dataset: raw/workstation/poste_bleu_5s_11
+# Columns of labels.csv: file path, class (reference / good / anomaly), anomaly type.
+labels: {file: file, label: label, type: type_provisional}
+# Where each anomaly type must be found: a zone name, null (anything outside the
+# zones named here: bench, slots) or any (any finding).
+anomaly_types:
+  missing_object: null
+  moved_object: any
+  clutter: walkway
+  object_in_zone: operator_mat
+  person_in_zone: walkway
+# Analyzer parameters specific to this section.
+params:
+  zone_allowed_labels:
+    operator_mat: [person]
+views:
+  - name: main
+    reference_image: raw/workstation/poste_bleu_5s_11/reference.png
+    empty_zones:
+      walkway: [[0.262, 0.554], [0.514, 0.385], [0.665, 0.354], [0.857, 0.415], [0.867, 0.769], [0.726, 0.825], [0.665, 1.000], [0.252, 1.000]]
+      operator_mat: [[0.544, 0.142], [0.641, 0.123], [0.690, 0.295], [0.617, 0.345], [0.573, 0.252]]
+    element_slots:
+      rack_bin: [[0.867, 0.446], [0.948, 0.446], [0.948, 0.631], [0.867, 0.631]]
+      orange_crate: [[0.060, 0.754], [0.151, 0.754], [0.151, 0.969], [0.060, 0.969]]

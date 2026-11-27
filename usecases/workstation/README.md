@@ -1,72 +1,73 @@
 # Cas d'usage `workstation` — écarts au poste de travail
 
 ## Rôle
-Poste **presse + établi 5S** : au début de la prise de poste, une **photo** du poste est comparée à sa **référence**, pour repérer (a) **ce qui n'est pas à sa place** (désordre sur l'établi, outil absent du tableau) et (b) **tout objet ou toute personne** dans la **zone rouge** hachurée à côté de la presse.
+Contrôle **5S** au début de la prise de poste : une **photo** du poste est comparée à sa **référence**, pour repérer (a) **ce qui n'est pas à sa place** et (b) **tout objet ou toute personne non autorisée** dans une zone à garder libre. **Une section = un poste = un fichier de poste** dans [stations/](stations/).
 
-**Données de référence (depuis le 26/11) : `presse_5S_20`**, 20 images synthétiques plus `reference.png` :
+| Section | Fichier | Jeu (`<data-root>/raw/workstation/`) | Zones | Éléments | Personne |
+|---|---|---|---|---|---|
+| Press cell | [press_cell.yaml](stations/press_cell.yaml) | `poste_5s_11` | `blue_mat`, `workbench` | `tool_tray`, `blue_bin`, `shelf_blue_bin`, `yellow_bin` | interdite sur le tapis |
+| Machine cell (top view) | [machine_cell.yaml](stations/machine_cell.yaml) | `poste_bleu_5s_11` | `walkway`, `operator_mat` | `rack_bin`, `orange_crate` | autorisée sur `operator_mat`, interdite sur `walkway` |
+| Machine cell variant | [machine_cell_variant.yaml](stations/machine_cell_variant.yaml) | `poste_variante_5s_11` | `passage`, `workbench` | `bench_blue_bin`, `rack_blue_bin`, `rack_yellow_bin` | interdite dans le passage |
+| Electrical bench | [electrical_bench.yaml](stations/electrical_bench.yaml) | `poste_electrique_5s_11` | `floor`, `workbench` | `tool_tray`, `screwdrivers`, `blue_bins`, `cable_coil` | autorisée partout (opérateur au travail) |
 
-| Catégorie | Nombre |
-|---|---|
-| `good` | 5 |
-| `disorder` | 7 |
-| `zone_object` (cartons, chariot, transpalette) | 4 |
-| `zone_person` (opérateur) | 4 |
-
-Les étiquettes sont **indicatives**. Le jeu est rangé dans `<data-root>/raw/workstation/presse_5S_20/` et n'est jamais versionné. Les jeux précédents (`dataset_5S`, `poste1` / `poste2`) ont été abandonnés.
+Chaque jeu contient 1 référence, 5 photos conformes et 5 anomalies synthétiques, avec des étiquettes **indicatives** dans 4 formats de `labels.csv` différents (colonnes décrites par la clé `labels` de chaque fichier de poste). Les jeux ne sont jamais versionnés. Les jeux précédents (`presse_5S_20`, `dataset_5S`, `poste1` / `poste2`) ont été abandonnés.
 
 ## Analyseur : une photo comparée à la normalité apprise
 
-Classe `usecases.workstation.model:ZoneWorkstationAnalyzer`. [config.yaml](config.yaml) pointe vers le fichier de poste [stations/presse_5s.yaml](stations/presse_5s.yaml), seule source de vérité : vues, boîtes, photos conformes.
+Classe `usecases.workstation.model:ZoneWorkstationAnalyzer`. [config.yaml](config.yaml) donne les réglages communs et la section par défaut (`station`).
 
-1. **Alignement sur la bonne vue** ([align.py](align.py)) : `reference.png` (vue « pilote ») ne correspond qu'à `good_001`, qui est la même image recadrée. **Toutes les autres photos**, y compris les anomalies du lot pilote, ont le cadrage « planche », dont la référence est `good/good_002.png` (**exclue de la mesure**). La photo est comparée à la vue qui s'aligne le mieux : les faux alignements obtiennent 47 à 80 correspondances, les bons 97 et plus. Échec partout : `alignment_failed`, donc `a_verifier`.
-2. **Normalité apprise** ([normal.py](normal.py)) : moyenne et dispersion par pixel des photos conformes alignées, **référence comprise**. Un pixel n'a changé que s'il s'écarte de plus de `normal_k` (4) dispersions, et d'au moins `diff_threshold` (25 niveaux). Il faut au moins 2 photos par vue ; sinon la vue se compare à sa seule référence.
-3. **Zones** : `red_zone` (ni objet ni personne) et `workbench` (rien de nouveau). L'arrière-plan de l'atelier, qui bouge d'une photo à l'autre, n'est **jamais** jugé.
-4. **Emplacements** : `blue_bins`, `screwdrivers`, `pliers`, `waste_bins`, `press`, `control_cabinet`. S'il a changé à plus de 25 %, l'élément n'est pas à sa place et va dans `missing`. L'étau n'a pas d'emplacement : il est sur l'établi, déjà surveillé par la zone `workbench` (sinon un objet posé à côté le ferait signaler « absent »).
-5. **Détecteur YOLO26 COCO** (activé par défaut) : il **nomme** les personnes (`person@red_zone`), mais ne déclenche jamais d'alerte seul.
+1. **Alignement** ([align.py](align.py)) : la photo est recalée sur la référence de sa section (SIFT + RANSAC ; 95 à 230 correspondances sur ces jeux). Échec : `alignment_failed`, donc `a_verifier`.
+2. **Normalité apprise** ([normal.py](normal.py)) : moyenne et dispersion par pixel des photos conformes alignées, référence comprise. Un pixel n'a changé que s'il s'écarte de plus de `normal_k` (4) dispersions, et d'au moins `diff_threshold` (25 niveaux).
+3. **Zones** : tout changement est un écart (`unknown_object@<zone>`, au moins `a_verifier`). La taille minimale d'un changement est 1 % de la zone, **plafonnée à 150 pixels**, pour voir un petit outil au sol dans une grande zone.
+4. **Personnes autorisées** : `zone_allowed_labels` (autorisée dans une zone seulement) ou `ignore_labels` (autorisée partout). La boîte de la personne, agrandie de 15 % (tabouret, ombre), est retirée de la comparaison. Cela demande le détecteur YOLO26 : sans lui, l'opérateur du poste électrique est signalé.
+5. **Emplacements** : s'il a changé à plus de 25 %, l'élément n'est pas à sa place et va dans `missing`.
+6. **Détecteur YOLO26 COCO** : il ne fait que **nommer** (personnes surtout), ne déclenche jamais d'alerte seul. Ses autres détections (la presse vue comme une « tv ») ne sont pas affichées.
 
 | Fichier | Rôle |
 |---|---|
-| [stations/presse_5s.yaml](stations/presse_5s.yaml) | Les deux vues, leurs zones et emplacements, la raison attendue par type d'anomalie |
-| [station.py](station.py) | Lecture du fichier de poste et de `labels.csv` (les deux formats d'étiquettes) |
+| [stations/](stations/) | Une annotation par section (zones, éléments, règles, colonnes de `labels.csv`), en anglais |
+| [station.py](station.py) | Lecture d'un fichier de poste et de son `labels.csv` |
 | [align.py](align.py) / [normal.py](normal.py) / [zones.py](zones.py) | Alignement, normalité apprise, masques et changements |
 | [model.py](model.py) / [detector.py](detector.py) | Analyseur et détecteur |
-| [evaluate.py](evaluate.py) | Mesure en validation croisée (une photo conforme mise de côté à chaque fois), images annotées |
+| [render.py](render.py) | Boîtes redessinées sur la photo d'origine, bandeau OK / CHECK / NOK |
+| [demo_app.py](demo_app.py) | Démo Streamlit : choix de la section, choix de la photo, verdict |
+| [evaluate.py](evaluate.py) | Mesure en validation croisée, images annotées |
 | [draw_zones.py](draw_zones.py) | Dessin de nouvelles zones à la souris (sur PC, fenêtre tkinter) |
-| [make_samples.py](make_samples.py) | Poste synthétique dessiné, pour les tests unitaires |
 
 ### Démo visuelle (Streamlit)
 ```bash
-streamlit run usecases/workstation/demo_app.py --server.port 8502 --browser.gatherUsageStats false
+streamlit run usecases/workstation/demo_app.py --server.port 8502 --server.address localhost --browser.gatherUsageStats false
 ```
-Les photos défilent une à une (lecture, pause, précédente, suivante) avec le verdict **OK / À VÉRIFIER / NOK** et les boîtes dessinées **sur la photo d'origine** ([render.py](render.py)) :
-- **vert** : élément à sa place, zone vide ;
+En haut, un bouton par **section**. Dans le panneau latéral, la **photo** à évaluer (liste, précédente / suivante, lecture automatique). L'image affiche le verdict (**OK / CHECK / NOK**) et les boîtes :
+- **vert** : élément à sa place, zone libre ;
 - **rouge** : élément absent ou déplacé, zone occupée ;
 - **orange** : objet inconnu ;
 - **violet** : personne.
 
-La liste de lecture contient les 12 photos traitées correctement **et** précisément ; l'interrupteur « Toutes les photos » montre tout le jeu, lot pilote compris. Chaque photo conforme y est jugée par un modèle qui ne l'a pas apprise. C'est un outil de démonstration du binôme : le tableau de bord de l'équipe reste celui qui passe par l'API.
+À droite : le constat, la vérité terrain et si le verdict est juste. Chaque photo conforme est jugée par un modèle qui ne l'a pas apprise. C'est un outil de démonstration du binôme : le tableau de bord de l'équipe reste celui qui passe par l'API.
 
 ### Mesurer
 ```bash
-python -m usecases.workstation.evaluate --data-root ~/data --annotate      # --device cuda sur le cluster
+python -m usecases.workstation.evaluate --station electrical_bench --data-root ~/data --annotate
 ```
-Sortie dans `<data-root>/processed/workstation/presse_5s/` : `results.csv`, `preview_planche.png` / `preview_pilote.png` (boîtes sur chaque référence), `annotated/` (chaque photo alignée, avec les boîtes et le verdict).
 
-### Résultats (26/11, CPU, seuils 0,4 / 0,7)
-| | Sans détecteur | Avec YOLO26 COCO |
+### Résultats (27/11, validation croisée, YOLO26, seuils 0,4 / 0,7)
+| Section | Anomalies détectées | Fausses alertes |
 |---|---|---|
-| Anomalies détectées, pour la bonne raison | 15/15 | 15/15 |
-| Fausses alertes (photos conformes) | 0/4 | 0/4 |
-| Personnes nommées dans la zone rouge | 0/4 | 2/4 (les deux du lot généré) |
-| Latence | ≈ 0,4 s | ≈ 0,8 s |
+| Press cell | 5/5 | 0/5 |
+| Machine cell | 4/5 | 0/5 |
+| Machine cell variant | 5/5 | 0/5 |
+| Electrical bench | 5/5 | 1/5 |
+| **Total** | **19/20** | **1/20** |
 
-**À dire au jury, ce n'est pas un chiffre de performance :**
-- 20 images seulement, dont **4 conformes pour mesurer**, donc une erreur vaudrait 25 %. Ce sont des démonstrations, à présenter image par image.
-- Les 5 anomalies du **lot pilote** sont bien détectées, mais avec des **signalements en trop** : leur zone rouge porte un pictogramme absent des photos de la planche, et leurs bacs diffèrent. Aucune photo conforme du lot pilote n'existe dans ce cadrage, donc les 0/4 fausses alertes **ne couvrent pas ce lot**.
-- En production : une référence **et quelques photos conformes** par caméra et par configuration du poste.
+Les deux erreurs viennent des données :
+- **Machine cell `anomaly_01`** (« objet manquant ») : l'objet qui diffère de la référence (le bac bleu à ouverture noire de la machine) manque aussi sur les 5 photos conformes, donc l'anomalie est indiscernable d'une photo conforme.
+- **Electrical bench `good_03`** (« conforme_document ») : une feuille posée sur l'établi donne CHECK. C'est un vrai changement en 5S ; il faut que le client dise si un document y est autorisé.
+
+**Ce n'est pas un chiffre de performance** : 10 photos synthétiques par section, à présenter image par image.
 
 ### Tests
-`pytest usecases/workstation` : tests unitaires sur le poste synthétique (sans données ni modèle), plus [tests/test_presse_5s.py](tests/test_presse_5s.py) qui vérifie sur le vrai jeu, s'il est présent, que chaque type d'anomalie est détecté (sinon ignoré, par exemple en CI ; `WORKSTATION_DATA_ROOT=~/data` sur le cluster).
+`pytest usecases/workstation` : tests unitaires sur un poste synthétique (sans données ni modèle), plus [tests/test_sections.py](tests/test_sections.py) qui rejoue chaque section si son jeu est présent (sinon ignoré, par exemple en CI ; `WORKSTATION_DATA_ROOT=~/data` sur le cluster).
 
 ## Contrat
 

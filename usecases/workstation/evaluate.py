@@ -35,6 +35,7 @@ from typing import Any
 import cv2
 import numpy as np
 
+from usecases.workstation.detector import build_detector
 from usecases.workstation.model import ALIGNMENT_FAILED, View, ZoneWorkstationAnalyzer
 from usecases.workstation.station import analyzer_params, labelled_photos, load_station
 from visionhub.config import load_use_case_config
@@ -47,8 +48,12 @@ def build_analyzer(
     normal_images: list[str],
     overrides: dict[str, Any],
     slots: bool = True,
+    detector=None,
 ) -> tuple[ZoneWorkstationAnalyzer, Thresholds]:
-    """The analyzer with the platform config + the station, and its thresholds."""
+    """The analyzer with the platform config + the station, and its thresholds.
+
+    ``detector``: an already loaded detector to share (loading YOLO once for many
+    analyzers instead of once each)."""
     config = load_use_case_config(UseCase.WORKSTATION)
     params = {k: v for k, v in config.params.items() if k not in ("station", "data_root")}
     params |= analyzer_params(station, normal_images)
@@ -56,9 +61,20 @@ def build_analyzer(
         params["views"] = [{**v, "element_slots": {}} for v in params["views"]]
     params |= {"align": True, "persistence_frames": 1}
     params |= {k: v for k, v in overrides.items() if v is not None}
+    if detector is not None:
+        params["detector"] = "none"
     analyzer = ZoneWorkstationAnalyzer()
     analyzer.load(params)
+    if detector is not None:
+        analyzer.detector = detector
     return analyzer, config.thresholds
+
+
+def shared_detector(overrides: dict[str, Any]):
+    """The detector of the platform config (with overrides), loaded once."""
+    config = load_use_case_config(UseCase.WORKSTATION)
+    params = {**config.params, **{k: v for k, v in overrides.items() if v is not None}}
+    return build_detector(params)
 
 
 def right_reason(result: AnalysisResult, anomaly_type: str, reasons: dict) -> bool:
@@ -68,10 +84,12 @@ def right_reason(result: AnalysisResult, anomaly_type: str, reasons: dict) -> bo
     be found; ``None`` means any problem outside those zones (bench, tool board)."""
     found = [f for f in result.details.missing + result.details.misplaced if f != ALIGNMENT_FAILED]
     zone = reasons.get(anomaly_type)
+    if zone == "any":  # any problem found is the right one
+        return bool(found)
     if zone:  # an object or a person in that zone
         return any(f.endswith(f"@{zone}") for f in found)
     # disorder: something on the bench or a tool not in its place
-    zones = {z for z in reasons.values() if z}
+    zones = {z for z in reasons.values() if z and z != "any"}
     return any(not any(f.endswith(f"@{z}") for z in zones) for f in found)
 
 
@@ -138,14 +156,17 @@ def evaluate(
         return str(station["dataset_dir"] / r["filename"])
 
     results: list[dict[str, Any]] = []
+    detector = shared_detector(overrides)
     order = np.random.default_rng(seed).permutation(len(goods))
     for fold in np.array_split(order, max(1, folds)) if folds > 1 else []:
         held_out = [goods[i] for i in fold]
         train = [path(g) for g in goods if g not in held_out]
-        analyzer, thresholds = build_analyzer(station, train, overrides, slots)
+        analyzer, thresholds = build_analyzer(station, train, overrides, slots, detector)
         results += judge(analyzer, thresholds, station, held_out, annotate_dir)
 
-    analyzer, thresholds = build_analyzer(station, [path(g) for g in goods], overrides, slots)
+    analyzer, thresholds = build_analyzer(
+        station, [path(g) for g in goods], overrides, slots, detector
+    )
     if folds <= 1:  # no cross-validation: good photos judged by a model that saw them
         results += judge(analyzer, thresholds, station, goods, annotate_dir)
     results += judge(analyzer, thresholds, station, anomalies, annotate_dir)
@@ -216,7 +237,7 @@ def _pct(a: int, b: int) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--station", default="presse_5s")
+    parser.add_argument("--station", default="press_cell")
     parser.add_argument("--data-root", default="data", help="folder holding raw/ and processed/")
     parser.add_argument("--detector", choices=["none", "coco", "yoloe"], help="override config")
     parser.add_argument("--device", default="cpu")

@@ -1,7 +1,7 @@
 """Tests of the single-photo chain: alignment, views, learned normal, slots, naming.
 
 Everything runs on the synthetic station generated in memory (make_samples): no data/,
-no model. The real dataset is tested in test_presse_5s.py (skipped without the data).
+no model. The real datasets are tested in test_sections.py (skipped without the data).
 """
 
 import cv2
@@ -173,10 +173,10 @@ def test_huge_box_around_a_small_change_does_not_name_it():
 
 
 def test_station_file_is_valid_without_the_data(tmp_path):
-    station = load_station("presse_5s", tmp_path)  # empty data root
-    assert [v["name"] for v in station["views"]] == ["planche", "pilote"]
+    station = load_station("press_cell", tmp_path)  # empty data root
+    assert [v["name"] for v in station["views"]] == ["main"]
     for view in station["views"]:
-        assert {"red_zone", "workbench"} <= set(view["empty_zones"])
+        assert {"blue_mat", "workbench"} <= set(view["empty_zones"])
     params = analyzer_params(station)
     assert params["normal_images"] == []  # no dataset here: no normal photos
     a = ZoneWorkstationAnalyzer()

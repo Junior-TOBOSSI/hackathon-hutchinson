@@ -54,7 +54,13 @@ def render(
             missing = name in result.details.missing or name in result.details.misplaced
             label = f"{name}: missing / moved" if missing else name
             _outline(out, to_photo(polygon), RED if missing else GREEN, 2, label)
+        # Only what matters is drawn: unknown objects, persons, and detections that are
+        # part of a problem. Other detections (e.g. the press seen as a "tv") decide
+        # nothing and would only confuse the operator.
+        named = {f.split("@", 1)[0] for f in result.details.misplaced if "@" in f}
         for obj in result.details.detected:
+            if obj.label not in named | {"unknown_object", "person"}:
+                continue
             b = obj.bbox
             quad = to_photo([(b.x1, b.y1), (b.x2, b.y1), (b.x2, b.y2), (b.x1, b.y2)])
             colour = MAGENTA if obj.label == "person" else ORANGE
@@ -92,17 +98,17 @@ def _banner(img: np.ndarray, result: AnalysisResult, decision: Decision) -> np.n
 
 
 def describe(result: AnalysisResult) -> list[str]:
-    """The problems found, in plain French, for the operator screen."""
+    """The problems found, in plain English, for the operator screen."""
     lines = []
     for name in result.details.missing:
-        lines.append(f"{name} : pas à sa place")
+        lines.append(f"{name}: not in its place")
     for item in result.details.misplaced:
         if item == "alignment_failed":
-            lines.append("Photo impossible à aligner sur la référence : à vérifier")
+            lines.append("Photo cannot be aligned with the reference: to check")
         elif "@" in item:
             what, zone = item.split("@", 1)
-            who = {"person": "Personne", "unknown_object": "Objet"}.get(what, what)
-            lines.append(f"{who} dans la zone « {zone} »")
+            who = {"person": "Person", "unknown_object": "Object"}.get(what, what)
+            lines.append(f"{who} in {zone}")
         else:
-            lines.append(f"{item} : déplacé")
+            lines.append(f"{item}: moved")
     return lines

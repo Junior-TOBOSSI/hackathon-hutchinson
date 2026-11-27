@@ -12,9 +12,9 @@ thresholds:
 
 params:
   # --- Station: THE description of the workstation (views, boxes, conforming photos) -----
-  # stations/presse_5s.yaml: press + 5S workbench of presse_5S_20, two camera framings.
+  # One station file per section (stations/*.yaml); the demo switches between them.
   # data_root holds raw/ (images are never versioned): "data" on the PC, ~/data on the cluster.
-  station: presse_5s
+  station: press_cell
   data_root: data
 
   # --- Detector: only NAMES what changed (never raises an alert on its own) ------------
@@ -44,6 +44,8 @@ params:
   min_overlap: 0.15         # share of a detected box inside a zone to count it as "in"
   min_box_fill: 0.05        # a detection names a change only if the change fills 5 % of its box
   min_blob_area: 0.01       # smallest changed region, as a share of the zone area
+  min_blob_pixels: 150      # ...capped at this many pixels (small tool in a large zone)
+  ignore_box_margin: 0.15   # allowed persons: box grown by 15 % (stool, shadow)
   full_blob_area: 0.05      # changed region giving a confidence of 1 (share of the zone)
   unknown_min_score: 0.45   # any change in a zone is at least worth a check (> low)
   slot_min_change: 0.25     # share of a slot that must change for "not in its place"
