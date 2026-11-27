@@ -4,6 +4,17 @@ Serveur de démonstration qui enchaîne les cas d'usage sur **l'écran opérateu
 
 ## Lancer
 
+**Le plus simple (Windows)** : double-cliquer sur `demo\start.bat`, ou dans PowerShell à la racine du dépôt :
+
+```powershell
+.\demo\start.ps1              # avec l'analyse sécurité EPI (webcam)
+.\demo\start.ps1 -NoSafety    # sans la webcam (démo centrée qualité)
+```
+
+Deux fenêtres s'ouvrent (serveur du scénario, interface), puis le navigateur sur http://localhost:5173. Fermer les deux fenêtres pour arrêter. Git Bash, Linux ou cluster : `./demo/start.sh` (ou `SAFETY=0 ./demo/start.sh`).
+
+**À la main** :
+
 ```bash
 # 1. le serveur du scénario (racine du dépôt, environnement Python activé)
 python -m uvicorn demo.scenario:app --port 8000
