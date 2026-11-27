@@ -47,7 +47,7 @@ class FakeProviders:
             mlflow={"registered_model": "cat.q"},
             code={"commit": "abc"},
             dataset=SimpleNamespace(families=["fam"]),
-            compute={"environment": "serverless CPU"},
+            compute={"kind": "serverless-cpu", "gpu": False},
         )
         self.runs = [
             SimpleNamespace(
@@ -380,7 +380,7 @@ def test_closed_lock_refuses_and_takes_no_reservation(env):
             "no_concurrent_training",
         ),
         (lambda p: p.spec_obj.code.update(commit="def"), "code_version"),
-        (lambda p: p.spec_obj.compute.update(node="gpu-a10"), "cpu_only"),
+        (lambda p: p.spec_obj.compute.update(gpu=True), "cpu_only"),
     ],
 )
 def test_static_guardrails_are_rechecked_at_launch(env, setup, match):

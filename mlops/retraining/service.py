@@ -269,12 +269,16 @@ class RetrainingService:
                 detail="any hour" if hours is None else f"{hours[0]}h-{hours[1]}h, now {h}h",
             )
         )
-        gpu = "gpu" in json.dumps(spec.compute, default=str).lower()
+        # CPU must be DECLARED by the pipeline (gpu: false, CPU compute kind): unknown = refused
+        kind = str(spec.compute.get("kind", ""))
+        cpu = spec.compute.get("gpu") is False and "cpu" in kind.lower()
         g.append(
             GuardResult(
                 name="cpu_only",
-                ok=not gpu,
-                detail="CPU compute" if not gpu else "pipeline requests a GPU",
+                ok=cpu,
+                detail=f"CPU compute ({kind})"
+                if cpu
+                else f"CPU not declared (kind={kind or '?'}, gpu={spec.compute.get('gpu')})",
             )
         )
         busy = [

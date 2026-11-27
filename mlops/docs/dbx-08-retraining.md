@@ -164,3 +164,89 @@ indisponible n'est jamais satisfaite.
 | `mlops/databricks/training.py` | `DatabricksJobBackend.submit` désactivé. |
 | `mlops/monitoring/store.py`, `mlops/monitoring/service.py` | Table et enregistrement `drift_windows` à la collecte. |
 | Tests `test_databricks_unit.py`, `test_training.py` | Adaptation à la nouvelle garde. |
+
+## 8. DBX-08B — Interface « Politiques de réentraînement »
+
+**Training Factory.** Un sélecteur de vue apparaît sous l'en-tête : « Entraînements » ou
+« Politiques de réentraînement » (`?section=training&view=policies`). La vue Entraînements
+n'est pas modifiée.
+
+**La vue Politiques** (`training/policies/`) comprend :
+- **cinq KPI** : politiques (actives, automatiques), propositions en attente ou incertaines,
+  lancements du mois, état du planificateur, état du verrou distant ;
+- **le catalogue** des politiques, avec un filtre par modèle (`&model=`) quand on arrive
+  depuis Monitoring, et la liste des propositions à traiter ;
+- **un formulaire de création et de modification** : cas d'usage, modèle, pipeline (avec la
+  version du code affichée), famille, sélection de version (dernière publiée ou épinglée), mode
+  manuel ou automatique, combinaison ET / OU, état actif ;
+  - les cinq conditions, avec leur option « requise » en OU et leurs seuils ;
+  - les garde-fous : budget, délai minimal, plage horaire ;
+  - un commentaire de version. Une modification crée une nouvelle version ;
+- **le détail** d'une politique :
+  - actions : activer ou désactiver (nouvelle version), modifier, évaluer maintenant (aucun
+    lancement), demande manuelle ;
+  - cinq onglets : Configuration, Évaluation (états des conditions et des garde-fous),
+    Propositions, Historique des versions, Journal d'audit ;
+  - dans Propositions : raisons, « Vérifier pipeline et dataset » (via `/training/validate`, en
+    lecture seule), acceptation confirmée qui lance par `TrainingService.launch`, refus motivé,
+    réconciliation des réponses incertaines.
+
+**Monitoring.** L'onglet Alertes du détail d'un modèle du registre propose seulement un lien
+« Voir les politiques de ce modèle ». Les signaux de réentraînement restent en lecture seule.
+
+**Correction trouvée pendant la recette.** Le garde-fou CPU détectait le texte « gpu » dans la
+configuration (`gpu: false`), d'où un faux positif. Il exige désormais une déclaration
+explicite : `gpu: false` et un type de calcul CPU. Sans déclaration, la demande est refusée.
+
+### Recette fonctionnelle simulée (passerelle 8020 : verrou fermé, planificateur désactivé)
+
+Politique « Recette DBX-08 — Qualité 702 » : `quality-industrial` / pipeline
+`quality-industrial` (code `394a86a937`) / `quality-synthetic-3c`, dernière version publiée,
+mode manuel, OU, cinq conditions.
+
+1. **Création** : v1 créée. Une famille non déclarée par le pipeline est refusée (422).
+2. **Évaluation : non éligible.**
+   - Dérive : indisponible (aucune inférence reliée au modèle par une référence de paquet).
+   - Annotations : 0 nouvelle depuis v1.
+   - Performance : indisponible (pas de vérité terrain).
+   - Planification : prochaine échéance le 27/12.
+   - Demande manuelle : aucune.
+   - Garde-fous : verrou fermé ; délai minimal non écoulé (dernier entraînement le 27/11).
+3. **Demande manuelle** suivie d'une évaluation : éligible, une proposition est créée. Une
+   nouvelle évaluation ne crée pas de doublon.
+4. **Acceptation : 409** « guardrails: remote_lock ». Le registre reste vide, aucune
+   réservation n'est prise, et la liste des runs Databricks est inchangée (dernier :
+   741986436941977).
+5. **Journal** : création, évaluations, demande, proposition, acceptation, refus.
+
+Recette visuelle : `http://127.0.0.1:5174/ai-leader?section=training&view=policies`.
+
+### Fichiers partagés modifiés en DBX-08B
+
+| Fichier | Modification |
+|---|---|
+| `argos-ui/src/pages/ai-leader/training/TrainingFactory.tsx` | Sélecteur de vue ; la vue Entraînements est encapsulée sans changement. |
+| `argos-ui/src/pages/ai-leader/monitoring/ModelDetail.tsx` | Bouton « Voir les politiques de ce modèle ». |
+| `mlops/retraining/service.py`, `mlops/tests/test_retraining.py` | Garde-fou CPU explicite. |
+
+Nouveaux fichiers : `argos-ui/src/api/retraining.ts` et
+`argos-ui/src/pages/ai-leader/training/policies/` (`PoliciesView.tsx`, `PolicyForm.tsx`,
+`shared.tsx`, `policies.css`).
+
+## 9. Limites restantes
+
+- **Dérive** : la condition reste indisponible pour les modèles du registre. Il faut d'abord la
+  traçabilité exacte des paquets côté Edge (modèle UC, version, SHA-256) : c'est une demande
+  de coordination de DBX-07B.
+- **Performance de production** : indisponible sans échantillon étiqueté représentatif.
+- **Identité des acteurs** : la passerelle locale n'a pas d'authentification ; les actions sont
+  journalisées sous le rôle `ai_leader`. Le planificateur apparaît sous `scheduler`.
+- **Planificateur** : simple processus local (thread) dans la passerelle. Il s'arrête avec
+  elle ; au redémarrage, le budget et l'idempotence restent garantis par SQLite.
+- **Budget** : compté par politique. Un budget global par modèle reste à décider.
+- **Concurrence** : vérifiée au moment du lancement (lecture des runs) ; un run démarré par un
+  autre canal entre ce contrôle et la réservation n'est pas exclu.
+- **Persistance** : uniquement en SQLite local, sans synchronisation multi-postes. Le contrat
+  Core `RetrainingPolicy` n'est pas modifié.
+- **Ancien mode `PUT /models/retrain-mode`** : il reste en mémoire et n'est relié à aucun
+  lancement. Le remplacer par les politiques reste à décider.
