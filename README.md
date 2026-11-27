@@ -77,7 +77,7 @@ usecases/
     tests/
 dashboard/app.py      tableau de bord Streamlit (aucune logique métier)
 tests/                tests du socle, dont test_contract.py
-data/                 données locales, jamais versionnées (voir data/README.md)
+data/                 données et poids, versionnés (Git LFS pour poids et vidéos, voir data/README.md)
 docs/architecture.md  architecture en une page
 docs/production-engine.md  ARGOS Production Engine (cycles, verdicts, KPI, endpoints)
 docs/integration-contracts.md  contrats d'intégration des cinq groupes et catalogue des endpoints
@@ -92,10 +92,38 @@ Les paramètres se règlent par variables d'environnement (`.env`), toutes docum
 2. **Pull request vers `main`**, relue par une autre personne de l'équipe. La CI (ruff + pytest) doit être verte.
 3. **Le test de contrat est obligatoire** : `pytest tests/test_contract.py` doit passer **en local, avec votre vrai modèle**, avant d'ouvrir la PR. En CI, il est ignoré uniquement si les poids ou la bibliothèque du modèle manquent.
 4. **Chaque binôme travaille dans son dossier** `usecases/<cas>/`. Toute modification de `visionhub/` (contrats, décision, registre, API) se discute d'abord avec l'équipe.
-5. **Jamais de données, d'images ni de poids dans Git.** Les poids se rangent dans `data/models/<cas>/`. Aucune donnée n'est envoyée vers un service externe.
+5. **Données et poids versionnés** dans `data/` depuis le 2026-11-27, avec l'accord de Hutchinson ; poids et vidéos via **Git LFS** (`git lfs install` une fois par machine). Toute nouvelle donnée client doit avoir le même accord avant d'être poussée. Aucune autre donnée n'est envoyée vers un service externe.
 6. **Vie privée** : aucun visage stocké ni affiché, aucune identification de personne.
 7. Tenir à jour le `README.md` et l'`AGENTS.md` de son cas d'usage.
 
 ## Assistants de code
 
 `AGENTS.md` (racine et dossiers de cas d'usage), `CLAUDE.md` et `.github/copilot-instructions.md` donnent le contexte et les règles aux assistants (Claude Code, Cursor, Copilot…). Pour ChatGPT, collez le contenu d'`AGENTS.md` en début de conversation.
+
+## Lancer les simulations (démo HOVIS)
+
+Dans PowerShell, à la racine du dépôt. Toutes les options : [demo/COMMANDES.md](demo/COMMANDES.md) ; fonctionnement : [demo/README.md](demo/README.md).
+
+```powershell
+.\demo\start.ps1                                    # 1 poste actif (C3·P06), mode manuel
+.\demo\start.ps1 -Stations 3                        # 3 postes actifs, les autres « Pas d'activité »
+.\demo\start.ps1 -Stations 2 -Mode auto             # 2 postes, une pièce NOK n'arrête pas la ligne
+.\demo\start.ps1 -Stations 2 -Mode manuel           # une pièce NOK attend CONFIRMER / LAISSER PASSER
+.\demo\start.ps1 -Stations 2 -Mode auto -Here       # tous les serveurs dans ce terminal (Ctrl+C arrête tout)
+.\demo\start.ps1 -Stations 2 -Workstations press_cell:nok,electrical_bench   # poste de travail de chaque poste
+.\demo\start.ps1 -Stations 2 -Mode auto -Videos video3                       # vidéo à la place de la webcam (C3·P06)
+.\demo\start.ps1 -Stations 2 -Mode auto -Videos video1,video2                # une vidéo par poste
+.\demo\start.ps1 -Stations 2 -Mode auto -Videos ",video3"                    # vidéo sur C3·P01, webcam sur C3·P06
+.\demo\start.ps1 -Stations 2 -Videos video3 -VideoSpeed 0.5                  # vidéo deux fois plus lente
+.\demo\start.ps1 -NoSafety                          # sans l'analyse webcam EPI
+.\demo\start.ps1 -NoAiLeader                        # sans le serveur AI leader (Databricks)
+.\demo\start.bat -Stations 2 -Mode auto             # même chose par le .bat
+powershell -ExecutionPolicy Bypass -File demo\start.ps1 -Stations 2 -Mode auto   # si PowerShell refuse le script
+```
+
+Git Bash / Linux : `./demo/start.sh 2 auto press_cell:nok,electrical_bench` (postes, mode, postes de travail) ; `VIDEO_SPEED=0.5` devant pour la vitesse des vidéos.
+
+- Postes de travail (`-Workstations`) : `machine_cell_variant`, `press_cell`, `electrical_bench`, `machine_cell` ; `:nok` = démarre avec un objet dans le passage (NOK, NOK puis OK).
+- Vidéos (`-Videos`) : un nom rangé dans `data/raw/safety/videos/` (`video1`, `video2`, `video3`) ou un chemin ; une par poste actif, dans l'ordre C3·P06, C3·P01…
+- Dans l'interface (http://localhost:5173) : n'importe quel identifiant = opérateur ; **logo HOVIS** = lancer le poste affiché ; **Ctrl+M** = vue superviseur ; **Ctrl+P** = poste suivant ; **Ctrl+O** = espace AI leader ; bouton caméra **Lancer la vidéo** quand le poste a une vidéo.
+- Lancer tous les postes d'un coup : `curl.exe -X POST http://localhost:8000/api/scenario/restart`.
