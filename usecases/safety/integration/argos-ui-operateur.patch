@@ -299,6 +299,19 @@ index 6f36356..6fdd57a 100644
      </>
    );
  }
+diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
+index 1642809..20abf5f 100644
+--- a/argos-ui/src/pages/TeamLeader.tsx
++++ b/argos-ui/src/pages/TeamLeader.tsx
+@@ -97,7 +97,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
+ 
+       <div className="card col" style={{ gap: 8 }}>
+         <div className="between">
+-          <h2 className="h2">Postes de la {cell.cell.name.toLowerCase()}</h2>
++          <h2 className="h2">Postes</h2>
+           <span className="muted hide-mobile" style={{ fontSize: 13 }}>Cliquez sur un poste pour voir son écran · trait noir = attendu maintenant</span>
+         </div>
+         <StationTable stations={cell.stations} alerts={alerts} />
 diff --git a/argos-ui/src/vite-env.d.ts b/argos-ui/src/vite-env.d.ts
 index 73d2b55..f3b517c 100644
 --- a/argos-ui/src/vite-env.d.ts
