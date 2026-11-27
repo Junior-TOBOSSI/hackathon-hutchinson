@@ -26,6 +26,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import cv2
+import numpy as np
 from fastapi import FastAPI, Response
 from fastapi.responses import StreamingResponse
 
@@ -35,7 +36,7 @@ sys.path[:0] = [str(REPO), str(Path(__file__).parent)]
 from usecases.safety.hovis import StationIssueTracker, station_checks, station_ppe  # noqa: E402
 from usecases.safety.yolo_analyzer import YoloSafetyAnalyzer  # noqa: E402
 from visionhub.contracts import FrameMeta  # noqa: E402
-from webcam_preview import draw, hide_faces  # noqa: E402
+from webcam_preview import hide_faces  # noqa: E402
 
 STATION = "C3·P06"
 CAMERA = int(os.environ.get("CAMERA", "0"))
@@ -60,6 +61,63 @@ def reader(cap) -> None:
             latest["frame"] = frame
         else:
             time.sleep(0.05)
+
+
+# Labels shown on the camera image, in French, with the box colour (BGR).
+LABELS = {
+    "person": ("Personne", (235, 235, 235)),
+    "helmet": ("Casque", (0, 200, 255)),
+    "glasses": ("Lunettes", (255, 180, 0)),
+    "gloves": ("Gants", (60, 200, 60)),
+    "shoes": ("Chaussures", (200, 80, 200)),
+    "head": ("Tête", (170, 170, 170)),
+    "hands": ("Main nue", (80, 80, 230)),
+    "foot": ("Pied", (220, 140, 220)),
+    "phone_used": ("Téléphone en main", (40, 40, 220)),
+    "phone_idle": ("Téléphone posé", (0, 150, 255)),
+}
+
+
+def draw_labels(image, detections, threshold: float = 0.25) -> None:
+    """Readable boxes: thick frame, French name and confidence on a filled tag of the same colour.
+
+    Sizes follow the image width, so the text stays readable once the image is resized.
+    Faces are never labelled (they are pixelated before this runs).
+    """
+    from PIL import Image, ImageDraw, ImageFont  # accents (Tête) need a real font
+
+    h, w = image.shape[:2]
+    scale = max(1.0, w / 640)
+    thick = max(2, round(2 * scale))
+    font = None
+    for path in ("/System/Library/Fonts/Supplemental/Arial Bold.ttf", "/System/Library/Fonts/Helvetica.ttc",
+                 "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):  # fmt: skip
+        try:
+            font = ImageFont.truetype(path, round(16 * scale))
+            break
+        except OSError:
+            continue
+    font = font or ImageFont.load_default()
+    tags = []
+    for name, conf, (x1, y1, x2, y2) in detections:
+        if name not in LABELS or conf < threshold:
+            continue
+        text, color = LABELS[name]
+        cv2.rectangle(image, (x1, y1), (x2, y2), color, thick)
+        tags.append((f"{text} {conf:.2f}", color, x1, y1))
+    if not tags:
+        return
+    pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    pen = ImageDraw.Draw(pil)
+    pad = round(4 * scale)
+    for text, (b, g, r), x, y in tags:
+        left, top, right, bottom = pen.textbbox((0, 0), text, font=font)
+        tw, th = right - left, bottom - top
+        y0 = max(0, y - th - 2 * pad)
+        pen.rectangle((x, y0, x + tw + 2 * pad, y0 + th + 2 * pad), fill=(r, g, b))
+        dark = (r * 299 + g * 587 + b * 114) / 1000 > 150  # light tag: dark text
+        pen.text((x + pad, y0 + pad - top), text, font=font, fill=(20, 31, 63) if dark else (255, 255, 255))
+    image[:] = cv2.cvtColor(np.asarray(pil), cv2.COLOR_RGB2BGR)
 
 
 def loop() -> None:
@@ -91,14 +149,10 @@ def loop() -> None:
             return (d.name, d.conf, (int(d.box[0] * w), int(d.box[1] * h), int(d.box[2] * w), int(d.box[3] * h)))
         dets = [px(d) for d in analyzer.last_detections]
         hide_faces(frame, [px(d) for d in analyzer.last_privacy])  # from conf 0.10, not 0.25
-        draw(frame, dets, 0.25)
         idle = {id(d) for d in analyzer.last_idle_phones}
-        for d in analyzer.last_phones:
-            _, conf, (x1, y1, x2, y2) = px(d)
-            color, text = ((0, 165, 255), "phone sur le poste") if id(d) in idle else ((0, 0, 255), "phone en main")
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
-            cv2.putText(frame, f"{text} {conf:.2f}", (x1, max(14, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-        small = cv2.resize(frame, (640, int(640 * h / w)))
+        phones = [("phone_idle" if id(d) in idle else "phone_used", d.conf, px(d)[2]) for d in analyzer.last_phones]
+        draw_labels(frame, dets + phones)
+        small = cv2.resize(frame, (960, int(960 * h / w)))
         jpeg = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 75])[1].tobytes()
         n += 1
         with lock:
@@ -106,7 +160,7 @@ def loop() -> None:
             ppe = station_ppe(analyzer.last_states, issues)
             raw_names = [(d.name, round(d.conf, 2)) for d in analyzer.last_privacy]  # faces/heads/persons >= 0.10
             dets_dbg = sorted(((d.name, round(d.conf, 2)) for d in analyzer.last_detections), key=lambda x: -x[1])
-            state.update(debug={"detections": dets_dbg, "low_conf_people": raw_names, "states": [
+            state.update(debug={"detections": dets_dbg, "low_conf_people": raw_names, "low_conf_hands": sorted(((d.name, round(d.conf, 2)) for d in analyzer.last_raw if d.name in ("hands", "gloves")), key=lambda x: -x[1]), "states": [
                 {k: v.value for k, v in st.items()} for st in analyzer.last_states]})
             state.update(issues=issues, ppe=ppe, jpeg=jpeg, n=n, error=None, blocked=analyzer.last_camera_blocked,
                          ms=round((time.perf_counter() - start) * 1000))
