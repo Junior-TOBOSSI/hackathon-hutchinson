@@ -52,6 +52,8 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
   return (
     <div className="screen" style={{ background: ko || envIssues.length ? 'var(--red-tint)' : 'var(--op-bg)' }}>
       <TopBar
+        // Démo : un clic sur le logo HOVIS démarre ou relance la simulation (mode live).
+        onLogoClick={!USE_MOCK && !consult ? restartDemo : undefined}
         title={`POSTE ${live.stationId}`}
         sub={`Presse injection · ${live.product}`}
         right={consult
@@ -118,13 +120,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
       </main>
 
       <footer className="between muted" style={{ height: 40, alignItems: 'center', padding: '0 28px', fontSize: 13 }}>
-        <span className="row" style={{ gap: 8 }}>
-          {/* Démo : point discret qui démarre ou relance la simulation (mode live, écran opérateur). */}
-          {!USE_MOCK && !consult && (
-            <button onClick={restartDemo} aria-label="Démarrer la simulation" style={{ width: 9, height: 9, padding: 0, border: 'none', borderRadius: 5, background: 'currentColor', opacity: 0.18, cursor: 'default' }} />
-          )}
-          Visage flouté · aucune vidéo enregistrée
-        </span>
+        <span>Visage flouté · aucune vidéo enregistrée</span>
         <span>Caméra pièce {live.partCameraOnline ? 'en ligne' : 'hors ligne'} · modèle qualité {live.qualityModelVersion}</span>
       </footer>
 

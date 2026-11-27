@@ -35,12 +35,15 @@ export function Icon({ d, size = 24, color = 'currentColor', stroke = 2 }: { d: 
 }
 
 /** Bandeau du haut commun à tous les écrans. */
-export function TopBar({ title, sub, right }: { title: ReactNode; sub?: ReactNode; right?: ReactNode }) {
+/** `onLogoClick` (démo) : le logo devient un bouton, sans aucun signe visible. */
+export function TopBar({ title, sub, right, onLogoClick }: { title: ReactNode; sub?: ReactNode; right?: ReactNode; onLogoClick?: () => void }) {
   const { setUser } = useAuth();
   const nav = useNavigate();
   return (
     <header className="topbar">
-      <HovisLogo size={36} tone="light" />
+      {onLogoClick
+        ? <button onClick={onLogoClick} aria-label="HOVIS" style={{ background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'default', display: 'flex', alignItems: 'center' }}><HovisLogo size={36} tone="light" /></button>
+        : <HovisLogo size={36} tone="light" />}
       <span className="sep hide-mobile" />
       <span className="topbar-heading">
         <span className="cond topbar-title">{title}</span>

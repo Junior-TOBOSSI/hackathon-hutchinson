@@ -16,13 +16,13 @@ VITE_USE_MOCK=false npm run dev     # PowerShell : $env:VITE_USE_MOCK="false"; n
 
 Ouvrir http://localhost:5173. Se connecter avec n'importe quel identifiant : le serveur renvoie l'opérateur du poste C3·P06.
 
-**Le scénario attend le bouton discret** : un petit point presque invisible en bas à gauche de l'écran opérateur, devant « Visage flouté ». Un clic démarre la simulation, un autre la relance depuis le début (équivalent : `curl -X POST http://localhost:8000/api/scenario/restart`).
+**Le scénario attend un clic sur le logo HOVIS** (en haut à gauche de l'écran opérateur ; rien ne le signale). Un clic démarre la simulation, un autre la relance depuis le début (équivalent : `curl -X POST http://localhost:8000/api/scenario/restart`).
 
 ## Le scénario
 
 | Étape | Ce que montre l'écran | Cas d'usage |
 |---|---|---|
-| 0. En attente | « En attente de la prise de poste », jusqu'au bouton discret | — |
+| 0. En attente | « En attente de la prise de poste », jusqu'au clic sur le logo | — |
 | 1. Prise de poste, photo 1/3 | photo du poste à la place de la pièce : bac dans le passage → **KO**, bandeau « Dégagez le passage », tuile Poste rouge | workstation (`machine_cell_variant`, `anomaly_04`) |
 | 2. Photo 2/3 | la même photo → toujours **KO** | workstation (`anomaly_04`) |
 | 3. Photo 3/3 | photo conforme → **OK**, puis « Poste validé : l'activité commence » | workstation (`good_04`) |
@@ -68,5 +68,5 @@ data/models/workstation/yolo26n.pt                # détecteur de personnes (té
 | `POST /api/stations/{id}/parts/confirm` | l'opérateur confirme la pièce KO |
 | `POST /api/stations/{id}/parts/release` | l'opérateur laisse passer la pièce KO (erreur modèle) |
 | `GET /api/scenario/workstation.jpg` · `/part.jpg` | images affichées (poste annoté, pièce) |
-| `POST /api/scenario/restart` | démarrer ou relancer la simulation (bouton discret) |
+| `POST /api/scenario/restart` | démarrer ou relancer la simulation (clic sur le logo) |
 | `GET /api/scenario/status` | état interne (débogage) |

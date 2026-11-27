@@ -8,8 +8,8 @@ approach as usecases/safety/notebooks/hovis_demo.py, the Safety live demo). Not 
 the platform API: it chains the three use cases for the pitch.
 
 Scenario (one station, C3·P06):
-0. IDLE until the operator screen's discreet start button (bottom left, almost invisible)
-   is pressed: POST /api/scenario/restart starts (or restarts) the simulation.
+0. IDLE until the HOVIS logo of the operator screen is clicked (nothing shows it is a
+   button): POST /api/scenario/restart starts (or restarts) the simulation.
 1. WORKSTATION CHECK (no activity started yet): the photo of the station takes the place
    of the camera image. One photo every ``CHECK_PERIOD`` s (2), analysed by the real
    workstation analyzer (section ``machine_cell_variant``), 2.5 s by default:
