@@ -39,7 +39,7 @@ function Workspace() {
           {SECTIONS.map((s) => {
             const active = s.id === section;
             return (
-              <button key={s.id} onClick={() => go(s.id)} className="btn" aria-current={active ? 'page' : undefined}
+              <button key={s.id} onClick={() => go(s.id, s.id === 'registry' ? null : undefined)} className="btn" aria-current={active ? 'page' : undefined}
                 style={{ background: 'none', borderRadius: 0, height: 52, whiteSpace: 'nowrap', color: active ? 'var(--ink)' : 'var(--muted)', borderBottom: `3px solid ${active ? 'var(--red)' : 'transparent'}` }}>
                 {s.label}
               </button>

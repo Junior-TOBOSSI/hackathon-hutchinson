@@ -1,7 +1,8 @@
 // Dedicated lifecycle client. No UI action calls it until the Registry and Deployment mockups land.
 // The backend owns Databricks credentials; declared authors are not verified identities.
 
-const BASE = import.meta.env.VITE_API_URL ?? '/api';
+const BASE = (import.meta as ImportMeta & { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? '/api';
+export const LIFECYCLE_READ_ONLY = (import.meta as ImportMeta & { env?: { VITE_LIFECYCLE_READ_ONLY?: string } }).env?.VITE_LIFECYCLE_READ_ONLY === 'true';
 
 export type DecisionValue = 'approved' | 'rejected';
 export type OperationStatus =
@@ -65,11 +66,12 @@ export interface DeploymentOperation {
   inference_tested: false;
 }
 
-async function call<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+async function call<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
+    signal,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
@@ -83,17 +85,20 @@ const registry = (modelId: string, version: string) =>
   `/mlops/registry/${encodeURIComponent(modelId)}/versions/${encodeURIComponent(version)}`;
 
 export const deploymentApi = {
-  decisionState: (modelId: string, version: string) =>
-    call<Record<string, unknown>>(`${registry(modelId, version)}/decision-state`),
-  decisionHistory: (modelId: string, version: string) =>
-    call<DecisionRecord[]>(`${registry(modelId, version)}/decisions`),
+  decisionState: (modelId: string, version: string, signal?: AbortSignal) =>
+    call<Record<string, unknown>>(`${registry(modelId, version)}/decision-state`, 'GET', undefined, signal),
+  decisionHistory: (modelId: string, version: string, signal?: AbortSignal) =>
+    call<DecisionRecord[]>(`${registry(modelId, version)}/decisions`, 'GET', undefined, signal),
   decide: (modelId: string, version: string, decision: DecisionRequest) =>
     call<DecisionRecord>(`${registry(modelId, version)}/decisions`, 'POST', decision),
-  history: (endpoint?: string) => call<DeploymentOperation[]>(
-    `/mlops/deployments${endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : ''}`),
-  get: (id: string) => call<DeploymentOperation>(`/mlops/deployments/${encodeURIComponent(id)}`),
-  events: (id: string) => call<Array<{ at: string; status: OperationStatus; note: string | null }>>(
-    `/mlops/deployments/${encodeURIComponent(id)}/events`),
+  history: (endpoint?: string, signal?: AbortSignal) => call<DeploymentOperation[]>(
+    `/mlops/deployments?limit=500${endpoint ? `&endpoint=${encodeURIComponent(endpoint)}` : ''}`, 'GET', undefined, signal),
+  get: (id: string, signal?: AbortSignal) =>
+    call<DeploymentOperation>(`/mlops/deployments/${encodeURIComponent(id)}`, 'GET', undefined, signal),
+  events: (id: string, signal?: AbortSignal) => call<Array<{ at: string; status: OperationStatus; note: string | null }>>(
+    `/mlops/deployments/${encodeURIComponent(id)}/events`, 'GET', undefined, signal),
+  edgeStations: (signal?: AbortSignal) =>
+    call<EdgeStation[]>('/v1/stations', 'GET', undefined, signal),
   prepare: (request: PrepareDeployment) =>
     call<DeploymentOperation>('/mlops/deployments/prepare', 'POST', request),
   prepareRollback: (sourceOperationId: string, reason: string, authorDeclared: string) =>
@@ -104,3 +109,19 @@ export const deploymentApi = {
     call<DeploymentOperation>(`/mlops/deployments/${encodeURIComponent(id)}/confirm`,
       'POST', { confirmation }),
 };
+
+export interface EdgeStation {
+  station_id: string;
+  name: string;
+  cell: string;
+  online: boolean;
+  simulated: boolean;
+  last_seen_at: string | null;
+  models: Array<{
+    use_case: string;
+    status: 'loaded' | 'loading' | 'failed' | 'absent';
+    model: { registered_model: string; version: string } | null;
+    loaded_at: string | null;
+    error: string | null;
+  }>;
+}
