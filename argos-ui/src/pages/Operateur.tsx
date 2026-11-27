@@ -41,6 +41,8 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
   const hour = new Date(live.now).getHours();
   const startup = live.startup && live.startup.phase !== 'RUNNING' ? live.startup : null;
   const confirm = async () => { await api.confirmPart(stationId); reload(); };
+  const release = async () => { await api.releasePart(stationId); reload(); };
+  const restartDemo = async () => { await api.restartScenario(); reload(); };
 
   const report = async () => { await api.reportProblem(stationId); setReported(true); setTimeout(() => setReported(false), 4000); };
   const stationAlerts = (cellAlerts ?? []).filter((a) => a.stationId === stationId);
@@ -68,7 +70,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
             ? <StartupPanel startup={startup} />
             : !ko && envIssues.length > 0 && live.frontSnapshotUrl
               ? <SnapshotPanel live={live} instruction={envIssues[0].instruction} />
-              : <PartPanel live={live} onConfirm={consult ? undefined : confirm} />}
+              : <PartPanel live={live} onConfirm={consult ? undefined : confirm} onRelease={consult ? undefined : release} />}
         </section>
 
         <section className="col grow" style={{ gap: 18 }}>
@@ -116,7 +118,13 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
       </main>
 
       <footer className="between muted" style={{ height: 40, alignItems: 'center', padding: '0 28px', fontSize: 13 }}>
-        <span>Visage flouté · aucune vidéo enregistrée</span>
+        <span className="row" style={{ gap: 8 }}>
+          {/* Démo : point discret qui démarre ou relance la simulation (mode live, écran opérateur). */}
+          {!USE_MOCK && !consult && (
+            <button onClick={restartDemo} aria-label="Démarrer la simulation" style={{ width: 9, height: 9, padding: 0, border: 'none', borderRadius: 5, background: 'currentColor', opacity: 0.18, cursor: 'default' }} />
+          )}
+          Visage flouté · aucune vidéo enregistrée
+        </span>
         <span>Caméra pièce {live.partCameraOnline ? 'en ligne' : 'hors ligne'} · modèle qualité {live.qualityModelVersion}</span>
       </footer>
 
@@ -169,7 +177,7 @@ function ProblemBanner({ actions }: { actions: OperatorAction[] }) {
   );
 }
 
-function PartPanel({ live, onConfirm }: { live: StationLive; onConfirm?: () => void }) {
+function PartPanel({ live, onConfirm, onRelease }: { live: StationLive; onConfirm?: () => void; onRelease?: () => void }) {
   const ko = live.part.verdict === 'KO';
   const c = ko ? 'var(--red)' : 'var(--green)';
   const waiting = ko && live.part.awaitingConfirmation;
@@ -180,17 +188,18 @@ function PartPanel({ live, onConfirm }: { live: StationLive; onConfirm?: () => v
         <img src={live.part.imageUrl} alt={ko ? `Pièce non conforme : ${live.part.jointsDetected} joints détectés, zone en défaut entourée de rouge` : 'Pièce conforme : un seul joint détecté'} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#0b1220', display: 'block' }} />
       </div>
       <div style={{ flex: 1, minHeight: 120, borderRadius: 20, background: c, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 22, padding: '0 20px' }}>
-        <span className="num" style={{ fontSize: 96, lineHeight: 0.9 }}>{ko ? 'KO' : 'OK'}</span>
-        <span style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.3 }}>
-          {ko ? <>{live.part.jointsDetected === 0 ? 'Joint absent' : `${live.part.jointsDetected} joints détectés`}<br />Posez la pièce dans le bac rebuts</> : <>1 joint bleu détecté<br />Le cycle est parti</>}
-        </span>
+        <span className="num" style={{ fontSize: 120, lineHeight: 0.9 }}>{ko ? 'KO' : 'OK'}</span>
       </div>
-      {waiting && onConfirm && (
-        <button onClick={onConfirm} className="cond" style={{ height: 76, border: 'none', borderRadius: 20, background: 'var(--navy)', color: '#fff', fontWeight: 700, fontSize: 30, letterSpacing: '0.06em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
-          <Icon d={ICONS.check} size={34} color="#fff" stroke={2.6} />
-          CONFIRMER
-          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: 0 }}>pièce au rebut · pièce suivante</span>
-        </button>
+      {waiting && onConfirm && onRelease && (
+        <div className="row" style={{ gap: 10 }}>
+          <button onClick={onConfirm} className="cond" style={{ flex: 1, height: 52, border: 'none', borderRadius: 14, background: 'var(--navy)', color: '#fff', fontWeight: 700, fontSize: 20, letterSpacing: '0.05em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <Icon d={ICONS.check} size={22} color="#fff" stroke={2.6} />
+            CONFIRMER
+          </button>
+          <button onClick={onRelease} className="cond" style={{ flex: 1, height: 52, borderRadius: 14, background: '#fff', color: 'var(--navy)', border: '2px solid var(--navy)', fontWeight: 700, fontSize: 16, letterSpacing: '0.03em', lineHeight: 1.1 }}>
+            LAISSER PASSER<br /><span style={{ fontSize: 12, fontWeight: 600 }}>erreur modèle</span>
+          </button>
+        </div>
       )}
     </>
   );
@@ -198,8 +207,15 @@ function PartPanel({ live, onConfirm }: { live: StationLive; onConfirm?: () => v
 
 /** Prise de poste : la photo du poste à la place de la pièce, avec son verdict. */
 function StartupPanel({ startup }: { startup: WorkstationStartup }) {
+  if (startup.phase === 'IDLE') {
+    return (
+      <>
+        <span className="label-caps" style={{ textAlign: 'center', fontSize: 18 }}>Vérification du poste</span>
+        <div style={{ flex: 1, minHeight: 300, borderRadius: 18, border: '5px solid var(--op-bg)', background: 'var(--op-bg)' }} />
+      </>
+    );
+  }
   const ok = startup.verdict === 'OK';
-  const validated = startup.phase === 'VALIDATED';
   const c = ok ? 'var(--green)' : 'var(--red)';
   return (
     <>
@@ -209,11 +225,8 @@ function StartupPanel({ startup }: { startup: WorkstationStartup }) {
       <div style={{ borderRadius: 18, overflow: 'hidden', border: `5px solid ${c}`, lineHeight: 0 }}>
         <img src={startup.imageUrl} alt={ok ? 'Photo du poste : conforme à la référence' : 'Photo du poste : écart encadré'} style={{ width: '100%', display: 'block' }} />
       </div>
-      <div className="col" style={{ flex: 1, justifyContent: 'center', gap: 6, borderRadius: 20, background: c, color: '#fff', padding: '14px 20px' }}>
-        <span className="num" style={{ fontSize: 40, lineHeight: 1 }}>{validated ? 'POSTE VALIDÉ' : ok ? 'POSTE OK' : 'POSTE NON CONFORME'}</span>
-        <span style={{ fontSize: 17, fontWeight: 600 }}>
-          {validated ? "L'activité peut commencer" : ok ? 'Validation du poste…' : startup.findings.join(' · ') || 'Écart avec la référence'}
-        </span>
+      <div style={{ flex: 1, minHeight: 120, borderRadius: 20, background: c, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span className="num" style={{ fontSize: 120, lineHeight: 0.9 }}>{ok ? 'OK' : 'KO'}</span>
       </div>
     </>
   );
@@ -222,6 +235,14 @@ function StartupPanel({ startup }: { startup: WorkstationStartup }) {
 /** Colonne de droite pendant la prise de poste : ce qui se passe et pourquoi. */
 function StartupCard({ startup }: { startup: WorkstationStartup }) {
   const validated = startup.phase === 'VALIDATED';
+  if (startup.phase === 'IDLE') {
+    return (
+      <div className="card-op col" style={{ gap: 14, padding: '22px 30px', flex: 1 }}>
+        <span className="label-caps" style={{ fontSize: 18 }}>Prise de poste</span>
+        <div className="num" style={{ fontSize: 44, lineHeight: 1.05 }}>En attente de la prise de poste</div>
+      </div>
+    );
+  }
   return (
     <div className="card-op col" style={{ gap: 14, padding: '22px 30px', flex: 1 }}>
       <span className="label-caps" style={{ fontSize: 18 }}>Prise de poste</span>

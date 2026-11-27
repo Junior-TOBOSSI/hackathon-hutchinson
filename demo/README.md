@@ -16,17 +16,18 @@ VITE_USE_MOCK=false npm run dev     # PowerShell : $env:VITE_USE_MOCK="false"; n
 
 Ouvrir http://localhost:5173. Se connecter avec n'importe quel identifiant : le serveur renvoie l'opérateur du poste C3·P06.
 
-**Le scénario démarre à la première ouverture de l'écran opérateur.** Pour le rejouer : `curl -X POST http://localhost:8000/api/scenario/restart`.
+**Le scénario attend le bouton discret** : un petit point presque invisible en bas à gauche de l'écran opérateur, devant « Visage flouté ». Un clic démarre la simulation, un autre la relance depuis le début (équivalent : `curl -X POST http://localhost:8000/api/scenario/restart`).
 
 ## Le scénario
 
 | Étape | Ce que montre l'écran | Cas d'usage |
 |---|---|---|
-| 1. Prise de poste, photo 1/3 | photo du poste à la place de la pièce : bac dans le passage → **POSTE NON CONFORME**, bandeau « Dégagez le passage », tuile Poste rouge | workstation (`machine_cell_variant`, `anomaly_04`) |
-| 2. Photo 2/3 | la même photo → toujours NON CONFORME | workstation (`anomaly_04`) |
-| 3. Photo 3/3 | photo conforme → **POSTE VALIDÉ**, « L'activité peut commencer » | workstation (`good_04`) |
-| 4. Activité | une pièce toutes les 2 s, **OK** ou **KO** (joint absent ou en double) | quality (`qualite702 v1`) |
-| 5. Pièce KO | le défilement **s'arrête** ; bouton **CONFIRMER** (pièce au rebut, pièce suivante) | quality |
+| 0. En attente | « En attente de la prise de poste », jusqu'au bouton discret | — |
+| 1. Prise de poste, photo 1/3 | photo du poste à la place de la pièce : bac dans le passage → **KO**, bandeau « Dégagez le passage », tuile Poste rouge | workstation (`machine_cell_variant`, `anomaly_04`) |
+| 2. Photo 2/3 | la même photo → toujours **KO** | workstation (`anomaly_04`) |
+| 3. Photo 3/3 | photo conforme → **OK**, puis « Poste validé : l'activité commence » | workstation (`good_04`) |
+| 4. Activité | une pièce toutes les 2 s : 5 OK, **KO** (pièce 6), 20 OK, **KO** (pièce 27), puis uniquement des pièces bonnes | quality (`qualite702 v1`) |
+| 5. Pièce KO | le défilement **s'arrête** : **CONFIRMER** (pièce au rebut) ou **LAISSER PASSER** (erreur modèle : la pièce compte comme bonne, l'erreur est comptée) | quality |
 
 La vérification du poste n'est faite **qu'une fois** : une fois le poste validé, on ne la refait plus.
 
@@ -43,10 +44,11 @@ La vérification du poste n'est faite **qu'une fois** : une fois le poste valid�
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `CHECK_PERIOD` | 2 | secondes par photo du poste |
+| `CHECK_PERIOD` | 2.5 | secondes par photo du poste |
 | `QUALITY_PERIOD` | 2 | secondes par pièce |
 | `VALIDATED_HOLD` | 3 | secondes d'affichage de « Poste validé » avant l'activité |
 | `WORKSTATION_SECTION` | `machine_cell_variant` | section du poste vérifié |
+| `QUALITY_PATTERN` | `5:1,20:1` | blocs « OK:KO » joués au début de l'activité, puis uniquement des pièces bonnes |
 | `SAFETY` | 1 | 0 = pas d'analyse webcam |
 
 ## Données attendues (jamais versionnées)
@@ -64,6 +66,7 @@ data/models/workstation/yolo26n.pt                # détecteur de personnes (té
 |---|---|
 | `GET /api/stations/{id}/live` | état complet du poste (`StationLive`), avec `startup` (prise de poste) et `part.awaitingConfirmation` |
 | `POST /api/stations/{id}/parts/confirm` | l'opérateur confirme la pièce KO |
+| `POST /api/stations/{id}/parts/release` | l'opérateur laisse passer la pièce KO (erreur modèle) |
 | `GET /api/scenario/workstation.jpg` · `/part.jpg` | images affichées (poste annoté, pièce) |
-| `POST /api/scenario/restart` | rejouer le scénario |
+| `POST /api/scenario/restart` | démarrer ou relancer la simulation (bouton discret) |
 | `GET /api/scenario/status` | état interne (débogage) |

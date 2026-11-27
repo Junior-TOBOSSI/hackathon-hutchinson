@@ -8,16 +8,19 @@ approach as usecases/safety/notebooks/hovis_demo.py, the Safety live demo). Not 
 the platform API: it chains the three use cases for the pitch.
 
 Scenario (one station, C3·P06):
+0. IDLE until the operator screen's discreet start button (bottom left, almost invisible)
+   is pressed: POST /api/scenario/restart starts (or restarts) the simulation.
 1. WORKSTATION CHECK (no activity started yet): the photo of the station takes the place
    of the camera image. One photo every ``CHECK_PERIOD`` s (2), analysed by the real
-   workstation analyzer (section ``machine_cell_variant``):
+   workstation analyzer (section ``machine_cell_variant``), 2.5 s by default:
    anomaly_04 (bin in the passage) -> NOK, the same photo again -> NOK, good_04 -> OK:
    "Workstation validated, the activity can start". Done ONCE: never checked again.
 2. QUALITY: one part photo every ``QUALITY_PERIOD`` s (2), classified by the real quality
    model (qualite702 v1). When a part is KO, the scenario WAITS for the operator's
    "Confirmer" (POST /api/stations/{id}/parts/confirm), then goes on.
    Photos: the model's VALIDATION bursts only (R08, R12, R14, R21, R26, R27), never used
-   to train the weights.
+   to train the weights. Order (QUALITY_PATTERN, "5:1,20:1"): 5 OK then 1 KO, 20 OK then
+   1 KO, then good parts only.
 3. SAFETY (optional): if the Safety weights are on this machine and a webcam is there,
    EPI's live analysis runs as in hovis_demo (Sécurité tile, camera image, faces hidden).
 
@@ -28,7 +31,6 @@ VALIDATED_HOLD (s shown before the quality phase), SAFETY=0 to disable the webca
 
 from __future__ import annotations
 
-import itertools
 import logging
 import os
 import sys
@@ -55,11 +57,14 @@ from visionhub.decision import decide  # noqa: E402
 log = logging.getLogger("scenario")
 STATION = "C3·P06"
 DATA = REPO / "data"
-CHECK_PERIOD = float(os.environ.get("CHECK_PERIOD", "2"))
+CHECK_PERIOD = float(os.environ.get("CHECK_PERIOD", "2.5"))
 QUALITY_PERIOD = float(os.environ.get("QUALITY_PERIOD", "2"))
 VALIDATED_HOLD = float(os.environ.get("VALIDATED_HOLD", "3"))
 SECTION = os.environ.get("WORKSTATION_SECTION", "machine_cell_variant")
 CHECK_SEQUENCE = ["anomaly/anomaly_04.png", "anomaly/anomaly_04.png", "good/good_04.png"]
+# Blocks "OK count:KO count" played in order at the start of the activity; after the last
+# block, only good parts. Default: 5 OK, 1 KO (part 6), 20 OK, 1 KO (part 27), then OK only.
+QUALITY_PATTERN = os.environ.get("QUALITY_PATTERN", "5:1,20:1")
 VAL_BURSTS = {"R08", "R12", "R14", "R21", "R26", "R27"}  # qualite702 v1 report
 SAFETY_WEIGHTS = REPO / "data/models/safety/sh17_ours_yolov8s_640.pt"
 PER_HOUR = int(3600 / QUALITY_PERIOD)  # demo pace: one part per QUALITY_PERIOD
@@ -114,8 +119,9 @@ def prepare_check() -> list[dict]:
     return steps
 
 
-def quality_photos() -> list[Path]:
-    """Validation-burst photos, OK and NOK interleaved (3 OK then 1 NOK), fixed order."""
+def quality_photos() -> tuple[list[Path], list[Path]]:
+    """Validation-burst photos in the QUALITY_PATTERN order: (scripted start, good parts
+    played in a loop afterwards). Fixed order (seed 0)."""
     files = sorted(
         (int(p.stem.split("_")[-1]), p) for p in (DATA / "raw/quality/702").glob("*/*.jpg")
     )
@@ -131,10 +137,19 @@ def quality_photos() -> list[Path]:
     nok = [p for p in chosen if p.parent.name == "NOK"]
     rng.shuffle(ok)
     rng.shuffle(nok)
-    order = []
-    for i, p in enumerate(nok):
-        order += ok[3 * i : 3 * i + 3] + [p]
-    return order + ok[3 * len(nok) :]
+    scripted, i_ok, i_nok = [], 0, 0
+    for block in QUALITY_PATTERN.split(","):
+        n_ok, n_ko = (int(v) for v in block.split(":"))
+        scripted += ok[i_ok : i_ok + n_ok] + nok[i_nok : i_nok + n_ko]
+        i_ok, i_nok = i_ok + n_ok, i_nok + n_ko
+    return scripted, ok[i_ok:] or ok
+
+
+def photo_at(index: int, scripted: list[Path], good_only: list[Path]) -> Path:
+    """Photo of the part n° index + 1: the scripted start, then good parts in a loop."""
+    if index < len(scripted):
+        return scripted[index]
+    return good_only[(index - len(scripted)) % len(good_only)]
 
 
 def reset() -> None:
@@ -144,8 +159,7 @@ def reset() -> None:
         state.clear()
         state.update(
             steps=steps,
-            phase="CHECK",
-            started=False,  # the check starts when the operator screen first asks for /live
+            phase="IDLE",  # waits for the discreet start button (POST /api/scenario/restart)
             step=0,
             phase_since=time.monotonic(),
             validated_at=None,
@@ -154,6 +168,7 @@ def reset() -> None:
             good=0,
             ko=0,
             awaiting=False,
+            model_errors=0,  # KO parts released by the operator ("erreur modèle")
             run_since=None,
         )
 
@@ -161,14 +176,14 @@ def reset() -> None:
 # ------------------------------------------------------------------ scenario loop
 
 
-def loop(steps: list[dict], quality: Quality702Analyzer, thresholds, photos: list[Path]) -> None:
-    order = itertools.cycle(photos)
+def loop(steps: list[dict], quality: Quality702Analyzer, thresholds, photos) -> None:
+    scripted, good_only = photos
     while True:
         time.sleep(0.1)
         now = time.monotonic()
         with lock:
             phase, since = state["phase"], state["phase_since"]
-            if not state["started"]:
+            if phase == "IDLE":
                 continue
             if phase == "CHECK" and now - since >= CHECK_PERIOD:
                 if steps[state["step"]]["ok"]:  # the OK photo was shown long enough
@@ -187,7 +202,9 @@ def loop(steps: list[dict], quality: Quality702Analyzer, thresholds, photos: lis
                 phase = "RUNNING"
             if phase != "RUNNING" or state["awaiting"] or now - since < QUALITY_PERIOD:
                 continue
-        path = next(order)
+        with lock:
+            index = state["good"] + state["ko"]  # parts already made in this activity
+        path = photo_at(index, scripted, good_only)
         image = cv2.imread(str(path))
         result = quality.analyze(
             image, FrameMeta(frame_id=path.name, workstation_id=STATION, camera_id="part")
@@ -228,7 +245,7 @@ def _start() -> None:
     quality = Quality702Analyzer()
     quality.load({**config.params, "device": "cpu"})
     photos = quality_photos()
-    log.info("Quality: %d validation photos", len(photos))
+    log.info("Quality: %d scripted parts, then %d good photos in a loop", *map(len, photos))
     state["steps"] = steps
     reset()
     threading.Thread(
@@ -261,8 +278,6 @@ def login(body: dict) -> dict:
 @app.get("/api/stations/{station_id}/live")
 def live(station_id: str) -> dict:
     with lock:
-        if not state["started"]:  # first look of the operator screen: the check begins
-            state.update(started=True, phase_since=time.monotonic())
         s = {k: v for k, v in state.items() if k != "steps"}
         steps = state.get("steps", [])
     local = datetime.now().astimezone()
@@ -354,10 +369,27 @@ def confirm(station_id: str) -> Response:
     return Response(status_code=204)
 
 
+@app.post("/api/stations/{station_id}/parts/release", status_code=204)
+def release(station_id: str) -> Response:
+    """The operator disputes the KO ("erreur modèle"): the part goes on as GOOD and the
+    model error is counted (it feeds the model health / retraining decision)."""
+    with lock:
+        if state["awaiting"]:
+            state["ko"] -= 1
+            state["good"] += 1
+            state["model_errors"] += 1
+            if state["part"]:
+                state["part"]["verdict"] = "OK"
+        state.update(awaiting=False, phase_since=time.monotonic() - QUALITY_PERIOD)
+    return Response(status_code=204)
+
+
 @app.post("/api/scenario/restart", status_code=204)
 def restart() -> Response:
-    """Start the scenario again from the workstation check (for rehearsals)."""
+    """Start (or restart) the simulation: the workstation check begins now."""
     reset()
+    with lock:
+        state.update(phase="CHECK", phase_since=time.monotonic())
     return Response(status_code=204)
 
 

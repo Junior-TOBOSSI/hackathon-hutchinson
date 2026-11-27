@@ -37,7 +37,7 @@ export interface PartResult {
   score: number; // 0..1
   imageUrl: string; // photo prise au lancement du cycle, avec la zone en défaut dessinée si KO
   takenAt: string; // ISO
-  /** Pièce KO en attente : l'opérateur doit appuyer sur « Confirmer » avant la pièce suivante. */
+  /** Pièce KO en attente : « Confirmer » (pièce au rebut) ou « Laisser passer » (erreur modèle). */
   awaitingConfirmation?: boolean;
 }
 
@@ -47,7 +47,7 @@ export interface PartResult {
  * la photo du poste à la place de la pièce.
  */
 export interface WorkstationStartup {
-  phase: 'CHECK' | 'VALIDATED' | 'RUNNING'; // RUNNING = poste validé, activité en cours
+  phase: 'IDLE' | 'CHECK' | 'VALIDATED' | 'RUNNING'; // IDLE = pas démarré ; RUNNING = activité en cours
   step: number; // photo n° step / steps
   steps: number;
   verdict: Verdict; // verdict de la photo affichée
