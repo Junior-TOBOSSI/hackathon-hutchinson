@@ -427,7 +427,7 @@ def _start() -> None:
     video = VIDEO
     if (video or os.environ.get("SAFETY", "0") == "1") and weights.exists():
         if video:  # a video file instead of the webcam: EPI's loop opens it as its camera
-            epi.CAMERA, epi.reader = video, video_reader
+            epi.CAMERA, epi.reader, epi.newest_frame = video, video_reader, video_newest_frame
         threading.Thread(target=epi.loop, daemon=True).start()
         safety["on"] = True
         source = f"video {Path(video).name}" if video else f"webcam {epi.CAMERA}"
@@ -436,6 +436,13 @@ def _start() -> None:
 
 video_play = threading.Event()  # « LANCER LA VIDÉO » on the operator screen
 video_state = {"playing": False}
+video_frame: dict = {"img": None}  # the video image EPI's loop analyses next
+
+
+def video_newest_frame(cap):  # noqa: ARG001  replaces EPI's newest_frame for a video
+    """EPI's loop decodes the camera image only when it analyses one; for a video the
+    reader below already decoded it: hand it over."""
+    return video_frame["img"]
 
 
 def video_reader(cap) -> None:
@@ -459,12 +466,13 @@ def video_reader(cap) -> None:
             ok, frame = cap.read()
             if not ok:
                 break
-            epi.latest["frame"] = frame
+            video_frame["img"] = frame
+            epi.latest["frame"] = True  # EPI's flag: a fresh image is waiting
             next_at += period
             time.sleep(max(0.0, next_at - time.monotonic()))
         if video_play.is_set():
             continue
-        epi.latest["frame"] = None  # end of the video: nothing more to analyse
+        epi.latest["frame"], video_frame["img"] = None, None  # end of the video: nothing to analyse
         time.sleep(1.0)  # let the analysis of the last frame finish
         with epi.lock:
             epi.state["issues"] = []

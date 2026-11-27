@@ -109,16 +109,12 @@ def touches(a: tuple[float, ...], b: tuple[float, ...], margin: float) -> bool:
     return a[0] - dx < b[2] and b[0] < a[2] + dx and a[1] - dy < b[3] and b[1] < a[3] + dy
 
 
-def covered(hand: tuple[float, ...], gloves: list[Det], min_share: float = 0.5) -> bool:
-    """True if a glove box covers at least ``min_share`` of the hand box: a gloved hand is
-    often ALSO detected as "hands", it is not a bare hand."""
-    area = max(1e-9, (hand[2] - hand[0]) * (hand[3] - hand[1]))
-    for g in gloves:
-        w = min(hand[2], g.box[2]) - max(hand[0], g.box[0])
-        h = min(hand[3], g.box[3]) - max(hand[1], g.box[1])
-        if w > 0 and h > 0 and w * h / area >= min_share:
-            return True
-    return False
+def overlap(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+    """Share of box a covered by box b (0 to 1)."""
+    w = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    h = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    area = (a[2] - a[0]) * (a[3] - a[1])
+    return w * h / area if area > 0 else 0.0
 
 
 def risk(conf: float) -> float:
@@ -141,16 +137,20 @@ def assess_person(person: Det, parts: list[Det], phones: list[Det], p: dict) -> 
     by_name: dict[str, list[Det]] = {}
     for d in parts:
         by_name.setdefault(d.name, []).append(d)
-    # A hand covered by a glove box is a gloved hand (the model often sees both): only the
-    # hands NOT covered by a glove are bare hands.
-    if "hands" in by_name:
-        bare = [h for h in by_name["hands"] if not covered(h.box, by_name.get("gloves", []))]
-        if bare:
-            by_name["hands"] = bare
-        else:
-            del by_name["hands"]
     best = {name: max(d.conf for d in dets) for name, dets in by_name.items()}
     out = PersonAssessment(box=person.box)
+    # A "hands" box on a "gloves" box is the same gloved hand, seen twice by the model:
+    # only a hand touching no glove is a BARE hand.
+    glove_boxes = [d.box for d in parts if d.name == "gloves"]
+    bare = [
+        d
+        for d in by_name.get("hands", [])
+        if not any(overlap(d.box, g) >= 0.3 for g in glove_boxes)
+    ]
+    if bare:
+        best["hands"] = max(d.conf for d in bare)
+    else:
+        best.pop("hands", None)
 
     def decide(item: str, worn: str, evidence: str) -> None:
         if evidence in best and item == "gloves":  # one bare hand is enough to break the rule
@@ -274,6 +274,7 @@ class YoloSafetyAnalyzer(Analyzer):
         )  # fmt: skip
         raw = [] if self.last_camera_blocked else self._predict(self.model, image, low)
         dets = [d for d in raw if d.conf >= class_conf.get(d.name, self.p["conf"])]
+        self.last_raw = raw  # every detection from the lowest threshold (diagnosis only)
         if self.p["require_head"]:
             dets = keep_real_persons(dets)
         # Privacy: faces must be hidden even when the model is unsure, so the boxes used

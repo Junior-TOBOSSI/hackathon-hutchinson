@@ -151,10 +151,20 @@ def test_clear_forgets_problems_at_once():
     assert tracker.update(result(0.1, []), T0 + timedelta(seconds=1)) == []
 
 
-def test_issue_cleared_soon_after_the_problem_is_gone():
-    tracker = StationIssueTracker("C3·P06")
-    t0 = datetime(2026, 11, 27, 8, 0, tzinfo=UTC)
-    assert tracker.update(result(0.9, [person(gloves=A)]), now=t0)
-    ok = result(0.0, [person()])
-    assert tracker.update(ok, now=t0 + timedelta(seconds=1))  # still held 1 s later
-    assert tracker.update(ok, now=t0 + timedelta(seconds=2)) == []  # gone after 1.5 s
+def test_alert_ends_at_once_when_the_ppe_is_clearly_worn_again():
+    """Glasses put back on and seen on 2 frames: the alert ends now, not after the 5 s hold."""
+    tracker = StationIssueTracker("P1", hold_s=5)
+    tracker.update(result(0.9, [person(glasses=A)]), T0)
+    first = tracker.update(result(0.1, [person()]), T0 + timedelta(seconds=0.25))
+    second = tracker.update(result(0.1, [person()]), T0 + timedelta(seconds=0.5))
+    assert [i["label"] for i in first] == ["Lunettes absentes"]  # one frame: maybe a flicker
+    assert second == []  # two frames worn: fixed
+
+
+def test_a_hidden_ppe_does_not_end_the_alert_early():
+    """Face turned away (glasses not visible): still the 5 s hold, never a quick 'all good'."""
+    tracker = StationIssueTracker("P1", hold_s=5)
+    tracker.update(result(0.9, [person(glasses=A)]), T0)
+    tracker.update(result(0.1, [person(glasses=U)]), T0 + timedelta(seconds=0.25))
+    later = tracker.update(result(0.1, [person(glasses=U)]), T0 + timedelta(seconds=0.5))
+    assert [i["label"] for i in later] == ["Lunettes absentes"]
