@@ -11,6 +11,9 @@ import type {
   AiOverview, Alert, AppUser, AuditEntry, CellOverview, Role, RoleDefinition, StationDetail, StationLive, User,
 } from './types';
 
+/** Ce que l'opérateur signale avec « Signaler un problème ». */
+export type ReportCategory = 'QUALITY_MODEL' | 'WORKSTATION_MODEL' | 'EPI_MODEL' | 'MACHINE';
+
 export const USE_MOCK = (import.meta.env.VITE_USE_MOCK ?? 'true') !== 'false';
 /** AI Leader branché sur le backend réel (Databricks) même si les autres écrans restent en démo. */
 export const LIVE_AI_LEADER = !USE_MOCK || import.meta.env.VITE_LIVE_AI_LEADER === 'true';
@@ -58,10 +61,13 @@ export const api = {
     if (USE_MOCK) return later(undefined);
     return http(`/scenario/restart?station=${encodeURIComponent(stationId)}`, { method: 'POST' });
   },
-  /** POST /api/stations/{id}/report -> 204. Crée une alerte SIGNALEMENT chez le team leader de la cellule. */
-  reportProblem(stationId: string): Promise<void> {
+  /**
+   * POST /api/stations/{id}/report  {category} -> 204. Crée une alerte chez le team leader de la
+   * cellule : problème du modèle qualité, du modèle poste de travail, du modèle EPI, ou machine.
+   */
+  reportProblem(stationId: string, category: ReportCategory): Promise<void> {
     if (USE_MOCK) return later(undefined);
-    return http(`/stations/${encodeURIComponent(stationId)}/report`, { method: 'POST' });
+    return http(`/stations/${encodeURIComponent(stationId)}/report`, { method: 'POST', body: JSON.stringify({ category }) });
   },
 
   /**

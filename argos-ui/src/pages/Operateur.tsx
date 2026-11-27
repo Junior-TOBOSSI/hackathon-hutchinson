@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { api, USE_MOCK } from '../api/client';
+import { api, USE_MOCK, type ReportCategory } from '../api/client';
 import type { Scenario } from '../api/mock';
 import type { Alert, StationLive, WorkstationStartup } from '../api/types';
 import { useAuth } from '../auth';
@@ -33,6 +33,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
   const cellId = user?.cellId ?? 'C3';
   const { data: cellAlerts, setData: setCellAlerts } = useApi(() => (consult ? api.alerts(cellId) : Promise.resolve([] as Alert[])), [consult, cellId], 5000);
   const [reported, setReported] = useState(false);
+  const [choosing, setChoosing] = useState(false); // « Signaler » : choix de la catégorie
 
   if (!rawLive) return <Loading />;
   // Pièce KO revérifiée par l'opérateur et requalifiée OK : on l'affiche OK tout de suite.
@@ -50,7 +51,12 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
   const release = async () => { await api.releasePart(stationId); reload(); };
   const restartDemo = async () => { await api.restartScenario(stationId); reload(); };
 
-  const report = async () => { await api.reportProblem(stationId); setReported(true); setTimeout(() => setReported(false), 4000); };
+  const report = async (category: ReportCategory) => {
+    setChoosing(false);
+    await api.reportProblem(stationId, category);
+    setReported(true);
+    setTimeout(() => setReported(false), 4000);
+  };
   const stationAlerts = (cellAlerts ?? []).filter((a) => a.stationId === stationId);
   const acknowledge = (id: string) => api.acknowledgeAlert(id).then(() => setCellAlerts((cellAlerts ?? []).map((a) => (a.id === id ? { ...a, acknowledgedBy: user?.name ?? 'Team leader', acknowledgedAt: new Date().toISOString() } : a))));
   const shiftChip = <span className="chip hide-mobile">Shift {live.shift.code} · {live.shift.start.slice(0, 2)} h – {live.shift.end.slice(0, 2)} h</span>;
@@ -117,13 +123,14 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
           </div>
 
           {!consult && (
-            <button onClick={report} className="cond btn-report" data-done={reported} style={{ height: 88, border: 'none', borderRadius: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, fontWeight: 700, fontSize: 36, letterSpacing: '0.06em' }}>
+            <button onClick={() => setChoosing(true)} className="cond btn-report" data-done={reported} style={{ height: 88, border: 'none', borderRadius: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, fontWeight: 700, fontSize: 36, letterSpacing: '0.06em' }}>
               <Icon d={ICONS.flag} size={40} color="currentColor" stroke={2.4} />
               {reported ? 'TEAM LEADER PRÉVENU' : 'SIGNALER UN PROBLÈME'}
             </button>
           )}
         </section>
       </main>
+      {choosing && <ReportChoice onChoose={report} onCancel={() => setChoosing(false)} />}
 
       <footer className="between muted" style={{ height: 40, alignItems: 'center', padding: '0 28px', fontSize: 13 }}>
         <span>Visage flouté · aucune vidéo enregistrée{live.qualityModelVersion === 'simulé' && <button onClick={() => api.simulateNokPart()} style={{ marginLeft: 16, border: '1px solid var(--line)', background: '#fff', borderRadius: 8, padding: '2px 8px', fontSize: 12, color: 'var(--muted)' }}>Démo · simuler une pièce NOK</button>}</span>
@@ -216,6 +223,35 @@ function PartPanel({ live, onConfirm, onRelease, onRequalify }: { live: StationL
         <button onClick={() => setChecking(true)} style={{ height: 52, borderRadius: 14, border: '2px solid var(--ink)', background: '#fff', color: 'var(--ink)', fontWeight: 700, fontSize: 18, flexShrink: 0 }}>Revérifier la pièce</button>
       ))}
     </>
+  );
+}
+
+const REPORT_CHOICES: { category: ReportCategory; label: string; sub: string }[] = [
+  { category: 'QUALITY_MODEL', label: 'Modèle Quality', sub: 'Verdict de la pièce faux' },
+  { category: 'WORKSTATION_MODEL', label: 'Modèle Workspace', sub: 'Verdict du poste faux' },
+  { category: 'EPI_MODEL', label: 'Modèle EPI', sub: 'Alerte sécurité fausse' },
+  { category: 'MACHINE', label: 'Problème machine', sub: 'Panne, bruit, fuite…' },
+];
+
+/** « Signaler un problème » : l'opérateur choisit la catégorie, le team leader reçoit l'alerte. */
+function ReportChoice({ onChoose, onCancel }: { onChoose: (c: ReportCategory) => void; onCancel: () => void }) {
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Quel problème signaler ?" onClick={onCancel}
+      style={{ position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(11,31,63,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div className="card-op col" onClick={(e) => e.stopPropagation()} style={{ gap: 18, padding: '26px 30px', width: 760, maxWidth: '100%' }}>
+        <span className="cond" style={{ fontSize: 34, fontWeight: 700 }}>Quel problème ?</span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          {REPORT_CHOICES.map((c) => (
+            <button key={c.category} onClick={() => onChoose(c.category)} className="cond btn-report"
+              style={{ minHeight: 120, border: 'none', borderRadius: 22, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 12 }}>
+              <span style={{ fontWeight: 700, fontSize: 30 }}>{c.label}</span>
+              <span style={{ fontWeight: 600, fontSize: 17 }}>{c.sub}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={onCancel} style={{ height: 60, borderRadius: 16, border: '2px solid var(--ink)', background: '#fff', color: 'var(--ink)', fontWeight: 700, fontSize: 22 }}>Annuler</button>
+      </div>
+    </div>
   );
 }
 

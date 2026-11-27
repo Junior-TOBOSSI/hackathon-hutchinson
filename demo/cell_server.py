@@ -19,6 +19,7 @@ import logging
 import os
 import sys
 import threading
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
@@ -321,8 +322,9 @@ async def cell_overview(cell_id: str) -> dict:
 
 @app.get("/api/cells/{cell_id}/alerts")
 async def alerts(cell_id: str) -> list:
-    """Open alerts: those of each station server, plus the operators' reports (EPI)."""
-    out = [a for a in epi.alerts(cell_id) if a["category"] == "EQUIPEMENT"]  # reports
+    """Open alerts: those of each station server, plus the operators' reports."""
+    _, shift, _, _ = epi.context()
+    out = report_alerts(cell_id, shift["code"])
     for sid in PORTS:
         for a in await get(sid, "/api/station/alerts") or []:
             if a["id"] not in epi.DONE:
@@ -345,9 +347,50 @@ def call_maintenance(alert_id: str) -> Response:
     return epi.call_maintenance(alert_id)
 
 
+REPORT_KINDS = {  # category of the operator's report -> (alert category, label, action)
+    "QUALITY_MODEL": ("QUALITE", "Modèle Quality", "VALIDATE"),
+    "WORKSTATION_MODEL": ("POSTE", "Modèle Workspace", "VALIDATE"),
+    "EPI_MODEL": ("SECURITE_EPI", "Modèle EPI", "VALIDATE"),
+    "MACHINE": ("EQUIPEMENT", "Problème machine", "MAINTENANCE"),
+}
+REPORTS: list[dict] = []  # « Signaler un problème » of the operators, with their category
+
+
 @app.post("/api/stations/{station_id}/report", status_code=204)
-def report(station_id: str) -> Response:
-    return epi.report(station_id)
+def report(station_id: str, body: dict | None = None) -> Response:
+    """The operator pressed « Signaler un problème » and chose what it is about: a model
+    (quality, workstation, PPE: the team leader validates or rejects) or the machine (the
+    team leader calls maintenance)."""
+    kind = str((body or {}).get("category", "MACHINE"))
+    kind = kind if kind in REPORT_KINDS else "MACHINE"
+    now = datetime.now().astimezone()
+    REPORTS.append(
+        {"id": f"report-{len(REPORTS) + 1}", "station": station_id, "kind": kind, "at": now}
+    )
+    log.info("%s : signalement opérateur, %s", station_id, REPORT_KINDS[kind][1])
+    return Response(status_code=204)
+
+
+def report_alerts(cell_id: str, shift_code: str) -> list[dict]:
+    out = []
+    for r in REPORTS:
+        if r["id"] in epi.DONE:
+            continue
+        category, label, action = REPORT_KINDS[r["kind"]]
+        model = r["kind"] != "MACHINE"
+        detail = (
+            f"L’opérateur signale une erreur du {label.lower()} : verdict à vérifier"
+            if model
+            else "Problème machine signalé avec le bouton « Signaler un problème »"
+        )
+        out.append({
+            "id": r["id"], "cellId": cell_id, "stationId": r["station"], "category": category,
+            "title": f"Signalement opérateur · {label}",
+            "detail": detail,
+            "shift": shift_code, "when": f"{r['at'].hour:02d}:{r['at'].minute:02d}",
+            "priority": not model, "action": action, "reportedByOperator": True, **epi.ack(r["id"]),
+        })  # fmt: skip
+    return out
 
 
 @app.get("/api/stations/{station_id}/detail")
