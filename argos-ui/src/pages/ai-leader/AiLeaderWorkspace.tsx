@@ -43,13 +43,13 @@ function Workspace() {
 
   return (
     <div className="screen" style={{ background: 'var(--app-bg)' }}>
-      <TopBar title="Fabrique de modèles" sub="AI Leader" right={connection} />
+      <TopBar title="Centre de pilotage IA" sub="AI Leader" right={connection} />
       <nav className="aw-bar" aria-label="Navigation AI Leader">
         <button className="aw-burger" aria-label={menuOpen ? 'Replier le menu' : 'Déplier le menu'} title={menuOpen ? 'Replier le menu' : 'Déplier le menu'}
           aria-expanded={menuOpen} aria-controls="aw-menu" onClick={toggleMenu}>
           <span /><span /><span />
         </button>
-        <span className="aw-current">{policies ? 'Politiques de réentraînement' : SECTIONS.find((s) => s.id === section)?.label}</span>
+        <span className="aw-current">{policies ? 'Réentraînement' : SECTIONS.find((s) => s.id === section)?.label}</span>
         <span style={{ flex: 1 }} />
         {scoped && <ModelPicker />}
         <FreshnessLabel f={freshness} />
@@ -109,24 +109,31 @@ function FreshnessLabel({ f }: { f: ReturnType<typeof useFreshness> }) {
   return <span className="muted" style={{ fontSize: 13, whiteSpace: 'nowrap' }} title="Date réelle de lecture dans Databricks des données affichées à l'écran">{parts.join(' · ')}</span>;
 }
 
-const MENU_ICONS: Record<Section, keyof typeof ICONS> = {
-  overview: 'home', datasets: 'db', training: 'play', registry: 'badge', deployment: 'monitor', monitoring: 'bars',
+/** Menu icons (24 px stroke paths, Lucide-style). */
+const MENU_ICONS: Record<Section | 'policies', string> = {
+  overview: ICONS.overview, // four squares
+  datasets: ICONS.db, // database cylinder
+  training: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M10 8.5v7l6-3.5z', // play in a circle
+  policies: 'M20 11a8 8 0 0 0-14.6-4.4 M5 3v4h4 M4 13a8 8 0 0 0 14.6 4.4 M19 21v-4h-4', // circular arrows
+  registry: 'M12 3l9 4.5-9 4.5-9-4.5z M3 12l9 4.5 9-4.5 M3 16.5l9 4.5 9-4.5', // layers
+  deployment: 'M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2.1-.1-2.9a2.2 2.2 0 0 0-2.9-.1z M12 15l-3-3a22 22 0 0 1 2-4A13 13 0 0 1 22 2c0 2.7-.8 7.5-6 11a22 22 0 0 1-4 2z M9 12H4s.6-3 2-4c1.6-1 5 0 5 0 M12 15v5s3-.6 4-2c1-1.6 0-5 0-5', // rocket
+  monitoring: 'M3 3h18v18H3z M7 15l3-3 3 2 4-5', // chart in a square
 };
 
 /** Menu latéral docké (ouvert par défaut) : sections AI Leader + Politiques sous Training
     Factory. Il ne se ferme que par le bouton « trois traits » de la barre. */
 function SideMenu({ section, policies, onGo }: { section: Section; policies: boolean; onGo: (s: Section | 'policies') => void }) {
-  const item = (id: Section | 'policies', label: string, icon: keyof typeof ICONS, active: boolean, sub = false) => (
+  const item = (id: Section | 'policies', label: string, icon: Section | 'policies', active: boolean, sub = false) => (
     <button key={id} className={`aw-item${active ? ' active' : ''}${sub ? ' sub' : ''}`}
       aria-current={active ? 'page' : undefined} onClick={() => onGo(id)}>
-      <Icon d={ICONS[icon]} size={sub ? 15 : 17} /><span>{label}</span>
+      <Icon d={MENU_ICONS[icon]} size={sub ? 15 : 17} /><span>{label}</span>
     </button>
   );
   return (
     <nav id="aw-menu" className="aw-side" aria-label="Sections AI Leader">
       {SECTIONS.map((s) => [
-        item(s.id, s.label, MENU_ICONS[s.id], s.id === section && !policies),
-        s.id === 'training' ? item('policies', 'Politiques', 'log', policies, true) : null,
+        item(s.id, s.label, s.id, s.id === section && !policies),
+        s.id === 'training' ? item('policies', 'Réentraînement', 'policies', policies, true) : null,
       ])}
     </nav>
   );

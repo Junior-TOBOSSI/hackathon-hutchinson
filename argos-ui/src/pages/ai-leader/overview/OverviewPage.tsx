@@ -92,7 +92,7 @@ export default function OverviewPage() {
       <header className="card tf-hero">
         <div className="tf-hero-title">
           <span className="tf-hero-icon"><Icon d={ICONS.home} size={24} /></span>
-          <div><h1 className="h2">Accueil — AI Leader</h1>
+          <div><h1 className="h2">Tableau de bord</h1>
             <p className="muted">Pilotez le cycle de vie des modèles de vision, de la donnée au déploiement, sur Databricks et sur les postes.</p></div>
         </div>
       </header>

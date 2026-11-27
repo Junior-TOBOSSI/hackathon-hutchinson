@@ -127,3 +127,10 @@ Ces changements portent sur le cadre commun `AiLeaderWorkspace.tsx` et le nouvea
   - le volet est **ouvert par défaut** et ne se replie ou ne se déplie **que** par les trois traits, sans fermeture au choix d'une page, à Échap ou au clic extérieur. L'état est mémorisé dans `localStorage` (`hovis.aiLeaderMenu`) ;
   - le volet est léger : fond blanc, fine bordure, 216 px ; la page active est sur fond bleu clair avec un liseré rouge. « Politiques » figure en sous-entrée de Training Factory.
 - **Vérification :** dans Edge headless (ouverture par défaut, navigation, Échap, clic dans le contenu, bascule, persistance). TypeScript, les tests frontend et le build passent.
+- **Noms et icônes :**
+  - le bandeau devient « Centre de pilotage IA · AI Leader » ;
+  - le titre de l'accueil devient « Tableau de bord » ;
+  - les entrées du menu deviennent Tableau de bord, Jeux de données, Entraînement, Réentraînement (sous-entrée), Registre des modèles, Déploiement et Surveillance ;
+  - les icônes sont des tracés de 24 px : carrés, cylindre, lecture dans un cercle, flèches circulaires, couches, fusée, courbe dans un carré.
+  
+  Les libellés sont modifiés à leur source unique (`SECTIONS` dans `common.tsx`). Les titres internes des pages (« Training Factory — Entraînements »…) ne changent pas.
