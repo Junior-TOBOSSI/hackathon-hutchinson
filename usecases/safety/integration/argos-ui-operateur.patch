@@ -94,7 +94,7 @@ index 73a3eb4..d21976e 100644
    { id: 'a6', cellId: 'C3', stationId: 'C3·P04', category: 'EQUIPEMENT', title: 'Caméra pièce hors ligne', detail: 'Le poste tourne sans contrôle qualité automatique', shift: 'B', when: 'depuis 16:07', priority: false, action: 'MAINTENANCE' },
  ];
 diff --git a/argos-ui/src/api/types.ts b/argos-ui/src/api/types.ts
-index c1b98d8..cab6903 100644
+index c1b98d8..d0fc825 100644
 --- a/argos-ui/src/api/types.ts
 +++ b/argos-ui/src/api/types.ts
 @@ -36,6 +36,8 @@ export interface PartResult {
@@ -106,7 +106,18 @@ index c1b98d8..cab6903 100644
    takenAt: string; // ISO
  }
  
-@@ -149,6 +151,9 @@ export interface StationDetail {
+@@ -122,8 +124,9 @@ export interface Alert {
+   priority: boolean;
+   action: AlertAction; // NONE pour EPI et poste : information seule
+   reportedByOperator?: boolean;
+-  /** Renseigné quand le team leader a acquitté l'alerte (« je m'en occupe »). */
++  /** Renseigné quand le team leader a pris l'alerte en charge : qui, et à quelle heure (ISO). */
+   acknowledgedBy?: string;
++  acknowledgedAt?: string;
+ }
+ 
+ export interface StationEvent {
+@@ -149,6 +152,9 @@ export interface StationDetail {
    lanes: { name: string; episodes: [number, number][]; soft?: boolean }[];
    epiCounts: { label: string; count: number }[];
    events: StationEvent[];
@@ -312,9 +323,18 @@ index 0129f23..d1f9a41 100644
    );
  }
 diff --git a/argos-ui/src/pages/Operateur.tsx b/argos-ui/src/pages/Operateur.tsx
-index 6f36356..89d755a 100644
+index 6f36356..a2ee2dd 100644
 --- a/argos-ui/src/pages/Operateur.tsx
 +++ b/argos-ui/src/pages/Operateur.tsx
+@@ -16,7 +16,7 @@ import { useApi } from '../hooks/useApi';
+  *
+  * Le même écran sert au team leader qui CONSULTE un poste depuis son PC (`consultStationId`) :
+  * il voit exactement ce que voit l'opérateur, sans le bouton Signaler, avec en plus
+- * les alertes du poste qu'il peut acquitter (« je m'en occupe »).
++ * les alertes du poste qu'il peut prendre en charge.
+  */
+ export default function Operateur({ consultStationId }: { consultStationId?: string }) {
+   const { user } = useAuth();
 @@ -24,12 +24,18 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
    const scenario = (params.get('scenario') as Scenario) || 'ok';
    const consult = !!consultStationId;
@@ -336,6 +356,15 @@ index 6f36356..89d755a 100644
    const actions = operatorActions(live);
    const envIssues = live.issues.filter((i) => i.category === 'SECURITE_EPI' || i.category === 'COMPORTEMENT' || i.category === 'POSTE');
    const ko = live.part.verdict === 'KO';
+@@ -38,7 +44,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
+ 
+   const report = async () => { await api.reportProblem(stationId); setReported(true); setTimeout(() => setReported(false), 4000); };
+   const stationAlerts = (cellAlerts ?? []).filter((a) => a.stationId === stationId);
+-  const acknowledge = (id: string) => api.acknowledgeAlert(id).then(() => setCellAlerts((cellAlerts ?? []).map((a) => (a.id === id ? { ...a, acknowledgedBy: user?.name ?? 'Team leader' } : a))));
++  const acknowledge = (id: string) => api.acknowledgeAlert(id).then(() => setCellAlerts((cellAlerts ?? []).map((a) => (a.id === id ? { ...a, acknowledgedBy: user?.name ?? 'Team leader', acknowledgedAt: new Date().toISOString() } : a))));
+   const shiftChip = <span className="chip hide-mobile">Shift {live.shift.code} · {live.shift.start.slice(0, 2)} h – {live.shift.end.slice(0, 2)} h</span>;
+ 
+   return (
 @@ -60,7 +66,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
          <section className="card-op col" style={{ width: 440, maxWidth: '100%', gap: 14 }}>
            {!ko && envIssues.length > 0 && live.frontSnapshotUrl
@@ -372,6 +401,17 @@ index 6f36356..89d755a 100644
          <span>Caméra pièce {live.partCameraOnline ? 'en ligne' : 'hors ligne'} · modèle qualité {live.qualityModelVersion}</span>
        </footer>
  
+@@ -127,8 +133,8 @@ function ConsultBar({ stationId, alerts, onAcknowledge }: { stationId: string; a
+         <span key={a.id} className="row" style={{ gap: 8, background: 'rgba(255,255,255,.08)', borderRadius: 12, padding: '4px 4px 4px 12px' }}>
+           <span style={{ fontSize: 14, fontWeight: 600 }}>{a.title}</span>
+           {a.acknowledgedBy
+-            ? <span className="pill pill-green">Pris en charge</span>
+-            : <button className="btn-report" onClick={() => onAcknowledge(a.id)} style={{ border: 'none', borderRadius: 10, padding: '6px 12px', fontWeight: 700, fontSize: 14, boxShadow: 'none' }}>Je m’en occupe</button>}
++            ? <span className="pill pill-green">Prise en charge{a.acknowledgedAt ? ` · ${new Date(a.acknowledgedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span>
++            : <button className="btn-report" onClick={() => onAcknowledge(a.id)} style={{ border: 'none', borderRadius: 10, padding: '6px 12px', fontWeight: 700, fontSize: 14, boxShadow: 'none' }}>Prendre en charge</button>}
+         </span>
+       ))}
+       <Link to={`/team-leader/poste/${encodeURIComponent(stationId)}/historique`} className="chip" style={{ color: '#fff', fontWeight: 600 }}>Historique du shift</Link>
 @@ -159,9 +165,10 @@ function ProblemBanner({ actions }: { actions: OperatorAction[] }) {
    );
  }
@@ -542,7 +582,7 @@ index 89edae1..09c58d6 100644
        </main>
      </div>
 diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
-index 1642809..d3c2e41 100644
+index 1642809..70df117 100644
 --- a/argos-ui/src/pages/TeamLeader.tsx
 +++ b/argos-ui/src/pages/TeamLeader.tsx
 @@ -23,7 +23,7 @@ export const CATEGORIES: (Category & { key: AlertCategory })[] = [
@@ -554,6 +594,15 @@ index 1642809..d3c2e41 100644
    RYTHME: ['Rythme', 'pill-amber'], CAMERA: ['Caméra hors ligne', 'pill-amber'], OBJET: ['Objet étranger', 'pill-amber'],
  };
  
+@@ -51,7 +51,7 @@ export default function TeamLeader() {
+     { key: 'alerts', label: 'Alertes', icon: ICONS.warn, badge: alerts.length, hot: alerts.some((a) => a.priority) },
+   ];
+   const removeAlert = (id: string) => setAlerts(alerts.filter((a) => a.id !== id));
+-  const acknowledge = (id: string) => api.acknowledgeAlert(id).then(() => setAlerts(alerts.map((a) => (a.id === id ? { ...a, acknowledgedBy: user?.name ?? 'Team leader' } : a))));
++  const acknowledge = (id: string) => api.acknowledgeAlert(id).then(() => setAlerts(alerts.map((a) => (a.id === id ? { ...a, acknowledgedBy: user?.name ?? 'Team leader', acknowledgedAt: new Date().toISOString() } : a))));
+ 
+   return (
+     <div className="screen">
 @@ -88,7 +88,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
        <div className="grid-5">
          <Kpi label="Pièces bonnes · shift" value={fmt(good)} sub={`sur ${fmt(target)} · ${Math.round((good / target) * 100)} % de l’objectif`} />
@@ -748,7 +797,7 @@ index 1642809..d3c2e41 100644
      </div>
 +  );
 +}
- 
++
 +/** Une ligne de carte : libellé à gauche, valeur à droite (verte si OK, rouge sinon). */
 +function CardLine({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'bad' }) {
 +  return (
@@ -758,7 +807,7 @@ index 1642809..d3c2e41 100644
 +    </span>
 +  );
 +}
-+
+ 
 +/** Détail d'un poste, ouvert d'un clic sur sa carte. */
 +function StationDetailPanel({ s, alerts, onClose, onScreen }: { s: StationSummary; alerts: Alert[]; onClose: () => void; onScreen: () => void }) {
 +  const delta = s.good - s.expectedNow;
@@ -804,6 +853,33 @@ index 1642809..d3c2e41 100644
        </div>
      </div>
    );
+@@ -255,6 +264,8 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
+ }
+ 
+ /* ---------------- Alertes de la cellule : texte seul ---------------- */
++const ackTime = (iso?: string) => (iso ? ` · ${new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : '');
++
+ function Alerts({ cell, alerts, onDone, onAcknowledge }: { cell: CellOverview; alerts: Alert[]; onDone: (id: string) => void; onAcknowledge: (id: string) => void }) {
+   const [cat, setCat] = useState<AlertCategory | 'ALL'>('ALL');
+   const list = useMemo(() => [...alerts].filter((a) => cat === 'ALL' || a.category === cat).sort((a, b) => Number(b.priority) - Number(a.priority)), [alerts, cat]);
+@@ -285,7 +296,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
+       <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+         <span className="cond" style={{ fontWeight: 700, fontSize: 26 }}>{a.stationId}</span>
+         <span className={`pill ${a.category === 'SECURITE_EPI' ? 'pill-red' : 'pill-blue'}`}>{cat.name}</span>
+-        {a.acknowledgedBy && <span className="pill pill-green">Pris en charge · {a.acknowledgedBy}</span>}
++        {a.acknowledgedBy && <span className="pill pill-green">Prise en charge · {a.acknowledgedBy}{ackTime(a.acknowledgedAt)}</span>}
+         <span style={{ flex: 1 }} />
+         <span className="muted" style={{ fontSize: 13 }}>{a.reportedByOperator ? 'signalé par l’opérateur' : ''}</span>
+       </div>
+@@ -294,7 +305,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
+       <span style={{ fontSize: 14, fontWeight: 600 }}>Shift {a.shift} · {a.when}</span>
+       {a.action === 'NONE' && <span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>Pour information : aucune validation demandée</span>}
+       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+-        {!a.acknowledgedBy && <button className="btn btn-primary grow" onClick={onAcknowledge}>Je m’en occupe</button>}
++        {!a.acknowledgedBy && <button className="btn btn-primary grow" onClick={onAcknowledge}>Prendre en charge</button>}
+         {a.action === 'VALIDATE' && (
+           <>
+             <button className="btn btn-dark grow" onClick={() => api.decideAlert(a.id, 'VALIDER').then(onDone)}>Valider</button>
 diff --git a/argos-ui/src/theme.css b/argos-ui/src/theme.css
 index b7b068e..8619a53 100644
 --- a/argos-ui/src/theme.css

@@ -272,12 +272,17 @@ def report(station_id: str) -> Response:
 # parts, operator reports); the 11 other stations are SIMULATED and labelled as such.
 EVENTS: list[dict] = []  # Safety episodes of the real station: start, end, label, category
 REPORTS: list[dict] = []  # 'Signaler un problème' pressed by the operator
-ACK: dict[str, str] = {}  # alert id -> who took it in charge
+ACK: dict[str, dict] = {}  # alert id -> who took it in charge, and when
 DONE: set[str] = set()  # alerts closed by the team leader (decision, maintenance called)
 CELL_STATIONS = [f"C3·P{i:02d}" for i in range(1, 13)]
 DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre",
           "octobre", "novembre", "décembre"]  # fmt: skip
+
+
+def ack(alert_id: str) -> dict:
+    """Who took the alert in charge, and when (empty if nobody yet)."""
+    return ACK.get(alert_id, {})
 
 
 def hhmm(t: datetime) -> str:
@@ -367,14 +372,14 @@ def alerts(cell_id: str) -> list:
         out.append({"id": i["id"], "cellId": cell_id, "stationId": STATION, "category": cat, "title": i["label"],
                     "detail": f"{i['instruction']} · vu par la caméra frontale (visage flouté)",
                     "shift": shift["code"], "when": f"depuis {hhmm(since)}", "priority": cat == "SECURITE_EPI",
-                    "action": "NONE", "acknowledgedBy": ACK.get(i["id"])})  # fmt: skip
+                    "action": "NONE", **ack(i["id"])})  # fmt: skip
     for r in REPORTS:
         if r["id"] not in DONE:
             out.append({"id": r["id"], "cellId": cell_id, "stationId": STATION, "category": "EQUIPEMENT",
                         "title": "Problème signalé par l’opérateur",
                         "detail": "Bouton « Signaler un problème » sur l’écran du poste", "shift": shift["code"],
                         "when": hhmm(r["at"]), "priority": True, "action": "MAINTENANCE",
-                        "reportedByOperator": True, "acknowledgedBy": ACK.get(r["id"])})  # fmt: skip
+                        "reportedByOperator": True, **ack(r["id"])})  # fmt: skip
     for k, q in enumerate(REQUALIFIED):
         aid = f"requal-{k + 1}"
         if aid not in DONE:
@@ -383,13 +388,13 @@ def alerts(cell_id: str) -> list:
                         "title": f"Pièce n° {q['part']} requalifiée OK par l’opérateur",
                         "detail": "Le modèle qualité avait vu 2 joints : fausse alerte à confirmer",
                         "shift": shift["code"], "when": hhmm(at), "priority": False, "action": "VALIDATE",
-                        "acknowledgedBy": ACK.get(aid)})  # fmt: skip
+                        **ack(aid)})  # fmt: skip
     return out
 
 
 @app.post("/api/alerts/{alert_id}/acknowledge", status_code=204)
 def acknowledge(alert_id: str) -> Response:
-    ACK[alert_id] = "Team leader démo"
+    ACK[alert_id] = {"acknowledgedBy": "Team leader démo", "acknowledgedAt": datetime.now().astimezone().isoformat()}
     return Response(status_code=204)
 
 
