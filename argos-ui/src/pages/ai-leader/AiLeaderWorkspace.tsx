@@ -33,7 +33,7 @@ function Workspace() {
 
   return (
     <div className="screen" style={{ background: 'var(--app-bg)' }}>
-      <TopBar title="Fabrique de modèles" sub="AI Leader · données réelles Databricks" right={connection} />
+      <TopBar title="Fabrique de modèles" sub="AI Leader" right={connection} />
       <nav style={{ background: '#fff', borderBottom: '1px solid var(--line)', position: 'sticky', top: 0, zIndex: 20 }}>
         <div className="row" style={{ padding: '0 24px', gap: 4, overflowX: 'auto', flexWrap: 'nowrap' }}>
           {SECTIONS.map((s) => {
@@ -93,8 +93,6 @@ function FreshnessLabel({ f }: { f: ReturnType<typeof useFreshness> }) {
   if (f.oldest && f.newest) {
     parts.push(time(f.oldest) === time(f.newest) ? `Lu à ${time(f.oldest)}` : `Lu entre ${time(f.oldest)} et ${time(f.newest)}`);
     if (f.kinds.includes('stale')) parts.push('dernier résultat connu');
-    else if (f.kinds.some((k) => k === 'hit' || k === 'mixed')) parts.push(f.kinds.includes('miss') ? 'en partie depuis le cache serveur' : 'cache serveur');
-    else parts.push('lecture directe');
   }
   if (f.refreshing) parts.push(`actualisation… (${f.refreshing})`);
   else if (f.loading) parts.push(`chargement… (${f.loading})`);

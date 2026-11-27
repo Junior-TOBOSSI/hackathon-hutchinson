@@ -6,7 +6,7 @@ import {
   type RegistryData, type RetrainingData, type TrainingData,
 } from '../../../api/overview';
 import { Loading, Unavailable } from '../common';
-import { read, useResource, useStore, type Resource } from '../data';
+import { read, useResource, type Resource } from '../data';
 import '../training/training.css';
 import { Chip, Kpi, SelectField, type IconName } from '../ui';
 import { bucketRuns, frReason, RUN_GROUPS } from './history';
@@ -74,7 +74,6 @@ function Card({ title, icon, sub, res, right, children, className }: {
 }
 
 export default function OverviewPage() {
-  const store = useStore();
   const goto = useGoto();
   const ds = useBlock<DatasetsData>('datasets');
   const tr = useBlock<TrainingData>('training');
@@ -83,8 +82,6 @@ export default function OverviewPage() {
   const mon = useBlock<MonitoringData>('monitoring');
   const ret = useBlock<RetrainingData>('retraining');
   const act = useBlock<ActivityData>('activity');
-  const all = [ds, tr, rg, inf, mon, ret, act];
-  const refreshing = all.some((r) => r.refreshing || r.loading);
   const v = <T,>(r: Resource<Block<T>>, f: (d: T) => ReactNode) => (r.error ? '—' : r.data?.data ? f(r.data.data) : r.data ? '—' : '…');
 
   const endpoints = inf.data?.data?.endpoints;
@@ -97,10 +94,6 @@ export default function OverviewPage() {
           <span className="tf-hero-icon"><Icon d={ICONS.home} size={24} /></span>
           <div><h1 className="h2">Accueil — AI Leader</h1>
             <p className="muted">Pilotez le cycle de vie des modèles de vision, de la donnée au déploiement, sur Databricks et sur les postes.</p></div>
-        </div>
-        <div className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span className="muted" style={{ fontSize: 13 }}>{refreshing ? 'Actualisation en cours…' : 'Chaque bloc indique sa propre fraîcheur'}</span>
-          <button className="btn btn-ghost" disabled={refreshing} onClick={() => store.invalidate('ov:')}>Actualiser</button>
         </div>
       </header>
 
