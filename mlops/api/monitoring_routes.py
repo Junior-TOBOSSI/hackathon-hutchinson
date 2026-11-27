@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from mlops.databricks.connector import DatabricksConnector, DatabricksConnectorError
 from mlops.databricks.read_cache import BudgetExceeded, read_scope
-from mlops.monitoring.service import MonitoringService, observations, select, source_block
+from mlops.monitoring.service import MonitoringService, observations, select
 
 _LOCK = threading.Lock()
 DataKind = Literal["real", "simulated", "all"]
@@ -290,83 +290,4 @@ def create_monitoring_router(
 
         return call(c, response, fresh, load)
 
-    @router.get("/mlops/overview/v2")
-    def overview_v2(c: Connector, response: Response, fresh: bool = False) -> dict[str, Any]:
-        """One block per source, each with its own status and freshness: a failing source
-        never hides the others."""
-
-        def load() -> dict[str, Any]:
-            svc = get_service(c)
-            blocks = [
-                source_block("datasets", lambda: _datasets(c)),
-                source_block("training", lambda: svc.training.kpis().model_dump()),
-                source_block("registry", lambda: _registry(c)),
-                _deployment(svc),
-                source_block("monitoring", lambda: svc.summary("all")),
-                source_block("stations", lambda: _stations(svc)),
-            ]
-            for b in blocks:
-                data = b.get("data") or {}
-                if b["status"] == "available" and isinstance(data, dict):
-                    if data.get("status") in ("partial", "unavailable"):
-                        b["status"] = data["status"]
-                    elif data.get("simulated_only"):
-                        b["status"] = "simulated"
-            return {"blocks": blocks}
-
-        return call(c, response, fresh, load)
-
     return router
-
-
-def _datasets(c: DatabricksConnector) -> dict[str, Any]:
-    from mlops.databricks.datasets import dataset_store
-
-    fams = dataset_store(c).catalog()
-    return {
-        "families": len(fams),
-        "items": [{"id": f.dataset_id, "latest": getattr(f, "latest_version", None)} for f in fams],
-    }
-
-
-def _registry(c: DatabricksConnector) -> dict[str, Any]:
-    rows = []
-    for m in c.settings.models:
-        st = c.model_status(m.id)
-        rows.append(
-            {
-                "model_id": m.id,
-                "uc_name": m.uc_name,
-                "versions": len(st.versions),
-                "champion": st.aliases.get("champion"),
-                "served": {k: v for k, v in st.served.items() if v},
-                "approved": [v.version.version for v in st.versions if v.approved],
-                "synthetic": m.synthetic,
-            }
-        )
-    return {"models": rows}
-
-
-def _deployment(svc: MonitoringService) -> dict[str, Any]:
-    data, status = svc.deployment.snapshot()
-    return {
-        "name": "deployment",
-        "status": status.status,
-        "fetched_at": status.fetched_at,
-        "detail": status.detail,
-        "data": data,
-        "optional": True,
-    }
-
-
-def _stations(svc: MonitoringService) -> dict[str, Any]:
-    snap = svc._snapshot()
-    return {
-        "status": snap.status.status,
-        "fetched_at": snap.status.fetched_at,
-        "detail": snap.status.detail,
-        "stations": len(snap.stations),
-        "online": sum(1 for s in snap.stations if s.get("online")),
-        "simulated_only": bool(snap.stations) and all(s.get("simulated") for s in snap.stations),
-        "truncated_stations": snap.truncated_stations,
-    }

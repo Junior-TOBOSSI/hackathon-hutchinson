@@ -19,6 +19,7 @@ from mlops.retraining.scheduler import Scheduler
 from mlops.retraining.service import LaunchRefused, PolicyError, Providers, RetrainingService
 
 _LOCK = threading.Lock()
+SCHEDULER = None  # set by create_retraining_router (state shown on the home page)
 ACTOR = "ai_leader"  # no user identity in the local gateway: actions are journaled with this role
 
 
@@ -45,6 +46,8 @@ def create_retraining_router(
     Connector = Annotated[DatabricksConnector, Depends(get_connector)]
     scheduler = Scheduler(lambda enabled: get_service(get_connector()).tick(enabled))
     scheduler.start()  # no-op unless HOVIS_RETRAIN_SCHEDULER=1
+    global SCHEDULER
+    SCHEDULER = scheduler  # read-only state for the AI Leader home page
 
     def call(c: DatabricksConnector, response: Response | None, fn: Callable[[], Any]) -> Any:
         try:
