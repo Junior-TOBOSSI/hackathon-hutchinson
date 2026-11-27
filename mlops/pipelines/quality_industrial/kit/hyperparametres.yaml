@@ -1,0 +1,15 @@
+# Hyperparamètres d'entraînement du modèle qualité 702.
+# Valeurs = série "c3f" de la validation croisée (3 classes + augmentation forte).
+# Si la seed 1 montre que l'augmentation forte n'apporte rien, remettre flipud 0.0, hsv_v 0.4, scale 0.5
+# (valeurs par défaut d'Ultralytics) et noter le changement dans le rapport.
+modele_base: yolo26n-cls.pt   # modèle pré-entraîné de départ (2,8 M paramètres)
+imgsz: 128                    # taille d'entrée (les photos font 126 x 86 px)
+epochs: 30                    # nombre maximal d'époques
+patience: 10                  # arrêt anticipé après 10 époques sans progrès sur val
+batch: 32
+seed: 0
+erasing: 0.0                  # pas d'effacement aléatoire : il pourrait effacer le joint
+flipud: 0.5                   # retournement vertical (augmentation forte)
+hsv_v: 0.6                    # variation de luminosité (augmentation forte)
+scale: 0.6                    # recadrage / zoom aléatoire (augmentation forte)
+rappel_vise: 0.90             # objectif client : 90 % des pièces mauvaises arrêtées

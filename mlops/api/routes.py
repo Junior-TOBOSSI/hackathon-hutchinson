@@ -22,6 +22,7 @@ from typing import Annotated, Any, Literal, TypeVar
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel
 
+from mlops.api.training_routes import create_training_router
 from mlops.connectors.mlflow_client import ExperimentInfo, MetricPoint, ModelVersionInfo, RunSummary
 from mlops.databricks.connector import (
     ConnectionStatus,
@@ -428,11 +429,12 @@ def create_mlops_router(
         label: Annotated[str, Form()],
         split: Annotated[str, Form()],
         synthetic_attested: Annotated[bool, Form()] = False,
+        group: Annotated[str | None, Form()] = None,
     ) -> list[ImportResult]:
         store = dataset_store(c)
         stream = ((f.filename or "image", f.file) for f in files)
         return store.import_files(
-            store.scope_id(dataset_id), draft_id, stream, label, split, synthetic_attested
+            store.scope_id(dataset_id), draft_id, stream, label, split, synthetic_attested, group
         )
 
     @router.delete("/mlops/datasets/{dataset_id}/drafts/{draft_id}/imports/{sha}")
@@ -544,10 +546,11 @@ def create_mlops_router(
         label: Annotated[str, Form()],
         split: Annotated[str, Form()],
         synthetic_attested: Annotated[bool, Form()] = False,
+        group: Annotated[str | None, Form()] = None,
     ) -> list[ImportResult]:
         stream = ((f.filename or "image", f.file) for f in files)
         return dataset_store(c).import_files(
-            model_id, draft_id, stream, label, split, synthetic_attested
+            model_id, draft_id, stream, label, split, synthetic_attested, group
         )
 
     @router.delete("/mlops/models/{model_id}/dataset-drafts/{draft_id}/imports/{sha}")
@@ -572,6 +575,9 @@ def create_mlops_router(
     @translate
     def dataset_job(job_id: str, c: Connector) -> PublishJob:
         return dataset_store(c).job(job_id).model_copy()
+
+    # DBX-05 Training Factory (dedicated module, same connector and cache).
+    router.include_router(create_training_router(get_connector))
 
     return router
 

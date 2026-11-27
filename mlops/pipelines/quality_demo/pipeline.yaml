@@ -1,0 +1,40 @@
+# Pipeline quality-demo : POC synthétique DBX-00 (régression logistique sur caractéristiques).
+id: quality-demo
+name: Qualité — démonstration synthétique (POC DBX-00)
+use_case: quality
+task: classification
+architecture: logistic-regression (scikit-learn, 2 configurations fixes C=0.1 / C=10)
+description: >-
+  POC synthétique existant. Les deux configurations entraînées sont fixées dans le code du job
+  (aucun hyperparamètre exposé). Seule la version du dataset est configurable.
+code:
+  repo: local
+  path: mlops/databricks_poc/remote/train_quality.py
+  version: DBX-00 (code téléversé dans le Volume ; mise à jour option B non déployée)
+classes: [OK, NOK]
+dataset:
+  families: [quality-synthetic]
+  annotation_format: classification
+  image_extensions: [.png]
+  required_splits: [train, validation, test]
+  group_field: null
+  group_required: false
+parameters: []
+compute:
+  kind: serverless-cpu
+  gpu: false
+  environment: [mlflow==3.18.0, scikit-learn==1.9.1, numpy, pandas, pillow, matplotlib, joblib]
+job:
+  name: argos-poc-quality-training
+  dataset_argument: --dataset-dir
+entrypoints:
+  train: train_quality.py (sélection sur validation, test évalué après sélection)
+  evaluate: intégré à l'entraînement
+outputs: [runs MLflow (2), versions Unity Catalog, tables Delta annotations / dataset_versions]
+mlflow:
+  experiment: /Shared/ARGOS-POC/quality-demo
+  registered_model: workspace.argos_poc.quality_demo
+evaluation:
+  split: test
+  independent: true
+  unit: image

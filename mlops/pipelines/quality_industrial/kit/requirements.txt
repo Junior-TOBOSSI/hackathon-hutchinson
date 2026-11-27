@@ -1,0 +1,9 @@
+# Dépendances du module qualité 702.
+# PyTorch s'installe à part, selon la machine (voir README_INTEGRATION.md) :
+#   PC sans GPU : pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# Les versions exactes utilisées pour entraîner sont écrites dans config_qualite702.yaml (rubrique versions).
+ultralytics>=8.4,<9
+pyyaml>=6
+numpy
+pillow
+onnxruntime>=1.17   # seulement si on utilise modele.onnx
