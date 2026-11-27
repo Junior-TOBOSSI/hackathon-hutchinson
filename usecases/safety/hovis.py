@@ -108,3 +108,16 @@ class StationIssueTracker:
                 "since": since,
             })  # fmt: skip
         return issues
+
+
+def station_checks(issues: list[dict]) -> dict[str, bool]:
+    """Safety part of ``StationLive.checks`` (True = green tile on the operator screen).
+
+    argos-ui files a phone in hand under "Sécurité · comportement", so COMPORTEMENT turns
+    the Sécurité tile red too; a phone lying on the station turns the Poste tile red.
+    """
+    categories = {issue["category"] for issue in issues}
+    return {
+        "securite": not categories & {"SECURITE_EPI", "COMPORTEMENT"},
+        "poste": "POSTE" not in categories,
+    }

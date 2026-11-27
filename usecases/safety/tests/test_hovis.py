@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from usecases.safety.hovis import StationIssueTracker, current_problems
+from usecases.safety.hovis import StationIssueTracker, current_problems, station_checks
 from visionhub.contracts import AnalysisResult, PersonPPE, PPEState, SafetyDetails, UseCase
 
 A, P, U = PPEState.ABSENT, PPEState.PRESENT, PPEState.UNCERTAIN
@@ -92,3 +92,14 @@ def test_phone_in_use_is_not_also_reported_as_lying_on_the_station():
     tracker.update(result(0.9, [person(phone=True)]), T0, idle_phone=True)
     issues = tracker.update(result(0.9, [person(phone=True)]), T0, idle_phone=True)
     assert [i["category"] for i in issues] == ["COMPORTEMENT"]
+
+
+def test_phone_in_hand_turns_the_securite_tile_red_and_lying_phone_the_poste_tile():
+    tracker = StationIssueTracker("P1")
+    assert station_checks([]) == {"securite": True, "poste": True}
+    in_hand = tracker.update(result(0.9, [person(phone=True)]), T0)
+    assert station_checks(in_hand) == {"securite": False, "poste": True}
+    other = StationIssueTracker("P2")
+    other.update(result(0.1, [person()]), T0, idle_phone=True)
+    lying = other.update(result(0.1, [person()]), T0, idle_phone=True)
+    assert station_checks(lying) == {"securite": True, "poste": False}
