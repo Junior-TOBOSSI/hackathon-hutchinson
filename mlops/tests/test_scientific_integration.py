@@ -92,3 +92,21 @@ def test_workstation_group_results_are_visible_in_training_factory(monkeypatch):
     assert page["total"] == 1
     assert page["items"][0]["right_reason"]
     assert page["items"][0]["annotated_path"] == "evaluation/annotated/bad.png"
+
+
+def test_mlops_workstation_kit_is_byte_identical_to_the_run_analyzer():
+    """ONE Workstation implementation: the kit used for MLOps computations and the analyzer
+    loaded by the Production Engine (usecases/workstation) must never diverge."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    run = root / "usecases" / "workstation"
+    kit = root / "mlops" / "pipelines" / "workstation" / "kit" / "usecases" / "workstation"
+    names = sorted(
+        p.relative_to(run).as_posix()
+        for p in run.rglob("*")
+        if p.is_file() and p.suffix in (".py", ".yaml") and "__pycache__" not in p.parts
+    )
+    assert "model.py" in names and "stations/press_cell.yaml" in names
+    diverging = [n for n in names if (kit / n).read_bytes() != (run / n).read_bytes()]
+    assert diverging == []

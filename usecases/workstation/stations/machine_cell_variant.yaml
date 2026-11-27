@@ -1,0 +1,30 @@
+# Section "Machine cell variant" (poste_variante_5s_11, synthetic pilot, labels indicative).
+# Same machine, another framing, with a steel workbench. The central passage must
+# stay clear; the blue mat is allowed (not watched).
+#
+# Paths are relative to --data-root. Coordinates are NORMALIZED [x, y] on the reference.
+# empty_zones  : nothing new may appear there (objects, and persons unless allowed)
+# element_slots: each element must stay in its place; they are the boxes shown on photos
+name: machine_cell_variant
+title: Machine cell variant
+dataset: raw/workstation/poste_variante_5s_11
+# Columns of labels.csv: file path, class (reference / good / anomaly), anomaly type.
+labels: {file: image, label: classe, type: anomalie}
+# Where each anomaly type must be found: a zone name, null (anything outside the
+# zones named here: bench, slots) or any (any finding).
+anomaly_types:
+  "bac absent": null
+  "outil au sol": passage
+  "etabli desorganise": workbench
+  "bac dans passage": passage
+  "personne dans passage": passage
+views:
+  - name: main
+    reference_image: raw/workstation/poste_variante_5s_11/reference.png
+    empty_zones:
+      passage: [[0.333, 0.385], [0.746, 0.385], [0.746, 0.991], [0.333, 0.991]]
+      workbench: [[0.085, 0.529], [0.333, 0.529], [0.333, 0.991], [0.085, 0.991]]
+    element_slots:
+      bench_blue_bin: [[0.161, 0.815], [0.262, 0.815], [0.262, 0.954], [0.161, 0.954]]
+      rack_blue_bin: [[0.827, 0.292], [0.907, 0.292], [0.907, 0.394], [0.827, 0.394]]
+      rack_yellow_bin: [[0.786, 0.394], [0.847, 0.394], [0.847, 0.508], [0.786, 0.508]]
