@@ -1,0 +1,11 @@
+file,type,expected,decision,score,correct,right_reason,named_person,view,alignment_failed,found,latency_ms
+good/good_03.png,good,conforme,conforme,0.0,True,False,False,main,False,,741.6
+good/good_05.png,good,conforme,conforme,0.0,True,False,False,main,False,,949.1
+good/good_04.png,good,conforme,conforme,0.0,True,False,False,main,False,,867.6
+good/good_01.png,good,conforme,conforme,0.0,True,False,False,main,False,,1147.0
+good/good_02.png,good,conforme,conforme,0.0,True,False,False,main,False,,556.1
+anomaly/anomaly_01.png,missing_object,anomalie,conforme,0.0,False,False,False,main,False,,677.6
+anomaly/anomaly_02.png,moved_object,anomalie,anomalie,1.0,True,True,False,main,False,unknown_object@forbidden_zone,629.3
+anomaly/anomaly_03.png,clutter,anomalie,anomalie,0.924,True,True,False,main,False,unknown_object@forbidden_zone,622.4
+anomaly/anomaly_04.png,object_in_zone,anomalie,anomalie,1.0,True,True,False,main,False,unknown_object@forbidden_zone; unknown_object@person_spot,845.7
+anomaly/anomaly_05.png,person_in_zone,anomalie,anomalie,0.992,True,True,True,main,False,person@forbidden_zone,632.9

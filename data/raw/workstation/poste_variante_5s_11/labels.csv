@@ -1,0 +1,12 @@
+image,classe,anomalie
+reference.png,reference,aucune
+good/good_01.png,good,aucune
+good/good_02.png,good,aucune
+good/good_03.png,good,aucune
+good/good_04.png,good,aucune
+good/good_05.png,good,aucune
+anomaly/anomaly_01.png,anomaly,bac absent
+anomaly/anomaly_02.png,anomaly,outil au sol
+anomaly/anomaly_03.png,anomaly,etabli desorganise
+anomaly/anomaly_04.png,anomaly,bac dans passage
+anomaly/anomaly_05.png,anomaly,personne dans passage

@@ -1,0 +1,12 @@
+file,label,intended_anomaly,source
+reference.png,reference,none,synthetic_collage_crop
+good/good_01.png,good,none,synthetic_collage_crop
+good/good_02.png,good,none,synthetic_collage_crop
+good/good_03.png,good,none,synthetic_collage_crop
+good/good_04.png,good,none,synthetic_collage_crop
+good/good_05.png,good,none,synthetic_collage_crop
+anomaly/anomaly_01.png,anomaly,missing_object,synthetic_collage_crop
+anomaly/anomaly_02.png,anomaly,displaced_object,synthetic_collage_crop
+anomaly/anomaly_03.png,anomaly,disorder,synthetic_collage_crop
+anomaly/anomaly_04.png,anomaly,object_intrusion,synthetic_collage_crop
+anomaly/anomaly_05.png,anomaly,person_intrusion,synthetic_collage_crop

@@ -1,6 +1,5 @@
-# --- Data: never versioned (only data/README.md is kept) ---
-data/*
-!data/README.md
+# --- Data: VERSIONED since 2026-11-27 (Hutchinson's agreement, see AGENTS.md) ---
+# Weights and videos of data/ go through Git LFS (.gitattributes).
 
 # --- Model weights and exports ---
 *.pt
@@ -71,3 +70,9 @@ hovis.local.env
 *.mov
 *.mkv
 *.webm
+
+# --- data/: weights and demo videos ARE versioned (Git LFS), despite the rules above ---
+!data/**/*.pt
+!data/**/*.ts
+!data/raw/safety/videos/*.mp4
+data/raw/safety/videos/lunettes.mp4

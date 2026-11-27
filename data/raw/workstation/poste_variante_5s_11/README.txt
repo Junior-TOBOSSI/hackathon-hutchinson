@@ -1,0 +1,1 @@
+Reference originale redimensionnee. Variantes synthetiques issues d une planche decoupee. Passage central a garder libre, tapis bleu autorise. Etiquettes indicatives a valider. Geometrie non strictement identique.

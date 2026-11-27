@@ -1,0 +1,12 @@
+file,label,type_provisional
+reference.png,reference,none
+good/good_01.png,good,none
+good/good_02.png,good,none
+good/good_03.png,good,none
+good/good_04.png,good,none
+good/good_05.png,good,none
+anomaly/anomaly_01.png,anomaly,missing_object
+anomaly/anomaly_02.png,anomaly,moved_object
+anomaly/anomaly_03.png,anomaly,clutter
+anomaly/anomaly_04.png,anomaly,object_in_zone
+anomaly/anomaly_05.png,anomaly,person_in_zone

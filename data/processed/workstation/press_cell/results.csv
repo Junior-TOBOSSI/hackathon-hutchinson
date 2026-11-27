@@ -1,0 +1,11 @@
+file,type,expected,decision,score,correct,right_reason,named_person,view,alignment_failed,found,latency_ms
+good/good_03.png,good,conforme,conforme,0.0,True,False,False,main,False,,1275.4
+good/good_05.png,good,conforme,conforme,0.0,True,False,False,main,False,,693.8
+good/good_04.png,good,conforme,conforme,0.0,True,False,False,main,False,,644.5
+good/good_01.png,good,conforme,conforme,0.0,True,False,False,main,False,,597.9
+good/good_02.png,good,conforme,conforme,0.0,True,False,False,main,False,,630.0
+anomaly/anomaly_01.png,missing_object,anomalie,a_verifier,0.638,True,True,False,main,False,unknown_object@workbench,755.4
+anomaly/anomaly_02.png,displaced_object,anomalie,anomalie,0.814,True,True,False,main,False,unknown_object@blue_mat,836.3
+anomaly/anomaly_03.png,disorder,anomalie,anomalie,1.0,True,True,False,main,False,unknown_object@workbench,899.5
+anomaly/anomaly_04.png,object_intrusion,anomalie,anomalie,1.0,True,True,False,main,False,unknown_object@blue_mat,832.7
+anomaly/anomaly_05.png,person_intrusion,anomalie,anomalie,1.0,True,True,True,main,False,person@blue_mat; unknown_object@workbench,840.6

@@ -1,0 +1,11 @@
+file,type,expected,decision,score,correct,right_reason,named_person,view,alignment_failed,found,latency_ms
+good/good_03.png,good,conforme,conforme,0.0,True,False,False,main,False,,795.5
+good/good_05.png,good,conforme,conforme,0.0,True,False,False,main,False,,885.3
+good/good_04.png,good,conforme,conforme,0.0,True,False,False,main,False,,684.6
+good/good_01.png,good,conforme,conforme,0.0,True,False,False,main,False,,933.8
+good/good_02.png,good,conforme,conforme,0.0,True,False,False,main,False,,752.5
+anomaly/anomaly_01.png,bac absent,anomalie,anomalie,1.0,True,True,False,main,False,bench_blue_bin; unknown_object@workbench,753.0
+anomaly/anomaly_02.png,outil au sol,anomalie,a_verifier,0.519,True,True,False,main,False,unknown_object@passage,805.6
+anomaly/anomaly_03.png,etabli desorganise,anomalie,anomalie,1.0,True,True,False,main,False,bench_blue_bin; unknown_object@workbench,804.4
+anomaly/anomaly_04.png,bac dans passage,anomalie,anomalie,1.0,True,True,False,main,False,unknown_object@passage,912.4
+anomaly/anomaly_05.png,personne dans passage,anomalie,anomalie,1.0,True,True,True,main,False,person@passage; unknown_object@workbench,819.9

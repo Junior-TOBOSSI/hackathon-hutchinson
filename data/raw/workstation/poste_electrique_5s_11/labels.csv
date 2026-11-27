@@ -1,0 +1,12 @@
+image,classe,type,personne
+reference.png,reference,reference,0
+good/good_01.png,good,conforme,0
+good/good_02.png,good,operateur_armoire,1
+good/good_03.png,good,conforme_document,0
+good/good_04.png,good,operateur_assis,1
+good/good_05.png,good,operateur_etabli,1
+anomaly/anomaly_01.png,anomaly,objet_manquant,0
+anomaly/anomaly_02.png,anomaly,cable_deplace,0
+anomaly/anomaly_03.png,anomaly,etabli_desorganise,0
+anomaly/anomaly_04.png,anomaly,bac_au_sol,0
+anomaly/anomaly_05.png,anomaly,dechet_au_sol,0

@@ -1,3 +1,6 @@
 * text=auto eol=lf
 *.png binary
 *.jpg binary
+# Git LFS: model weights and demo videos of data/ (GitHub refuses files > 100 MB)
+data/models/** filter=lfs diff=lfs merge=lfs -text
+data/raw/safety/videos/** filter=lfs diff=lfs merge=lfs -text

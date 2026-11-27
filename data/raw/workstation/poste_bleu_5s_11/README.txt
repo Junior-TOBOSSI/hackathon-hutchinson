@@ -1,0 +1,1 @@
+Reference originale redimensionnee. Variantes issues d une planche generative, recadrees et redimensionnees. Labels provisoires a verifier. Zone operateur bleue autorisee; zone de circulation centrale a maintenir libre selon regle proposee. Variations de geometrie possibles; redimensionnement non proportionnel. Dataset pilote synthetique, non valide industriellement.

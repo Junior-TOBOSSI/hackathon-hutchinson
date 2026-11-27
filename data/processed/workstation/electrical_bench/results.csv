@@ -1,0 +1,11 @@
+file,type,expected,decision,score,correct,right_reason,named_person,view,alignment_failed,found,latency_ms
+good/good_03.png,good,conforme,conforme,0.0,True,False,False,main,False,,735.2
+good/good_05.png,good,conforme,conforme,0.0,True,False,False,main,False,,663.3
+good/good_04.png,good,conforme,conforme,0.0,True,False,False,main,False,,781.7
+good/good_01.png,good,conforme,conforme,0.0,True,False,False,main,False,,617.1
+good/good_02.png,good,conforme,conforme,0.0,True,False,False,main,False,,721.7
+anomaly/anomaly_01.png,objet_manquant,anomalie,anomalie,0.819,True,True,False,main,False,cable_coil; unknown_object@workbench,1021.0
+anomaly/anomaly_02.png,cable_deplace,anomalie,anomalie,1.0,True,True,False,main,False,cable_coil; unknown_object@workbench,500.9
+anomaly/anomaly_03.png,etabli_desorganise,anomalie,anomalie,0.919,True,True,False,main,False,cable_coil; unknown_object@workbench,474.5
+anomaly/anomaly_04.png,bac_au_sol,anomalie,anomalie,1.0,True,True,False,main,False,unknown_object@floor,734.2
+anomaly/anomaly_05.png,dechet_au_sol,anomalie,anomalie,0.869,True,True,False,main,False,unknown_object@floor,938.6

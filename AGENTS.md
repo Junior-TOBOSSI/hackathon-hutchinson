@@ -20,7 +20,7 @@ Chaîne : **source → prétraitement → analyseurs → décision → stockage 
 - **Ne jamais modifier** `visionhub/contracts.py`, `visionhub/decision.py`, `visionhub/registry.py` ni `visionhub/api.py` sans accord explicite de l'équipe. Si un changement semble nécessaire : le proposer et **s'arrêter**.
 - Travailler **uniquement** dans le dossier du cas d'usage concerné (`usecases/<cas>/`).
 - Le **test de contrat** (`pytest tests/test_contract.py`) doit passer avant toute pull request.
-- Ne jamais versionner de données, d'images ou de poids de modèles. **Aucune donnée ne part vers un service externe** (pas d'API cloud, pas de télémétrie).
+- **Données et poids versionnés** dans `data/` depuis le 2026-11-27, **avec l'accord de Hutchinson** pour un dépôt public (confirmé par Gilbert TOBOSSI) : poids (`data/models/`) et vidéos (`data/raw/safety/videos/`) passent par **Git LFS** (`.gitattributes`, `git lfs install` une fois par machine). Toute nouvelle donnée client doit avoir le même accord avant d'être poussée. **Aucune autre donnée ne part vers un service externe** (pas d'API cloud, pas de télémétrie), hormis l'espace Databricks de l'équipe utilisé par l'AI leader.
 - Ne jamais stocker ni afficher de visage, ni chercher à identifier une personne.
 
 ## 4. Travailler avec l'humain
