@@ -11,6 +11,8 @@ from usecases.safety.yolo_analyzer import (
     assess_frame,
     assess_person,
     idle_phones,
+    keep_real_persons,
+    scene_visible,
 )
 from visionhub.contracts import Decision, FrameMeta, PPEState, Thresholds
 from visionhub.decision import decide
@@ -123,9 +125,10 @@ def meta(i):
     return FrameMeta(frame_id=str(i), workstation_id="WS", camera_id="C")
 
 
-IMAGE = np.zeros((240, 320, 3), dtype=np.uint8)
-BARE_HAND = [PERSON, Det("hands", 0.9, (0.32, 0.5, 0.36, 0.55))]
-GOOD = [PERSON, Det("gloves", 0.9, (0.32, 0.5, 0.36, 0.55))]
+IMAGE = np.random.default_rng(0).integers(0, 256, (240, 320, 3), dtype=np.uint8)  # a visible scene
+HEAD = [Det("head", 0.9, (0.40, 0.08, 0.50, 0.20)), Det("helmet", 0.9, (0.40, 0.06, 0.50, 0.14))]
+BARE_HAND = [PERSON, *HEAD, Det("hands", 0.9, (0.32, 0.5, 0.36, 0.55))]
+GOOD = [PERSON, *HEAD, Det("gloves", 0.9, (0.32, 0.5, 0.36, 0.55))]
 
 
 def test_one_bad_frame_does_not_raise_an_alert():
@@ -176,8 +179,28 @@ def test_idle_phone_is_one_touching_no_hand_and_no_head():
 def test_unsure_face_is_still_hidden_but_ignored_by_the_rules():
     """A face at 0.15 is too weak for the glasses rule, but must still be pixelated."""
     unsure_face = Det("face", 0.15, (0.3, 0.1, 0.4, 0.2))
-    analyzer = make_analyzer([[PERSON, unsure_face]])
+    analyzer = make_analyzer([[PERSON, *HEAD, unsure_face]])
     result = analyzer.analyze(IMAGE, meta(0))
     assert unsure_face in analyzer.last_privacy
     assert unsure_face not in analyzer.last_detections
     assert result.details.persons[0].glasses == PPEState.UNCERTAIN
+
+
+def test_covered_camera_means_nobody_and_no_alert():
+    """A hand on the lens: dark, uniform, blurry image -> no person, no PPE problem."""
+    covered = np.full((240, 320, 3), 25, dtype=np.uint8)
+    assert not scene_visible(covered, P["min_contrast"], P["min_sharpness"])
+    assert scene_visible(IMAGE, P["min_contrast"], P["min_sharpness"])
+    analyzer = make_analyzer([BARE_HAND] * 3)
+    results = [analyzer.analyze(covered, meta(i)) for i in range(3)]
+    assert analyzer.last_camera_blocked
+    assert results[-1].details.person_count == 0 and results[-1].score == 0.0
+
+
+def test_a_person_box_without_head_or_face_is_ignored():
+    hand_on_lens = [
+        Det("person", 0.6, (0.0, 0.0, 1.0, 1.0)),
+        Det("hands", 0.8, (0.2, 0.2, 0.8, 0.8)),
+    ]
+    assert [d.name for d in keep_real_persons(hand_on_lens)] == ["hands"]
+    assert any(d.name == "person" for d in keep_real_persons(BARE_HAND))

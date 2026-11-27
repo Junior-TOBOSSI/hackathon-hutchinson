@@ -100,6 +100,12 @@ class StationIssueTracker:
         self._problem: dict[str, tuple[str, str, str]] = {}  # key -> (category, label, instr.)
         self._idle_phone = deque(maxlen=3)  # phone lying on the station, last 3 frames
 
+    def clear(self) -> None:
+        """Forget every ongoing problem at once (e.g. camera covered: nobody can be seen)."""
+        self._since.clear()
+        self._last_seen.clear()
+        self._idle_phone.clear()
+
     def update(
         self,
         result: AnalysisResult,

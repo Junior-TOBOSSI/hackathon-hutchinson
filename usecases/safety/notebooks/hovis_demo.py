@@ -75,6 +75,8 @@ def loop() -> None:
         frame = frame.copy()
         meta = FrameMeta(frame_id=f"demo-{n}", workstation_id=STATION, camera_id="front")
         result = analyzer.analyze(frame, meta)
+        if analyzer.last_camera_blocked:  # hand on the lens: nobody seen, the screen shows the part
+            tracker.clear()
         issues = tracker.update(
             result,
             idle_phone=bool(analyzer.last_idle_phones),
@@ -98,7 +100,7 @@ def loop() -> None:
         n += 1
         with lock:
             ppe = station_ppe(analyzer.last_states, issues)
-            state.update(issues=issues, ppe=ppe, jpeg=jpeg, n=n, error=None,
+            state.update(issues=issues, ppe=ppe, jpeg=jpeg, n=n, error=None, blocked=analyzer.last_camera_blocked,
                          ms=round((time.perf_counter() - start) * 1000))
         time.sleep(max(0.0, PERIOD - (time.perf_counter() - start)))
 
@@ -214,13 +216,23 @@ REQUALIFIED: list[dict] = []  # trace of requalifications (part number, time), i
 
 
 def current_part(number: int, now: str) -> dict:
-    """The part on screen: a simulated OK part, or the NOK part of the demo until the next one."""
+    """The part on screen: a simulated OK part, or the NOK part of the demo until the next one.
+
+    After a requalification, the photo stays the same: it is the same part.
+    """
     if PART["number"] is not None and number > PART["number"] + 1:
         PART.update(number=None, verdict="OK", requalified=False)  # the next part has arrived
     ko = PART["verdict"] == "KO"
-    return {"number": PART["number"] or number, "verdict": PART["verdict"], "jointsDetected": 2 if ko else 1,
-            "score": 0.91 if ko else 0.96, "requalified": PART["requalified"],
-            "imageUrl": "/img/piece-nok.jpg" if ko or PART["requalified"] else "/img/demo-piece-ok.svg",  # same part "takenAt": now}
+    photo = "/img/piece-nok.jpg" if ko or PART["requalified"] else "/img/demo-piece-ok.svg"
+    return {
+        "number": PART["number"] or number,
+        "verdict": PART["verdict"],
+        "jointsDetected": 2 if ko else 1,
+        "score": 0.91 if ko else 0.96,
+        "requalified": PART["requalified"],
+        "imageUrl": photo,
+        "takenAt": now,
+    }
 
 
 @app.post("/api/safety-demo/part-nok", status_code=204)
@@ -254,4 +266,4 @@ def alerts(cell_id: str) -> list:
 @app.get("/api/safety-demo/status")
 def status() -> dict:
     with lock:
-        return {"frames": state["n"], "ms_per_frame": state.get("ms"), "issues": state["issues"], "error": state["error"]}
+        return {"frames": state["n"], "ms_per_frame": state.get("ms"), "camera_blocked": state.get("blocked"), "issues": state["issues"], "error": state["error"]}

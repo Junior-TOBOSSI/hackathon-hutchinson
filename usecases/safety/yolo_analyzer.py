@@ -63,6 +63,9 @@ DEFAULTS: dict[str, Any] = {
     "full_body_bottom": 0.97,  # person box ending above this (normalized y) = feet in view
     "phone_margin": 0.5,
     "privacy_conf": 0.10,  # faces, heads, persons kept from this confidence on, for hiding
+    "require_head": True,  # a person counts only if a head or face is seen inside its box
+    "min_contrast": 12.0,  # below (grey-level std): camera covered or in the dark
+    "min_sharpness": 10.0,  # below (Laplacian variance): lens covered (e.g. by a hand)
 }
 
 
@@ -153,6 +156,31 @@ def assess_person(person: Det, parts: list[Det], phones: list[Det], p: dict) -> 
     return out
 
 
+def scene_visible(image: np.ndarray, min_contrast: float, min_sharpness: float) -> bool:
+    """False when the camera sees nothing usable: lens covered by a hand, cap, darkness.
+
+    A covered lens gives a dark or uniform, blurry image: low contrast (grey-level standard
+    deviation) and almost no edges (variance of the Laplacian).
+    """
+    import cv2  # installed with ultralytics
+
+    grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    small = cv2.resize(grey, (160, max(1, 160 * grey.shape[0] // grey.shape[1])))
+    sharpness = cv2.Laplacian(small, cv2.CV_64F).var()
+    return float(small.std()) >= min_contrast and float(sharpness) >= min_sharpness
+
+
+def keep_real_persons(dets: list[Det]) -> list[Det]:
+    """Drop person boxes with no head or face inside: a hand on the lens, a coat, a reflection.
+
+    Somebody working at the station shows a head (or a face) to the front camera.
+    """
+    anchors = [d.center for d in dets if d.name in ("head", "face")]
+    return [
+        d for d in dets if d.name != "person" or any(contains(d.box, c) for c in anchors)
+    ]  # fmt: skip
+
+
 def idle_phones(dets: list[Det], phones: list[Det], p: dict) -> list[Det]:
     """Phones that touch no hand, gloved hand or head in the frame: not in use, lying around."""
     zones = [d.box for d in dets if d.name in PHONE_ZONE]
@@ -212,15 +240,22 @@ class YoloSafetyAnalyzer(Analyzer):
     def analyze(self, image: np.ndarray, meta: FrameMeta) -> AnalysisResult:
         class_conf = self.p["class_conf"]
         low = min([self.p["conf"], *class_conf.values(), self.p["privacy_conf"]])
-        raw = self._predict(self.model, image, low)
+        # Camera covered (hand on the lens) or in the dark: nobody can be seen, so no person,
+        # no PPE problem; the station screen then shows the part instead of the camera.
+        self.last_camera_blocked = not scene_visible(
+            image, self.p["min_contrast"], self.p["min_sharpness"]
+        )  # fmt: skip
+        raw = [] if self.last_camera_blocked else self._predict(self.model, image, low)
         dets = [d for d in raw if d.conf >= class_conf.get(d.name, self.p["conf"])]
+        if self.p["require_head"]:
+            dets = keep_real_persons(dets)
         # Privacy: faces must be hidden even when the model is unsure, so the boxes used
         # for hiding keep a much lower threshold than the business rules (one inference).
         self.last_privacy = [
             d for d in raw if d.name in PRIVACY_CLASSES and d.conf >= self.p["privacy_conf"]
         ]  # fmt: skip
         phones = []
-        if self.phone_model is not None:
+        if self.phone_model is not None and not self.last_camera_blocked:
             phones = self._predict(self.phone_model, image, self.p["phone_conf"], [self.phone_id])
 
         # Kept for overlays (e.g. a debug view drawing boxes) without a second inference.

@@ -142,3 +142,10 @@ def test_shoes_raise_an_issue_from_the_analyzer_states_without_contract_change()
         ("SECURITE_EPI", "Chaussures de sécurité non détectées")
     ]
     assert station_ppe(states, issues)["shoes"] == "absent"
+
+
+def test_clear_forgets_problems_at_once():
+    tracker = StationIssueTracker("P1", hold_s=5)
+    tracker.update(result(0.9, [person(gloves=A)]), T0)
+    tracker.clear()
+    assert tracker.update(result(0.1, []), T0 + timedelta(seconds=1)) == []
