@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { mlops, type DatasetFamilySummary } from '../../api/mlops';
-import { Badge, Loading, Stat, Unavailable } from './common';
+import { Badge, Loading, Unavailable } from './common';
 import { errText, useDatasetCatalog, useHealth, useStore } from './data';
 import DatasetFamilyDetail from './datasets/DatasetFamilyDetail';
 import './datasets/catalog.css';
+import { fr, Kpi, SearchField, SelectField } from './ui';
 
 const useCases = ['quality', 'workstation', 'safety'] as const;
-const useCaseName: Record<string, string> = { quality: 'Qualité', workstation: 'Poste', safety: 'Safety' };
+const SPLIT_SHORT: Record<string, string> = { train: 'train', validation: 'val', test: 'test' };
+const useCaseName: Record<string, string> = { quality: fr('quality'), workstation: fr('workstation'), safety: fr('safety') };
 
 export default function Datasets() {
   const catalog = useDatasetCatalog();
@@ -58,12 +60,12 @@ export default function Datasets() {
     {catalog.loading && <Loading what="Lecture du catalogue" />}
     {catalog.data && <>
       <div className="dataset-kpis">
-        <Stat label="Datasets enregistrés" value={families.length} />
-        <Stat label="Versions publiées" value={versionCount} />
-        <Stat label="Images" value={imageCount == null ? 'Indisponible' : imageCount.toLocaleString('fr-FR')} hint="Somme des dernières versions" />
-        <Stat label="Datasets liés aux modèles" value={families.filter((f) => f.linked_models.length > 0).length} />
-        <Stat label="Brouillons actifs" value={totalDrafts} tone={totalDrafts ? 'amber' : undefined} />
-        <Stat label="Dernière publication" value={latestDate(families)} />
+        <Kpi icon="db" label="Datasets enregistrés" value={families.length} />
+        <Kpi icon="layers" label="Versions publiées" value={versionCount} />
+        <Kpi icon="camera" label="Images" value={imageCount == null ? 'Indisponible' : imageCount.toLocaleString('fr-FR')} hint="Somme des dernières versions" />
+        <Kpi icon="grid" label="Datasets liés aux modèles" value={families.filter((f) => f.linked_models.length > 0).length} />
+        <Kpi icon="log" label="Brouillons actifs" value={totalDrafts} tone={totalDrafts ? 'amber' : undefined} />
+        <Kpi icon="check" label="Dernière publication" value={latestDate(families)} />
       </div>
       <div className={`dataset-layout${current ? '' : ' dataset-layout-full'}`}>
         <section className="card dataset-list col" style={{ gap: 14 }}>
@@ -73,26 +75,23 @@ export default function Datasets() {
           </div>
           {creating && <CreateFamily onCreated={(id) => { setCreating(false); store.invalidate('dataset-catalog'); select(id); }} onError={setError} />}
           <div className="row dataset-filters">
-            <input className="input" placeholder="Rechercher un dataset…" value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} />
-            <select className="input" aria-label="Cas d'usage" value={filter} onChange={(event) => { setFilter(event.target.value); setPage(0); }}>
-              <option value="">Tous les cas d’usage</option>{useCases.map((c) => <option key={c} value={c}>{useCaseName[c]}</option>)}
-            </select>
-            <select className="input" aria-label="Format d'annotation" value={format} onChange={(event) => { setFormat(event.target.value); setPage(0); }}>
-              <option value="">Tous les formats</option>{Array.from(new Set(families.map((f) => f.annotation_format))).map((f) => <option key={f}>{f}</option>)}
-            </select>
-            <select className="input" aria-label="Trier" value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}>
-              <option value="name">Nom</option><option value="date">Publication récente</option><option value="size">Nombre d’images</option>
-            </select>
+            <SearchField placeholder="Rechercher un dataset…" value={query} onChange={(v) => { setQuery(v); setPage(0); }} />
+            <SelectField label="Cas d’usage" allLabel="Tous les cas d’usage" value={filter} onChange={(v) => { setFilter(v); setPage(0); }}
+              options={useCases.map((c) => [c, useCaseName[c]])} />
+            <SelectField label="Format d’annotation" allLabel="Tous les formats" value={format} onChange={(v) => { setFormat(v); setPage(0); }}
+              options={Array.from(new Set(families.map((f) => f.annotation_format))).map((f) => [f, fr(f)])} />
+            <SelectField label="Trier" icon="sort" value={sort} onChange={(v) => setSort(v as typeof sort)}
+              options={[['name', 'Trier par nom'], ['date', 'Publication récente'], ['size', 'Nombre d’images']]} />
           </div>
           <span className="muted" style={{ fontSize: 13 }}>{filtered.length} résultat(s)</span>
           <div className="dataset-table-wrap"><table className="dataset-table"><thead><tr>
-            <th>Dataset</th><th>Cas d’usage</th><th>Dernière version</th><th>Versions</th><th>Images</th><th>Splits</th><th>Modèles liés</th><th>Publication</th><th>Action</th>
+            <th>Dataset</th><th>Cas d’usage</th><th>Dernière version</th><th className="opt">Versions</th><th>Images</th><th className="opt">Splits</th><th className="opt">Modèles liés</th><th className="opt">Publication</th><th className="opt">Action</th>
           </tr></thead><tbody>{visible.map((f) => <tr key={f.dataset_id} className={selected === f.dataset_id ? 'selected' : ''}
             onClick={() => select(f.dataset_id)} tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') select(f.dataset_id); }}>
             <td><b>{f.name}</b><small>{f.dataset_id}</small></td>
-            <td>{useCaseName[f.use_case] ?? f.use_case}</td><td>{f.latest_version ?? '—'}</td><td>{f.version_count}</td><td>{f.latest_images ?? '—'}</td>
-            <td>{f.latest_splits ? Object.entries(f.latest_splits).map(([k, v]) => `${k}: ${v}`).join(' / ') : '—'}</td>
-            <td>{f.linked_models.length ? f.linked_models.join(', ') : '—'}</td><td>{f.last_published_at ? new Date(f.last_published_at).toLocaleDateString('fr-FR') : '—'}</td><td><button className="btn btn-ghost" onClick={() => select(f.dataset_id)}>Ouvrir</button></td>
+            <td>{useCaseName[f.use_case] ?? fr(f.use_case)}</td><td>{f.latest_version ?? '—'}</td><td className="opt">{f.version_count}</td><td>{f.latest_images ?? '—'}</td>
+            <td className="opt">{f.latest_splits ? Object.entries(f.latest_splits).map(([k, v]) => `${SPLIT_SHORT[k] ?? k} ${v}`).join(' / ') : '—'}</td>
+            <td className="opt">{f.linked_models.length ? f.linked_models.join(', ') : '—'}</td><td className="opt">{f.last_published_at ? new Date(f.last_published_at).toLocaleDateString('fr-FR') : '—'}</td><td className="opt"><button className="btn btn-ghost" onClick={() => select(f.dataset_id)}>Ouvrir</button></td>
           </tr>)}</tbody></table></div>
           {!filtered.length && <Unavailable tone="grey">Aucun dataset pour ces critères.</Unavailable>}
           {filtered.length > 10 && <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>

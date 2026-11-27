@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SearchField, SelectField } from './ui';
 import { familyImageUrl, mlops, type DatasetItem, type Draft, type DraftChange } from '../../api/mlops';
 import { Badge, KV, Loading, Panel, Technical, Unavailable } from './common';
 import { errText, useFamilyItems, useStore } from './data';
@@ -45,21 +46,21 @@ export default function DatasetExplorer({ modelId, version, classes, draft }: { 
         <Select label="Split" value={filters.split} onChange={(v) => setFilter('split', v)} options={Object.keys(facets?.split ?? {}).map((s) => [s, `${SPLIT_FR[s] ?? s} (${facets?.split[s]})`])} />
         <Select label="Classe" value={filters.label} onChange={(v) => setFilter('label', v)} options={Object.keys(facets?.label ?? {}).map((s) => [s, `${s} (${facets?.label[s]})`])} />
         <Select label="Revue" value={filters.review} onChange={(v) => setFilter('review', v)} options={Object.keys(facets?.review ?? {}).map((s) => [s, `${REVIEW_FR[s] ?? s} (${facets?.review[s]})`])} />
-        <input className="input" placeholder="Nom de fichier…" value={filters.q} maxLength={100} onChange={(e) => setFilter('q', e.target.value)} style={{ height: 38, padding: '0 12px', borderRadius: 10, border: '1px solid var(--line-strong)', minWidth: 180 }} />
+        <div style={{ flex: "2 1 200px", minWidth: 0 }}><SearchField placeholder="Nom de fichier…" value={filters.q} onChange={(v) => setFilter('q', v)} /></div>
       </div>
       {error && <Unavailable tone="red">{error}</Unavailable>}
       {page.loading && <Loading what="Chargement des annotations" />}
       {page.error && <Unavailable tone="red">Annotations indisponibles : {page.error}</Unavailable>}
       {data && data.total === 0 && <Unavailable tone="grey">Aucun élément ne correspond aux filtres.</Unavailable>}
       {data && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
           {data.items.map((item) => {
             const change = draft?.changes[item.file];
             const active = selected?.file === item.file;
             return (
               <button key={item.file} onClick={() => setSelected(active ? null : item)} title={item.file}
                 style={{ padding: 6, borderRadius: 12, cursor: 'pointer', textAlign: 'left', background: active ? 'var(--surface-soft)' : '#fff', border: `2px solid ${change ? 'var(--amber)' : active ? 'var(--primary)' : 'var(--line)'}`, opacity: change?.action === 'exclude' ? 0.45 : 1 }}>
-                <img src={familyImageUrl(modelId, version, item.file)} alt={item.file} loading="lazy" decoding="async" width={104} height={104}
+                <img src={familyImageUrl(modelId, version, item.file)} alt={item.file} loading="lazy" decoding="async" width={150} height={150}
                   style={{ width: '100%', height: 'auto', aspectRatio: '1 / 1', objectFit: 'contain', imageRendering: 'pixelated', borderRadius: 8, background: 'var(--track)' }} />
                 <div className="row" style={{ gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
                   <Badge tone={item.label === 'NOK' ? 'red' : 'green'}>{change?.action === 'relabel' ? `${item.label}→${change.label}` : item.label}</Badge>
@@ -130,13 +131,5 @@ function ItemDetail({ modelId, version, item, classes, draft, onApply }: { model
 }
 
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
-  return (
-    <label className="row" style={{ gap: 6, alignItems: 'center', fontSize: 14 }}>
-      <span className="muted" style={{ fontWeight: 600 }}>{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} style={{ height: 38, borderRadius: 10, border: '1px solid var(--line-strong)', padding: '0 8px', background: '#fff' }}>
-        <option value="">Tous</option>
-        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-      </select>
-    </label>
-  );
+  return <div style={{ flex: '1 1 170px', minWidth: 0 }}><SelectField label={label} allLabel={`${label} : tous`} value={value} onChange={onChange} options={options} /></div>;
 }
