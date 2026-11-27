@@ -61,7 +61,20 @@ DEFAULT_MODELS = [
         dataset_root="/Volumes/workspace/argos_poc/images",
         dataset_name="quality-synthetic",
         dataset_tables=["workspace.argos_poc.annotations", "workspace.argos_poc.dataset_versions"],
-    )
+    ),
+    # DBX-05D-FIX: the Quality group's YOLO model (candidates only; not served, no dataset
+    # root: its datasets live in the independent catalogue).
+    ManagedModel(
+        id="quality-industrial",
+        display_name="Qualité 702 — YOLO26n-cls (groupe Quality)",
+        use_case="Qualité",
+        argos_use_case="quality",
+        scope="Candidats entraînés par Training Factory (données synthétiques pour l'instant)",
+        uc_name="workspace.argos_poc.quality_industrial",
+        endpoint=None,
+        training_job="hovis-quality-industrial-training",
+        synthetic=True,
+    ),
 ]
 
 

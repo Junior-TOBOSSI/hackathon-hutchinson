@@ -134,3 +134,25 @@ Tout se fait en serverless CPU, sans GPU, sans warehouse et sans endpoint.
 | Exécution de `quality-industrial` | Job run `540537827556689`, **ÉCHEC à l'installation des bibliothèques** (environ 227 s de calcul, 567 s au total) : `protobuf` 5.29.4 → 7.36.2, `numpy` 1.26.4 → 2.2.6, `pyarrow` 15.0.2 → 26.0.1, puis le noyau Python ne démarre pas. **Aucun entraînement, aucun run MLflow, aucune version.** Log : `ARGOS_MLOPS_LOCAL/training/logs/540537827556689.txt`. Pas de relance. |
 
 Correctif proposé, non appliqué : environnement épinglé sur les versions du cœur (voir `pipeline.yaml`). Il demande une nouvelle autorisation : mise à jour de l'environnement du job, puis une seule exécution. Le verrou `HOVIS_TRAINING_REMOTE` est refermé.
+
+## 9. DBX-05D-FIX — environnement Quality corrigé (27/11/2026)
+
+**Cause de l'échec 540537827556689** : dépendances non épinglées (`onnx`, `onnxruntime`, `mlflow`… et leurs dépendances transitives) qui ont remplacé des paquets du cœur de l'environnement serverless 3 (Python 3.12.3, Ubuntu 24.04) : protobuf, numpy, pyarrow.
+
+**Résolution** : `uv pip compile`, cible Linux aarch64 / CPython 3.12, avec contraintes sur les paquets préinstallés.
+- `pandas` 1.5.3 n'a pas de wheel pour Python 3.12 et n'est requis que par `mlflow` (`<4`) : non épinglé, il est conservé.
+- `opencv` 4.11.0.86 est la dernière série compatible avec numpy 1.x.
+- `torch` aarch64 sur PyPI est CPU uniquement ; le seul paquet « nvidia » est `nvidia-ml-py`, une simple interface Python.
+
+**Dépendances finales** : numpy==1.26.4, protobuf==5.29.4, pyarrow==15.0.2, grpcio==1.71.0, grpcio-status==1.71.0, scipy==1.13.1, pillow==10.3.0, matplotlib==3.8.4, torch==2.5.1, torchvision==0.20.1, ultralytics==8.4.219, opencv-python==4.11.0.86, onnx==1.17.0, onnxruntime==1.20.1, onnxslim==0.1.98, mlflow==3.18.0, pyyaml.
+
+**Job `315903472839295`** : configuration précédente sauvegardée (`runs/hovis/backups/` et `ARGOS_MLOPS_LOCAL/backups/`). Seul l'environnement a été modifié. Le job reste serverless, sans planification ni nouvelle tentative, et le kit du groupe est identique (16 fichiers vérifiés).
+
+**Exécution `741986436941977`** : **SUCCESS**, 201 s au total.
+- Durées des phases : contrôle d'environnement 3,8 s, matérialisation 9,9 s, entraînement 43,9 s, évaluation 6,1 s, export 6,1 s.
+- Contrôle d'environnement réussi : aarch64, 4 CPU, sans CUDA, versions du cœur conservées (y compris pandas 1.5.3 et databricks-sdk 0.49.0).
+- Run MLflow `f6fd2e72798f490a8296145efad77f2a`.
+- Entraînement : 17 époques sur 30 (arrêt anticipé), meilleure époque 8, seuil NOK 0,454 (choisi sur la validation).
+- Test (18 images, **synthétiques**) : rappel NOK 100 %, 0 faux rejet, 0 défaut manqué, latence 12,9 ms en moyenne et 22,7 ms au P95. Ce n'est pas une mesure industrielle.
+- **ONNX** : exporté, `onnx.checker` et ONNX Runtime réussis. Le rapport du groupe donne un écart maximal de probabilité de 1,48e-2 entre le `.pt` et l'`.onnx`, avec 0 verdict différent, et recommande de livrer le `.pt` tant que cet écart n'est pas compris. **Non validé pour l'Edge.**
+- **Candidat** : `workspace.argos_poc.quality_industrial` v1, sans alias ni approbation. Le modèle est exposé par `/api/mlops/models` et `/status`.
