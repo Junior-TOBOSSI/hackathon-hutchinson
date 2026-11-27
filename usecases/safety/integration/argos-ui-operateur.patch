@@ -542,7 +542,7 @@ index 89edae1..09c58d6 100644
        </main>
      </div>
 diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
-index 1642809..b320daf 100644
+index 1642809..ec95c83 100644
 --- a/argos-ui/src/pages/TeamLeader.tsx
 +++ b/argos-ui/src/pages/TeamLeader.tsx
 @@ -88,7 +88,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
@@ -565,12 +565,16 @@ index 1642809..b320daf 100644
          </div>
          <StationTable stations={cell.stations} alerts={alerts} />
        </div>
-@@ -119,128 +119,117 @@ const DOT: Record<StationStatus, string> = {
+@@ -119,128 +119,122 @@ const DOT: Record<StationStatus, string> = {
    OK: 'var(--green)', SECURITE: 'var(--red)', QUALITE: 'var(--red)', RYTHME: 'var(--amber)', CAMERA: 'var(--amber)', OBJET: 'var(--amber)',
  };
  
 -const PAGE_SIZE = 6;
--
++/** Fond très léger de la carte, selon l'état du poste (la pastille et le libellé restent l'info principale). */
++const TINT: Record<StationStatus, string> = {
++  OK: '#f3faf6', SECURITE: '#fdf2f4', QUALITE: '#fdf2f4', RYTHME: '#fef8ee', CAMERA: '#fef8ee', OBJET: '#fef8ee',
++};
+ 
  /**
 - * Tableau des postes : une ligne par poste, dans l'ordre physique de la cellule, 6 par page.
 + * Postes en cartes : une carte par poste, dans l'ordre physique de la cellule, avec 3 infos
@@ -710,7 +714,7 @@ index 1642809..b320daf 100644
 +              aria-expanded={isSel}
 +              aria-label={`Poste ${shortId(s.id)} : ${STATUS[s.status][0]}, ${deltaText(delta, true)}, ${s.ko} pièces NOK. Voir le détail`}
 +              className="col"
-+              style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px', borderRadius: 16, background: '#fff',
++              style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px', borderRadius: 16, background: TINT[s.status],
 +                border: isSel ? '2px solid var(--navy)' : hot ? '2px solid var(--red)' : '1px solid var(--line)' }}
 +            >
 +              <span className="cond" style={{ fontWeight: 700, fontSize: 26, lineHeight: 1 }}>{shortId(s.id)}</span>
