@@ -31,6 +31,12 @@ electrical_bench, machine_cell ; « :nok » = démarre avec un objet dans le pas
 NOK puis OK), sinon OK d'emblée. Les postes non cités gardent leur poste de travail.
     .\demo\start.ps1 -Stations 2 -Workstations press_cell:nok,electrical_bench
 
+-Videos : des fichiers vidéo à la place de la webcam, un par poste actif dans l'ordre
+(C3·P06, P01, ...), séparés par des virgules ; un vide = pas de vidéo pour ce poste. Chaque
+poste qui a une vidéo a sa propre analyse EPI (visages floutés), la vidéo tourne en boucle.
+Sans vidéo, C3·P06 garde la webcam (sauf -NoSafety).
+    .\demo\start.ps1 -Stations 2 -Videos dataaw\safetyideos\p06.mp4,dataaw\safetyideos\p01.mp4
+
 -Here : tous les serveurs dans CE terminal (journaux mêlés, chaque ligne préfixée par le
 serveur), au lieu d'une fenêtre par serveur. Ctrl+C arrête alors tout.
     .\demo\start.ps1 -Stations 2 -Mode auto -Here
@@ -44,7 +50,8 @@ param(
     [switch]$NoSafety,
     [switch]$NoAiLeader,
     [switch]$Here,
-    [string[]]$Workstations = @()
+    [string[]]$Workstations = @(),
+    [string[]]$Videos = @()
 )
 
 $repo = Split-Path -Parent $PSScriptRoot
@@ -66,6 +73,17 @@ foreach ($w in $Workstations) {
         Write-Error "Poste de travail inconnu : '$w' (possibles : $($sections -join ', '), suivi ou non de :ok / :nok)"
         exit 1
     }
+}
+
+# -Videos : chemins vérifiés et rendus absolus (le serveur du poste travaille à la racine)
+$Videos = @($Videos | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() })
+for ($i = 0; $i -lt $Videos.Count; $i++) {
+    if (-not $Videos[$i]) { continue }
+    if (-not (Test-Path -LiteralPath $Videos[$i] -PathType Leaf)) {
+        Write-Error "Vidéo introuvable : '$($Videos[$i])'"
+        exit 1
+    }
+    $Videos[$i] = (Resolve-Path -LiteralPath $Videos[$i]).Path
 }
 
 # Ports déjà pris (ancienne démo restée ouverte, autre serveur) : on arrête le processus
@@ -115,11 +133,14 @@ function Start-Server([string]$title, [string]$dir, [hashtable]$vars, [string]$e
 for ($k = 0; $k -lt $Stations; $k++) {
     $station = $order[$k]
     $port = 8001 + $k
-    $safety = if ($k -eq 0 -and -not $NoSafety) { "1" } else { "0" }  # la webcam = C3·P06
+    $video = if ($k -lt $Videos.Count) { $Videos[$k] } else { "" }
+    # Analyse EPI : la vidéo du poste s'il en a une, sinon la webcam pour C3·P06
+    $safety = if ($video -or ($k -eq 0 -and -not $NoSafety)) { "1" } else { "0" }
     Start-Server "poste $station ($port)" $repo @{
         STATION_ID = $station; PROFILE = "$k"; PORT = "$port"; SAFETY = $safety
         QUALITY_MODE = $qualityMode; PYTHONIOENCODING = "utf-8"
         WORKSTATION = $(if ($k -lt $Workstations.Count) { $Workstations[$k] } else { "" })
+        VIDEO = $video
     } $python @("-m", "uvicorn", "demo.station_server:app", "--port", "$port", "--host", "127.0.0.1")
 }
 

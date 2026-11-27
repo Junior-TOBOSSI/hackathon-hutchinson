@@ -27,7 +27,8 @@ Scenario of the station (``PROFILE`` = its rank among the active stations, 0-5):
    ``QUALITY_MODE`` manual (default): a NOK part WAITS for the operator, CONFIRMER or
    LAISSER PASSER (model error). auto: the operator is not asked, the NOK part is
    scrapped and the line goes on.
-3. SAFETY (``SAFETY=1``, the station EPI's webcam watches): EPI's live analysis.
+3. SAFETY (``SAFETY=1``): EPI's live analysis of the webcam, or of a VIDEO FILE
+   (``VIDEO=path``, read at its own speed and looped): faces hidden as with the webcam.
 
 Counters: the shift so far (EPI's simulation) frozen when the activity starts, plus the
 demo parts; the plan advances at the demo pace only while the line produces.
@@ -419,10 +420,33 @@ def _start() -> None:
     threading.Thread(target=loop, daemon=True).start()
     log.info("ready: workstation %s, check %s, NOK mode %s", TITLE, CHECK_PHOTOS, QUALITY_MODE)
     weights = REPO / epi.WEIGHTS
-    if os.environ.get("SAFETY", "0") == "1" and weights.exists():
+    video = os.environ.get("VIDEO", "")
+    if (video or os.environ.get("SAFETY", "0") == "1") and weights.exists():
+        if video:  # a video file instead of the webcam: EPI's loop opens it as its camera
+            epi.CAMERA, epi.reader = video, video_reader
         threading.Thread(target=epi.loop, daemon=True).start()
         safety["on"] = True
-        log.info("safety: EPI live webcam analysis on (%s)", weights.name)
+        source = f"video {Path(video).name}" if video else f"webcam {epi.CAMERA}"
+        log.info("safety: EPI live analysis of the %s (%s)", source, weights.name)
+
+
+def video_reader(cap) -> None:
+    """Replaces EPI's camera reader for a VIDEO FILE: frames at the video's own speed (a
+    file would otherwise be read as fast as possible), back to the start at the end."""
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    period = 1.0 / (fps if 1 <= fps <= 120 else 25.0)
+    if not cap.isOpened():
+        log.error("safety: cannot open the video %s", epi.CAMERA)
+        return
+    next_at = time.monotonic()
+    while True:
+        ok, frame = cap.read()
+        if not ok:  # end of the video: loop
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            continue
+        epi.latest["frame"] = frame
+        next_at += period
+        time.sleep(max(0.0, next_at - time.monotonic()))
 
 
 @app.post("/api/models/workstation/check")
@@ -500,7 +524,7 @@ def live(station_id: str) -> dict:
         },
         "hourly": p["hourly"],
         "issues": issues,
-        "frontSnapshotUrl": "/api/safety-demo/stream.mjpg" if camera else None,
+        "frontSnapshotUrl": f"/api/safety-demo/stream.mjpg?station={STATION}" if camera else None,
         "checks": {
             "securite": not any(i["category"] != "POSTE" for i in issues),
             "poste": not any(i["category"] == "POSTE" for i in issues),
@@ -605,7 +629,7 @@ def station_alerts() -> list:
         out.append(
             {
                 **base,
-                "id": i["id"],
+                "id": i["id"] if STATION in i["id"] else f"{STATION}:{i['id']}",
                 "category": "POSTE" if poste else "SECURITE_EPI",
                 "action": "NONE",
                 "priority": not poste,

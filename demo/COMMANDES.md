@@ -14,6 +14,7 @@ Détails : [README.md](README.md).
 | **deux postes en mode auto** | `.\demo\start.ps1 -Stations 2 -Mode auto` |
 | tous les serveurs **dans mon terminal** (pas de fenêtres ; Ctrl+C arrête tout) | `.\demo\start.ps1 -Stations 2 -Mode auto -Here` |
 | choisir le **poste de travail** vérifié par chaque poste | `.\demo\start.ps1 -Stations 2 -Workstations press_cell:nok,electrical_bench` |
+| des **vidéos** à la place de la webcam (une par poste, en boucle, analyse EPI) | `.\demo\start.ps1 -Stations 2 -Videos dataaw\safetyideos\p06.mp4,dataaw\safetyideos\p01.mp4` |
 | sans l'analyse webcam EPI (sécurité) | `.\demo\start.ps1 -NoSafety` |
 | sans le serveur AI leader (Databricks) | `.\demo\start.ps1 -NoAiLeader` |
 | si PowerShell refuse le script | `powershell -ExecutionPolicy Bypass -File demo\start.ps1 -Stations 2 -Mode auto` |

@@ -267,11 +267,11 @@ def _next_part(station: str, index: int) -> dict:
 
 
 @app.get("/api/safety-demo/stream.mjpg")
-async def stream() -> Response:
-    """EPI's webcam stream (faces hidden), from the station server that analyses it."""
-    if CAMERA_STATION not in PORTS:
+async def stream(station: str = CAMERA_STATION) -> Response:
+    """The camera stream of a station (webcam or video, faces hidden), from its server."""
+    if station not in PORTS:
         return Response(status_code=404)
-    req = client.build_request("GET", url(CAMERA_STATION, "/api/safety-demo/stream.mjpg"))
+    req = client.build_request("GET", url(station, "/api/safety-demo/stream.mjpg"))
     try:
         r = await httpx.AsyncClient(timeout=None).send(req, stream=True)
     except httpx.HTTPError:

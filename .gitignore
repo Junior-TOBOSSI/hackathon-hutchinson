@@ -64,3 +64,10 @@ hovis.local.env
 
 # Separate Python environment of the MLOps backend (mlflow, databricks-sdk)
 .venv-mlops/
+
+# Demo videos (camera stream replacements, may show people): never versioned
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
