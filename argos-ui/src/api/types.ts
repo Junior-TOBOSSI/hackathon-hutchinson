@@ -99,6 +99,8 @@ export interface StationLive {
   partCameraOnline: boolean;
   /** Absent = pas de vérification du poste (données de démonstration). */
   startup?: WorkstationStartup;
+  /** Démo : une vidéo remplace la webcam ; « LANCER LA VIDÉO » la joue une fois. */
+  video?: { available: boolean; playing: boolean } | null;
 }
 
 /* ------------------------------------------------------------------ */

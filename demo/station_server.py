@@ -28,7 +28,8 @@ Scenario of the station (``PROFILE`` = its rank among the active stations, 0-5):
    LAISSER PASSER (model error). auto: the operator is not asked, the NOK part is
    scrapped and the line goes on.
 3. SAFETY (``SAFETY=1``): EPI's live analysis of the webcam, or of a VIDEO FILE
-   (``VIDEO=path``, read at its own speed and looped): faces hidden as with the webcam.
+   (``VIDEO=path``): it plays ONCE when the operator presses « LANCER LA VIDÉO », at its
+   own speed; at its end the camera closes. Faces hidden as with the webcam.
 
 Counters: the shift so far (EPI's simulation) frozen when the activity starts, plus the
 demo parts; the plan advances at the demo pace only while the line produces.
@@ -93,6 +94,7 @@ DATA = REPO / "data"
 CHECK_PERIOD = float(os.environ.get("CHECK_PERIOD", "2.5"))
 QUALITY_PERIOD = float(os.environ.get("QUALITY_PERIOD", "3"))
 VALIDATED_HOLD = float(os.environ.get("VALIDATED_HOLD", "3"))
+VIDEO = os.environ.get("VIDEO", "")  # a video file instead of the webcam (Safety)
 CELL_URL = os.environ.get("CELL_URL", "http://127.0.0.1:8000")  # decides the KO parts
 # manual: a NOK part stops the line until the operator answers; auto: it does not.
 QUALITY_MODE = "auto" if os.environ.get("QUALITY_MODE", "manual").lower() == "auto" else "manual"
@@ -420,7 +422,7 @@ def _start() -> None:
     threading.Thread(target=loop, daemon=True).start()
     log.info("ready: workstation %s, check %s, NOK mode %s", TITLE, CHECK_PHOTOS, QUALITY_MODE)
     weights = REPO / epi.WEIGHTS
-    video = os.environ.get("VIDEO", "")
+    video = VIDEO
     if (video or os.environ.get("SAFETY", "0") == "1") and weights.exists():
         if video:  # a video file instead of the webcam: EPI's loop opens it as its camera
             epi.CAMERA, epi.reader = video, video_reader
@@ -430,23 +432,42 @@ def _start() -> None:
         log.info("safety: EPI live analysis of the %s (%s)", source, weights.name)
 
 
+video_play = threading.Event()  # « LANCER LA VIDÉO » on the operator screen
+video_state = {"playing": False}
+
+
 def video_reader(cap) -> None:
-    """Replaces EPI's camera reader for a VIDEO FILE: frames at the video's own speed (a
-    file would otherwise be read as fast as possible), back to the start at the end."""
+    """Replaces EPI's camera reader for a VIDEO FILE. The video waits for the operator's
+    « LANCER LA VIDÉO » button, then plays ONCE at its own speed (a file would otherwise be
+    read as fast as possible). At the end the camera goes quiet and its issues are cleared:
+    with no infraction left, the camera image closes on the operator screen."""
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     period = 1.0 / (fps if 1 <= fps <= 120 else 25.0)
     if not cap.isOpened():
         log.error("safety: cannot open the video %s", epi.CAMERA)
         return
-    next_at = time.monotonic()
     while True:
-        ok, frame = cap.read()
-        if not ok:  # end of the video: loop
-            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        video_play.wait()
+        video_play.clear()
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        video_state["playing"] = True
+        log.info("safety: video started")
+        next_at = time.monotonic()
+        while not video_play.is_set():  # pressed again: restart from the beginning
+            ok, frame = cap.read()
+            if not ok:
+                break
+            epi.latest["frame"] = frame
+            next_at += period
+            time.sleep(max(0.0, next_at - time.monotonic()))
+        if video_play.is_set():
             continue
-        epi.latest["frame"] = frame
-        next_at += period
-        time.sleep(max(0.0, next_at - time.monotonic()))
+        epi.latest["frame"] = None  # end of the video: nothing more to analyse
+        time.sleep(1.0)  # let the analysis of the last frame finish
+        with epi.lock:
+            epi.state["issues"] = []
+        video_state["playing"] = False
+        log.info("safety: video finished, camera closed")
 
 
 @app.post("/api/models/workstation/check")
@@ -533,6 +554,8 @@ def live(station_id: str) -> dict:
         },
         "qualityModelVersion": "qualite702 v1",
         "partCameraOnline": True,
+        # Video instead of the webcam: the operator screen shows « LANCER LA VIDÉO »
+        "video": {"available": bool(VIDEO), "playing": video_state["playing"]} if VIDEO else None,
     }
 
 
@@ -577,6 +600,14 @@ def release(station_id: str) -> Response:
 @app.post("/api/stations/{station_id}/parts/{number}/requalify", status_code=204)
 def requalify(station_id: str, number: int) -> Response:
     return release(station_id)
+
+
+@app.post("/api/stations/{station_id}/video/play", status_code=204)
+def play_video(station_id: str) -> Response:
+    """« LANCER LA VIDÉO »: the station's video plays once (from the start)."""
+    if VIDEO:
+        video_play.set()
+    return Response(status_code=204)
 
 
 @app.post("/api/scenario/restart", status_code=204)

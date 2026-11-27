@@ -52,6 +52,11 @@ export const api = {
     return http(`/stations/${encodeURIComponent(stationId)}/parts/confirm`, { method: 'POST' });
   },
   /** POST /api/stations/{id}/parts/release -> 204. KO contesté (erreur modèle) : la pièce passe, l'erreur est comptée. */
+  /** POST /api/stations/{id}/video/play -> 204. Démo : joue la vidéo du poste (à la place de la webcam). */
+  playVideo(stationId: string): Promise<void> {
+    if (USE_MOCK) return later(undefined);
+    return http(`/stations/${encodeURIComponent(stationId)}/video/play`, { method: 'POST' });
+  },
   releasePart(stationId: string): Promise<void> {
     if (USE_MOCK) return later(undefined);
     return http(`/stations/${encodeURIComponent(stationId)}/parts/release`, { method: 'POST' });

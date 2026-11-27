@@ -52,6 +52,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
   const confirm = async () => { await api.confirmPart(stationId); reload(); };
   const release = async () => { await api.releasePart(stationId); reload(); };
   const restartDemo = async () => { await api.restartScenario(stationId); reload(); };
+  const playVideo = async () => { await api.playVideo(stationId); reload(); };
 
   const report = async (category: ReportCategory) => {
     setChoosing(false);
@@ -125,6 +126,11 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
             <StatusTile ok icon={ICONS.check} okTitle={ko ? 'Qualité' : 'Qualité OK'} okSub={`Taux NOK ${live.checks.koRatePct.toLocaleString('fr-FR')} %`} koTitle="" koSub="" />
           </div>
 
+          {!consult && live.video?.available && (
+            <button onClick={playVideo} disabled={live.video.playing} className="cond" style={{ height: 64, border: 'none', borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, fontWeight: 700, fontSize: 26, letterSpacing: '0.06em', color: '#fff', background: live.video.playing ? 'var(--muted)' : 'var(--navy)' }}>
+              {live.video.playing ? 'VIDÉO EN COURS…' : '▶  LANCER LA VIDÉO'}
+            </button>
+          )}
           {!consult && (
             <button onClick={() => setChoosing(true)} className="cond btn-report" data-done={reported} style={{ height: 88, border: 'none', borderRadius: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18, fontWeight: 700, fontSize: 36, letterSpacing: '0.06em' }}>
               <Icon d={ICONS.flag} size={40} color="currentColor" stroke={2.4} />

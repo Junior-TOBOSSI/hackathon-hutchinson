@@ -212,6 +212,11 @@ async def requalify(station_id: str, number: int) -> Response:
     )
 
 
+@app.post("/api/stations/{station_id}/video/play", status_code=204)
+async def play_video(station_id: str) -> Response:
+    return await forward_post(station_id, f"/api/stations/{quote(station_id)}/video/play")
+
+
 @app.post("/api/scenario/restart", status_code=204)
 async def restart(station: str = "") -> Response:
     """The HOVIS logo of a station's screen: THAT station starts (again) its workstation
