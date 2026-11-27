@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Respon
 from pydantic import BaseModel
 
 from mlops.api.monitoring_routes import create_monitoring_router
+from mlops.api.overview_routes import create_overview_router
 from mlops.api.retraining_routes import create_retraining_router
 from mlops.api.training_routes import create_training_router
 from mlops.api.training_routes import service_for as training_service_for
@@ -668,6 +669,8 @@ def create_mlops_router(
     router.include_router(create_monitoring_router(get_connector))
     # DBX-08 retraining policies (single launch path: TrainingService.launch).
     router.include_router(create_retraining_router(get_connector))
+    # DBX-09 AI Leader home page (one aggregation service, independent blocks).
+    router.include_router(create_overview_router(get_connector))
 
     return router
 

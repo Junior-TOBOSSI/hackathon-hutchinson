@@ -7,12 +7,12 @@ import { useSearchParams } from 'react-router-dom';
 export type Section = 'overview' | 'datasets' | 'training' | 'registry' | 'deployment' | 'monitoring';
 
 export const SECTIONS: { id: Section; label: string; scoped: boolean }[] = [
-  { id: 'overview', label: "Vue d'ensemble", scoped: false },
-  { id: 'datasets', label: 'Datasets', scoped: false },
-  { id: 'training', label: 'Training Factory', scoped: false },
-  { id: 'registry', label: 'Model Registry', scoped: true },
-  { id: 'deployment', label: 'Deployment Center', scoped: false },
-  { id: 'monitoring', label: 'Monitoring', scoped: false }, // DBX-07C: no preselected model
+  { id: 'overview', label: 'Tableau de bord', scoped: false },
+  { id: 'datasets', label: 'Jeux de données', scoped: false },
+  { id: 'training', label: 'Entraînement', scoped: false },
+  { id: 'registry', label: 'Registre des modèles', scoped: true },
+  { id: 'deployment', label: 'Déploiement', scoped: false },
+  { id: 'monitoring', label: 'Surveillance', scoped: false }, // DBX-07C: no preselected model
 ];
 
 /** Section et modèle courants, portés par l'URL (?section=…&model=…). */

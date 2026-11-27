@@ -1,0 +1,14 @@
+/* Espace AI Leader : barre fine + menu latéral docké, léger (charte HOVIS). */
+.aw-bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 0 24px 0 14px; height: 56px; background: #fff; border-bottom: 1px solid var(--line); }
+.aw-burger { display: inline-flex; flex-direction: column; justify-content: center; gap: 4px; width: 38px; height: 38px; padding: 0 10px; border: 0; border-radius: 9px; background: none; cursor: pointer; }
+.aw-burger span { display: block; height: 2px; border-radius: 2px; background: var(--navy); }
+.aw-burger:hover, .aw-burger:focus-visible { background: var(--primary-soft); outline: none; }
+.aw-current { font-weight: 700; font-size: 17px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aw-body { display: flex; align-items: flex-start; }
+.aw-main { flex: 1 1 auto; min-width: 0; }
+.aw-side { position: sticky; top: 56px; flex: 0 0 216px; height: calc(100vh - 56px); box-sizing: border-box; display: flex; flex-direction: column; gap: 2px; padding: 14px 10px; background: #fff; border-right: 1px solid var(--line); overflow-y: auto; }
+.aw-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 0; border-left: 3px solid transparent; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.aw-item:hover, .aw-item:focus-visible { color: var(--ink); background: var(--surface-soft); outline: none; }
+.aw-item.active { color: var(--ink); background: var(--primary-soft); border-left-color: var(--red); }
+.aw-item.sub { padding: 6px 12px 6px 36px; font-size: 13px; font-weight: 500; }
+@media (max-width: 900px) { .aw-side { flex-basis: 180px; } }
