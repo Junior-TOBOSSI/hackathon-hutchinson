@@ -1,0 +1,146 @@
+{
+  "per_class": [
+    {
+      "class": "person",
+      "sh17_name": "person",
+      "instances": 13802,
+      "images": 7617,
+      "small_%": 14.1,
+      "medium_%": 11.0,
+      "large_%": 75.0,
+      "inside_a_person_%": "-"
+    },
+    {
+      "class": "helmet",
+      "sh17_name": "helmet",
+      "instances": 927,
+      "images": 466,
+      "small_%": 71.5,
+      "medium_%": 21.4,
+      "large_%": 7.1,
+      "inside_a_person_%": 91.7
+    },
+    {
+      "class": "vest",
+      "sh17_name": "safety-vest",
+      "instances": 530,
+      "images": 213,
+      "small_%": 60.9,
+      "medium_%": 20.6,
+      "large_%": 18.5,
+      "inside_a_person_%": 88.9
+    },
+    {
+      "class": "glasses",
+      "sh17_name": "glasses",
+      "instances": 1945,
+      "images": 1588,
+      "small_%": 70.4,
+      "medium_%": 26.7,
+      "large_%": 2.8,
+      "inside_a_person_%": 94.4
+    },
+    {
+      "class": "gloves",
+      "sh17_name": "gloves",
+      "instances": 2790,
+      "images": 1321,
+      "small_%": 63.9,
+      "medium_%": 25.7,
+      "large_%": 10.4,
+      "inside_a_person_%": 90.9
+    },
+    {
+      "class": "shoes",
+      "sh17_name": "shoes",
+      "instances": 4560,
+      "images": 1570,
+      "small_%": 87.7,
+      "medium_%": 11.4,
+      "large_%": 0.9,
+      "inside_a_person_%": 92.2
+    },
+    {
+      "class": "head",
+      "sh17_name": "head",
+      "instances": 11985,
+      "images": 6495,
+      "small_%": 36.5,
+      "medium_%": 41.6,
+      "large_%": 21.9,
+      "inside_a_person_%": 96.9
+    },
+    {
+      "class": "hands",
+      "sh17_name": "hands",
+      "instances": 15850,
+      "images": 6455,
+      "small_%": 61.8,
+      "medium_%": 30.7,
+      "large_%": 7.6,
+      "inside_a_person_%": 95.0
+    },
+    {
+      "class": "foot",
+      "sh17_name": "foot",
+      "instances": 759,
+      "images": 347,
+      "small_%": 91.4,
+      "medium_%": 8.0,
+      "large_%": 0.5,
+      "inside_a_person_%": 95.9
+    }
+  ],
+  "persons_per_image": {
+    "0": 482,
+    "1": 4825,
+    "2": 1525,
+    "3-5": 1055,
+    "6+": 212
+  },
+  "persons_total": 13802,
+  "persons_with_nothing_annotated": 526,
+  "splits": {
+    "train": {
+      "images": 6479,
+      "person": 11068,
+      "helmet": 773,
+      "vest": 433,
+      "glasses": 1547,
+      "gloves": 2261,
+      "shoes": 3604
+    },
+    "val": {
+      "images": 1620,
+      "person": 2734,
+      "helmet": 154,
+      "vest": 97,
+      "glasses": 398,
+      "gloves": 529,
+      "shoes": 956
+    }
+  },
+  "images_in_two_splits": [],
+  "images_in_no_split": [],
+  "duplicate_pairs_across_splits": [],
+  "width_px": {
+    "min": 1335,
+    "median": 4475,
+    "max": 8192
+  },
+  "counts": {
+    "corrupt": 0,
+    "missing_label": 0,
+    "empty_label": 0,
+    "orphan_labels": 0
+  },
+  "line_issues": {
+    "out_of_image_clipped": 2184
+  },
+  "duplicates": [],
+  "examples": {
+    "corrupt": [],
+    "missing_label": [],
+    "empty_label": []
+  }
+}

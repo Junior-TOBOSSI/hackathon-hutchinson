@@ -1,0 +1,12 @@
+path: /Users/elianaouedraogo/Desktop/S9/Hackathon/hackathon-hutchinson/data/processed/safety/sh17_hand
+train: train.txt
+val: val.txt
+names:
+  0: person
+  1: face
+  2: helmet
+  3: glasses
+  4: hand
+  5: shoes
+  6: head
+  7: foot
