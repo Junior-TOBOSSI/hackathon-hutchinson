@@ -57,10 +57,19 @@ index 6834017..b4ebf13 100644
      </AuthProvider>
    );
 diff --git a/argos-ui/src/api/client.ts b/argos-ui/src/api/client.ts
-index 5921591..d78ad0e 100644
+index 5921591..d080bb7 100644
 --- a/argos-ui/src/api/client.ts
 +++ b/argos-ui/src/api/client.ts
-@@ -47,6 +47,19 @@ export const api = {
+@@ -8,7 +8,7 @@
+ 
+ import * as M from './mock';
+ import type {
+-  AiOverview, Alert, AppUser, AuditEntry, CellOverview, Role, RoleDefinition, StationDetail, StationLive, User,
++  AiOverview, Alert, AppUser, AuditEntry, CellOverview, CellSafety, Role, RoleDefinition, StationDetail, StationLive, User,
+ } from './types';
+ 
+ export const USE_MOCK = (import.meta.env.VITE_USE_MOCK ?? 'true') !== 'false';
+@@ -47,7 +47,24 @@ export const api = {
      return http(`/stations/${encodeURIComponent(stationId)}/report`, { method: 'POST' });
    },
  
@@ -78,13 +87,45 @@ index 5921591..d78ad0e 100644
 +  },
 +
    /* ---------------- Team leader et écran TV de la cellule ---------------- */
++  /** GET /api/cells/{cellId}/safety -> CellSafety (onglet Sécurité, shift en cours) */
++  cellSafety(cellId: string): Promise<CellSafety> {
++    return USE_MOCK ? later(M.mockCellSafety) : http(`/cells/${encodeURIComponent(cellId)}/safety`);
++  },
    /** GET /api/cells/{cellId}/overview -> CellOverview (postes de la cellule, production heure par heure) */
    cellOverview(cellId: string): Promise<CellOverview> {
+     return USE_MOCK ? later(M.mockCell) : http(`/cells/${encodeURIComponent(cellId)}/overview`);
 diff --git a/argos-ui/src/api/mock.ts b/argos-ui/src/api/mock.ts
-index 73a3eb4..d21976e 100644
+index 73a3eb4..6733c6f 100644
 --- a/argos-ui/src/api/mock.ts
 +++ b/argos-ui/src/api/mock.ts
-@@ -82,7 +82,7 @@ export const mockAlerts: Alert[] = [
+@@ -1,12 +1,25 @@
+ // Données de démonstration, identiques aux maquettes.
+ // À supprimer quand le backend répond : client.ts bascule automatiquement (voir USE_MOCK).
+ import type {
+-  AiOverview, Alert, AppUser, AuditEntry, CellOverview, RoleDefinition, StationDetail,
++  AiOverview, Alert, AppUser, AuditEntry, CellOverview, CellSafety, RoleDefinition, StationDetail,
+   StationIssue, StationLive, StationSummary, User,
+ } from './types';
+ 
+ export type Scenario = 'ok' | 'ko' | 'epi' | 'multi';
+ 
++export const mockCellSafety: CellSafety = {
++  shift: { code: 'B', start: '13:00', end: '21:00' },
++  byPpe: [
++    { label: 'Casque absent', count: 1, avgSec: 40 }, { label: 'Lunettes absentes', count: 5, avgSec: 52 },
++    { label: 'Gants absents', count: 3, avgSec: 25 }, { label: 'Chaussures de sécurité non détectées', count: 0, avgSec: null },
++    { label: 'Téléphone en main', count: 2, avgSec: 18 }, { label: 'Téléphone sur le poste', count: 1, avgSec: 40 },
++  ],
++  byStation: ['P01', 'P02', 'P03', 'P04', 'P05', 'P06', 'P07', 'P08', 'P09', 'P10', 'P11', 'P12']
++    .map((p, i) => ({ stationId: `C3·${p}`, count: [0, 1, 0, 2, 1, 4, 0, 1, 2, 0, 1, 0][i], openNow: p === 'P06' ? 1 : 0 })),
++  openNow: 1,
++  avgBackToGreenSec: 38,
++};
++
+ export const mockUsers: Record<string, User> = {
+   'm.rojas@hutchinson.com': { id: 'u1', name: 'M. Rojas', role: 'OPERATEUR', stationId: 'C3·P06' },
+   'c.diaz@hutchinson.com': { id: 'u2', name: 'C. Díaz', role: 'TEAM_LEADER', cellId: 'C3' },
+@@ -82,7 +95,7 @@ export const mockAlerts: Alert[] = [
    { id: 'a1', cellId: 'C3', stationId: 'C3·P06', category: 'SECURITE_EPI', title: 'Lunettes absentes · main près de la presse', detail: 'EPI : lunettes de sécurité non portées (2 fois) · comportement : main dans la zone de la presse (1 fois)', shift: 'B', when: '16:38, 16:41 et 16:51', priority: true, action: 'NONE' },
    { id: 'a2', cellId: 'C3', stationId: 'C3·P05', category: 'SECURITE_EPI', title: 'Flaque d’huile près de la presse', detail: 'Signalé par l’opérateur avec le bouton Signaler', shift: 'B', when: '16:40', priority: true, action: 'MAINTENANCE', reportedByOperator: true },
    { id: 'a3', cellId: 'C3', stationId: 'C3·P09', category: 'POSTE', title: 'Téléphone posé sur le poste', detail: 'Poste de travail : objet étranger dans la zone de travail', shift: 'B', when: '16:37 · rangé après 40 s', priority: false, action: 'NONE' },
@@ -94,7 +135,7 @@ index 73a3eb4..d21976e 100644
    { id: 'a6', cellId: 'C3', stationId: 'C3·P04', category: 'EQUIPEMENT', title: 'Caméra pièce hors ligne', detail: 'Le poste tourne sans contrôle qualité automatique', shift: 'B', when: 'depuis 16:07', priority: false, action: 'MAINTENANCE' },
  ];
 diff --git a/argos-ui/src/api/types.ts b/argos-ui/src/api/types.ts
-index c1b98d8..d0fc825 100644
+index c1b98d8..6306baf 100644
 --- a/argos-ui/src/api/types.ts
 +++ b/argos-ui/src/api/types.ts
 @@ -36,6 +36,8 @@ export interface PartResult {
@@ -127,6 +168,22 @@ index c1b98d8..d0fc825 100644
  }
  
  /* ------------------------------------------------------------------ */
+@@ -230,3 +236,15 @@ export interface AuditEntry {
+   by: string;
+   action: string; // « a donné le rôle Team leader à … »
+ }
++
++/** GET /api/cells/{cellId}/safety : onglet Sécurité du team leader, sur le shift en cours. */
++export interface CellSafety {
++  shift: Shift;
++  /** Événements par EPI (casque, lunettes, gants, chaussures, téléphone) et durée moyenne avant le retour au vert. */
++  byPpe: { label: string; count: number; avgSec: number | null }[];
++  byStation: { stationId: string; count: number; openNow: number }[];
++  openNow: number;
++  avgBackToGreenSec: number | null;
++  /** true en démo : seul le poste filmé est réel, les autres sont simulés. */
++  simulatedStations?: boolean;
++}
 diff --git a/argos-ui/src/components/charts.tsx b/argos-ui/src/components/charts.tsx
 index cfed526..f70a5b2 100644
 --- a/argos-ui/src/components/charts.tsx
@@ -661,7 +718,7 @@ index 89edae1..09c58d6 100644
        </main>
      </div>
 diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
-index 1642809..caa51c4 100644
+index 1642809..9332c1d 100644
 --- a/argos-ui/src/pages/TeamLeader.tsx
 +++ b/argos-ui/src/pages/TeamLeader.tsx
 @@ -1,10 +1,10 @@
@@ -669,7 +726,8 @@ index 1642809..caa51c4 100644
 +import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
  import { Link, useNavigate } from 'react-router-dom';
  import { api, USE_MOCK } from '../api/client';
- import type { Alert, AlertCategory, CellOverview, StationStatus, StationSummary } from '../api/types';
+-import type { Alert, AlertCategory, CellOverview, StationStatus, StationSummary } from '../api/types';
++import type { Alert, AlertCategory, CellOverview, CellSafety, StationStatus, StationSummary } from '../api/types';
  import { useAuth } from '../auth';
  import { CumulativeChart, type Category } from '../components/charts';
 -import { Clock, CountBadge, deltaText, fmt, Icon, ICONS, Kpi, Loading, TopBar } from '../components/ui';
@@ -677,6 +735,15 @@ index 1642809..caa51c4 100644
  import { useApi } from '../hooks/useApi';
  
  /**
+@@ -12,7 +12,7 @@ import { useApi } from '../hooks/useApi';
+  * L'interface ne montre rien au-dessus de la cellule (ni les autres cellules, ni l'UAP).
+  * Depuis un poste ou une alerte, il ouvre l'écran du poste (consultation) ou son historique.
+  */
+-type Tab = 'stations' | 'alerts';
++type Tab = 'stations' | 'alerts' | 'safety';
+ 
+ export const CATEGORIES: (Category & { key: AlertCategory })[] = [
+   { key: 'SECURITE_EPI', name: 'Sécurité et EPI', color: 'var(--cat-securite)' },
 @@ -23,7 +23,7 @@ export const CATEGORIES: (Category & { key: AlertCategory })[] = [
  ];
  
@@ -686,8 +753,11 @@ index 1642809..caa51c4 100644
    RYTHME: ['Rythme', 'pill-amber'], CAMERA: ['Caméra hors ligne', 'pill-amber'], OBJET: ['Objet étranger', 'pill-amber'],
  };
  
-@@ -51,7 +51,7 @@ export default function TeamLeader() {
+@@ -49,9 +49,10 @@ export default function TeamLeader() {
+   const tabs: { key: Tab; label: string; icon: string; badge?: number; hot?: boolean }[] = [
+     { key: 'stations', label: 'Postes', icon: ICONS.overview, badge: watched },
      { key: 'alerts', label: 'Alertes', icon: ICONS.warn, badge: alerts.length, hot: alerts.some((a) => a.priority) },
++    { key: 'safety', label: 'Sécurité', icon: ICONS.shield },
    ];
    const removeAlert = (id: string) => setAlerts(alerts.filter((a) => a.id !== id));
 -  const acknowledge = (id: string) => api.acknowledgeAlert(id).then(() => setAlerts(alerts.map((a) => (a.id === id ? { ...a, acknowledgedBy: user?.name ?? 'Team leader' } : a))));
@@ -695,7 +765,15 @@ index 1642809..caa51c4 100644
  
    return (
      <div className="screen">
-@@ -88,7 +88,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
+@@ -69,6 +70,7 @@ export default function TeamLeader() {
+       <main className="col page-sup" style={{ padding: '20px 24px', gap: 16, flex: 1 }}>
+         {tab === 'stations' && <Stations cell={cell} alerts={alerts} openAlerts={() => setTab('alerts')} />}
+         {tab === 'alerts' && <Alerts cell={cell} alerts={alerts} onDone={removeAlert} onAcknowledge={acknowledge} />}
++        {tab === 'safety' && <SafetyTab cellId={cellId} />}
+       </main>
+     </div>
+   );
+@@ -88,7 +90,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
        <div className="grid-5">
          <Kpi label="Pièces bonnes · shift" value={fmt(good)} sub={`sur ${fmt(target)} · ${Math.round((good / target) * 100)} % de l’objectif`} />
          <Kpi label="Rythme de la cellule" value={deltaText(good - expected, true)} valueStyle={{ fontSize: 30, color: good >= expected ? 'var(--green-text)' : 'var(--red-text)' }} sub={`${fmt(expected)} pièces attendues à cette heure`} />
@@ -704,7 +782,7 @@ index 1642809..caa51c4 100644
          <button onClick={openAlerts} style={{ all: 'unset', cursor: 'pointer', display: 'grid' }}>
            <Kpi label="Alertes ouvertes" value={alerts.length} sub={`${alerts.filter((a) => a.priority).length} prioritaires · voir les alertes`} valueStyle={{ color: 'var(--red)' }} />
          </button>
-@@ -97,8 +97,8 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
+@@ -97,8 +99,8 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
  
        <div className="card col" style={{ gap: 8 }}>
          <div className="between">
@@ -715,7 +793,7 @@ index 1642809..caa51c4 100644
          </div>
          <StationTable stations={cell.stations} alerts={alerts} />
        </div>
-@@ -119,128 +119,150 @@ const DOT: Record<StationStatus, string> = {
+@@ -119,128 +121,150 @@ const DOT: Record<StationStatus, string> = {
    OK: 'var(--green)', SECURITE: 'var(--red)', QUALITE: 'var(--red)', RYTHME: 'var(--amber)', CAMERA: 'var(--amber)', OBJET: 'var(--amber)',
  };
  
@@ -902,7 +980,7 @@ index 1642809..caa51c4 100644
      </div>
 +  );
 +}
-+
+ 
 +/** Une ligne de carte : libellé à gauche, valeur à droite (verte si OK, rouge sinon). */
 +function CardLine({ label, value, tone }: { label: string; value: ReactNode; tone?: 'ok' | 'bad' }) {
 +  return (
@@ -912,7 +990,7 @@ index 1642809..caa51c4 100644
 +    </span>
 +  );
 +}
- 
++
 +/** Détail d'un poste, ouvert d'un clic sur sa carte. */
 +function StationDetailPanel({ s, alerts, onClose, onScreen }: { s: StationSummary; alerts: Alert[]; onClose: () => void; onScreen: () => void }) {
 +  const delta = s.good - s.expectedNow;
@@ -958,16 +1036,75 @@ index 1642809..caa51c4 100644
        </div>
      </div>
    );
-@@ -255,6 +277,8 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
+@@ -254,7 +278,67 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
+   );
  }
  
++/* ---------------- Sécurité de la cellule : EPI et téléphone, sur le shift en cours ---------------- */
++const duration = (sec: number | null) => (sec == null ? '–' : sec < 60 ? `${sec} s` : `${Math.floor(sec / 60)} min ${String(sec % 60).padStart(2, '0')}`);
++
++/** Indicateurs de sécurité de la cellule : par EPI et par poste, jamais par personne. */
++function SafetyTab({ cellId }: { cellId: string }) {
++  const nav = useNavigate();
++  const { data } = useApi<CellSafety>(() => api.cellSafety(cellId), [cellId], 15000);
++  if (!data) return <Loading />;
++  const total = data.byStation.reduce((s, st) => s + st.count, 0);
++  const touched = data.byStation.filter((st) => st.count > 0).length;
++  const maxPpe = Math.max(1, ...data.byPpe.map((p) => p.count));
++  const stations = [...data.byStation].sort((a, b) => b.count - a.count || a.stationId.localeCompare(b.stationId));
++  const maxSt = Math.max(1, ...stations.map((s) => s.count));
++  const bar = (n: number, max: number, color: string) => (
++    <div className="track grow" style={{ height: 10 }}><div className="fill" style={{ width: `${(n / max) * 100}%`, background: color }} /></div>
++  );
++  return (
++    <>
++      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
++        <Kpi label="Événements sécurité · shift" value={<CountUp value={total} />} sub="EPI manquants et téléphone" valueStyle={{ color: total ? 'var(--red-text)' : 'var(--green-text)' }} />
++        <Kpi label="Postes concernés" value={`${touched} / ${data.byStation.length}`} sub="au moins un événement sur le shift" />
++        <Kpi label="En cours" value={data.openNow} sub={data.openNow ? 'alertes sécurité ouvertes maintenant' : 'aucune alerte ouverte'} valueStyle={{ color: data.openNow ? 'var(--red)' : 'var(--green-text)' }} />
++        <Kpi label="Retour au vert" value={duration(data.avgBackToGreenSec)} sub="temps moyen entre l’alerte et la correction" />
++      </div>
++
++      <div className="grid-2">
++        <div className="card col" style={{ gap: 6 }}>
++          <div className="between"><h2 className="h2">Par EPI</h2><span className="muted" style={{ fontSize: 13 }}>nombre · temps moyen avant correction</span></div>
++          {data.byPpe.map((p) => (
++            <div key={p.label} className="row" style={{ gap: 14, padding: '8px 0', borderBottom: '1px solid var(--line-soft)' }}>
++              <span style={{ width: 250, fontWeight: 600 }}>{p.label}</span>
++              {bar(p.count, maxPpe, 'var(--red-light)')}
++              <b style={{ width: 28, textAlign: 'right', color: p.count ? 'var(--red-text)' : 'var(--green-text)' }}>{p.count}</b>
++              <span className="muted" style={{ width: 70, textAlign: 'right', fontSize: 14 }}>{duration(p.avgSec)}</span>
++            </div>
++          ))}
++        </div>
++
++        <div className="card col" style={{ gap: 6 }}>
++          <div className="between"><h2 className="h2">Par poste</h2><span className="muted" style={{ fontSize: 13 }}>cliquez pour voir l’historique du poste</span></div>
++          {stations.map((s) => (
++            <button key={s.stationId} onClick={() => nav(stationHistoryUrl(s.stationId))} className="row"
++              style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, padding: '7px 0', borderBottom: '1px solid var(--line-soft)' }}>
++              <span className="cond" style={{ width: 50, fontWeight: 700, fontSize: 18 }}>{shortId(s.stationId)}</span>
++              {bar(s.count, maxSt, s.openNow ? 'var(--red)' : 'var(--red-light)')}
++              <b style={{ width: 28, textAlign: 'right' }}>{s.count}</b>
++              <span style={{ width: 90, textAlign: 'right', fontSize: 13, fontWeight: 600, color: s.openNow ? 'var(--red-text)' : 'var(--muted)' }}>{s.openNow ? `${s.openNow} en cours` : ''}</span>
++            </button>
++          ))}
++        </div>
++      </div>
++      <span className="muted" style={{ fontSize: 13 }}>
++        Indicateurs par poste, jamais par personne · shift {data.shift.code} ({data.shift.start} – {data.shift.end}){data.simulatedStations ? ' · démo : P06 réel, autres postes simulés' : ''}
++      </span>
++    </>
++  );
++}
++
  /* ---------------- Alertes de la cellule : texte seul ---------------- */
 +const ackTime = (iso?: string) => (iso ? ` · ${new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : '');
 +
  function Alerts({ cell, alerts, onDone, onAcknowledge }: { cell: CellOverview; alerts: Alert[]; onDone: (id: string) => void; onAcknowledge: (id: string) => void }) {
    const [cat, setCat] = useState<AlertCategory | 'ALL'>('ALL');
    const list = useMemo(() => [...alerts].filter((a) => cat === 'ALL' || a.category === cat).sort((a, b) => Number(b.priority) - Number(a.priority)), [alerts, cat]);
-@@ -285,7 +309,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
+@@ -285,7 +369,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
        <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
          <span className="cond" style={{ fontWeight: 700, fontSize: 26 }}>{a.stationId}</span>
          <span className={`pill ${a.category === 'SECURITE_EPI' ? 'pill-red' : 'pill-blue'}`}>{cat.name}</span>
@@ -976,7 +1113,7 @@ index 1642809..caa51c4 100644
          <span style={{ flex: 1 }} />
          <span className="muted" style={{ fontSize: 13 }}>{a.reportedByOperator ? 'signalé par l’opérateur' : ''}</span>
        </div>
-@@ -294,7 +318,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
+@@ -294,7 +378,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
        <span style={{ fontSize: 14, fontWeight: 600 }}>Shift {a.shift} · {a.when}</span>
        {a.action === 'NONE' && <span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>Pour information : aucune validation demandée</span>}
        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
