@@ -9,8 +9,8 @@
 | `usecases/safety/yolo_analyzer.py` | Analyseur réel `YoloSafetyAnalyzer` (interface `Analyzer`, contrat `SafetyDetails` respecté) |
 | `usecases/safety/hovis.py` | Traduction d'un résultat Safety en problèmes HOVIS (`StationIssue` d'argos-ui) |
 | `usecases/safety/config.yaml` | Réglages (modèles, EPI obligatoires, seuils, lissage). Le faux analyseur reste par défaut |
-| `usecases/safety/tests/test_yolo_logic.py` | 18 tests des règles métier, sans modèle |
-| `usecases/safety/tests/test_hovis.py` | 16 tests de la traduction vers HOVIS |
+| `usecases/safety/tests/test_yolo_logic.py` | 21 tests des règles métier, sans modèle |
+| `usecases/safety/tests/test_hovis.py` | 17 tests de la traduction vers HOVIS |
 | `usecases/safety/notebooks/` | Préparation des données, entraînement, évaluation, aperçu webcam (outils, hors plateforme) |
 | `usecases/safety/notebooks/hovis_demo.py` | Démo locale : webcam + vrai modèle -> écran opérateur argos-ui (flux vidéo floutée, production simulée) |
 | `usecases/safety/AGENTS.md` | Décisions prises et questions ouvertes |
@@ -89,6 +89,21 @@ station_live["checks"].update(station_checks(station_live["issues"]))
 **Délai d'affichage et anti-spam** : l'analyse prend ~0,1 s par image et le lissage ~0,5 s (à 4 images/s). argos-ui interroge le serveur toutes les **2 s**, volontairement, pour ne pas faire clignoter les alertes : on garde ce réglage. L'image caméra peut être un flux MJPEG (adresse fixe dans `frontSnapshotUrl`), fluide quel que soit ce rafraîchissement. Délai total d'une alerte : 1 à 3 s.
 
 **Image affichée (si HOVIS montre la caméra)** : pixelliser les visages **avant** tout encodage, avec `analyzer.last_privacy` (visages, têtes, personnes dès 0,10 de confiance) et non `last_detections` (0,25, réservé aux règles). Aucune image ne doit être enregistrée.
+
+## 4 bis. Écran opérateur (argos-ui) : patch proposé
+
+`usecases/safety/integration/argos-ui-operateur.patch` contient les modifications de l'écran opérateur testées en démo. Il s'applique sur la branche `interface` : `git apply usecases/safety/integration/argos-ui-operateur.patch`. À relire et valider par l'équipe interface avant de l'appliquer.
+
+| Changement | Fichiers |
+|---|---|
+| Jauge du shift : une seule barre (verte dans les temps, rouge en retard), heures en dessous, sans trait ni légende | `components/charts.tsx` |
+| Revérification d'une pièce KO : bouton « Revérifier la pièce », confirmation, pièce requalifiée OK et tracée (`POST /stations/{id}/parts/{n}/requalify`) | `pages/Operateur.tsx`, `api/client.ts`, `api/types.ts` (`PartResult.requalified`) |
+| État des EPI du poste, champ facultatif `safetyPpe` (casque, lunettes, gants, chaussures) | `api/types.ts`, `api/mock.ts` |
+| Démo locale seulement : bouton « simuler une pièce NOK », visible quand le modèle qualité est « simulé » | `pages/Operateur.tsx`, `api/client.ts` |
+
+Côté serveur, la démo `notebooks/hovis_demo.py` fournit ces routes. Une photo de pièce NOK peut être placée dans `argos-ui/public/img/piece-nok.jpg` pour la démo : **image industrielle, à ne jamais versionner**.
+
+**Caméra masquée** : une main sur l'objectif (image sombre, uniforme, floue) signifie « personne au poste » ; les alertes Safety s'effacent et l'écran montre la pièce. Recommandation pour la production : alerter le team leader si la caméra reste masquée plus de 10 à 20 s.
 
 ## 5. Logique de décision (résumé)
 
