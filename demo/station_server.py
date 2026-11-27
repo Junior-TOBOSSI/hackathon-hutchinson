@@ -13,7 +13,7 @@ and the station's screen (``/api/stations/{id}/live``, CONFIRMER, LAISSER PASSER
 ``/api/station/summary`` and ``/api/station/alerts`` read by the cell server.
 
 Scenario of the station (``PROFILE`` = its rank among the active stations, 0-5):
-0. IDLE until POST /api/scenario/restart (the HOVIS logo of THIS station's screen,
+0. IDLE until POST /api/scenario/restart (the ARGOS logo of THIS station's screen,
    through the cell server): each station is started by hand, on its own.
 1. WORKSTATION CHECK, done ONCE, one photo every ``CHECK_PERIOD`` s (2.5), each photo sent
    to the workstation model: profiles 0-1 (Machine cell variant) anomaly_04 -> KO, the

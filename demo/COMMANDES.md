@@ -52,7 +52,7 @@ Un nom par poste actif, dans l'ordre C3·P06, C3·P01, C3·P02, C3·P03, C3·P04
 |---|---|
 | me connecter en opérateur (poste C3·P06) | n'importe quel identifiant |
 | me connecter en superviseur | `c.diaz@hutchinson.com` |
-| lancer / relancer **le poste affiché** | clic sur le **logo HOVIS** (en haut à gauche, invisible) |
+| lancer / relancer **le poste affiché** | clic sur le **logo ARGOS** (en haut à gauche, invisible) |
 | passer à la vue superviseur (team leader) et revenir | **Ctrl+M** |
 | passer à l'écran opérateur du poste suivant | **Ctrl+P** |
 | ouvrir l'espace AI leader (cycle de vie des modèles) et revenir | **Ctrl+O** |

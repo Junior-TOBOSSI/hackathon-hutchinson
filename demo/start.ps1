@@ -193,7 +193,7 @@ Write-Host "Postes actifs : $($order[0..($Stations - 1)] -join ', ') ; les autre
 Write-Host "Mode NOK : $Mode$(if ($Mode -eq 'auto') { ' (la ligne continue, opérateur non sollicité)' } else { " (une pièce NOK attend CONFIRMER / LAISSER PASSER)" })"
 Write-Host "Démarrage... le navigateur s'ouvre dans quelques secondes (modèles prêts en ~20 s)."
 Write-Host "Connexion : n'importe quel identifiant = opérateur ; c.diaz@hutchinson.com = superviseur."
-Write-Host "Clic sur le logo HOVIS = lancer / relancer le poste affiché (chaque poste se lance à la main) ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant ; Ctrl+O = espace AI leader."
+Write-Host "Clic sur le logo ARGOS = lancer / relancer le poste affiché (chaque poste se lance à la main) ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant ; Ctrl+O = espace AI leader."
 Start-Sleep -Seconds 8
 Start-Process "http://localhost:5173"
 

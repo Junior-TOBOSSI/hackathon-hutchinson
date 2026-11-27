@@ -42,7 +42,7 @@ export function TopBar({ title, sub, right, onLogoClick }: { title: ReactNode; s
   return (
     <header className="topbar">
       {onLogoClick
-        ? <button onClick={onLogoClick} aria-label="HOVIS" style={{ background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'default', display: 'flex', alignItems: 'center' }}><HovisLogo size={36} tone="light" /></button>
+        ? <button onClick={onLogoClick} aria-label="ARGOS" style={{ background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'default', display: 'flex', alignItems: 'center' }}><HovisLogo size={36} tone="light" /></button>
         : <HovisLogo size={36} tone="light" />}
       <span className="sep hide-mobile" />
       <span className="topbar-heading">

@@ -219,7 +219,7 @@ async def play_video(station_id: str) -> Response:
 
 @app.post("/api/scenario/restart", status_code=204)
 async def restart(station: str = "") -> Response:
-    """The HOVIS logo of a station's screen: THAT station starts (again) its workstation
+    """The ARGOS logo of a station's screen: THAT station starts (again) its workstation
     check; the others wait for their own logo. Without ``station``: every active station
     (and the cell's alerts and part count start afresh)."""
     targets = [station] if station else list(PORTS)

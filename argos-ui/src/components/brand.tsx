@@ -44,24 +44,25 @@ export function HovisMark({ size = 40, color = 'var(--navy)', title }: { size?: 
 }
 
 /**
- * Logo complet : symbole | HOVIS, avec la signature en option.
- * `tone="light"` pour un fond marine, `tone="dark"` pour un fond blanc.
+ * Logo ARGOS (image fournie par l'équipe, détourée sur fond transparent) :
+ * `tone="light"` pour un fond marine (lettres blanches), `tone="dark"` pour un fond blanc.
+ * `size` : hauteur de référence (comme l'ancien logo) ; la signature est en option.
+ * Le nom `HovisLogo` est gardé pour les écrans qui l'importent.
  */
-export function HovisLogo({ size = 40, tone = 'light', tagline = false }: { size?: number; tone?: 'light' | 'dark'; tagline?: boolean }) {
-  const ink = tone === 'light' ? '#fff' : 'var(--navy)';
+export function ArgosLogo({ size = 40, tone = 'light', tagline = false }: { size?: number; tone?: 'light' | 'dark'; tagline?: boolean }) {
   const soft = tone === 'light' ? 'var(--on-navy-muted)' : 'var(--muted)';
+  const height = Math.round(size * 0.8);
   return (
-    <span role="img" aria-label="HOVIS" style={{ display: 'inline-flex', alignItems: 'center', gap: size * 0.45 }}>
-      <HovisMark size={size} color={ink} />
-      <span aria-hidden="true" style={{ width: 1, alignSelf: 'stretch', background: soft, opacity: 0.4 }} />
-      <span aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: size * 0.12 }}>
-        <span style={{ color: ink, fontWeight: 400, fontSize: size * 0.62, lineHeight: 1, letterSpacing: '0.32em' }}>HOVIS</span>
-        {tagline && (
-          <span style={{ color: soft, fontWeight: 400, fontSize: Math.max(10, size * 0.14), letterSpacing: '0.28em', whiteSpace: 'nowrap' }}>
-            SMARTER VISION. SAFER INDUSTRY.
-          </span>
-        )}
-      </span>
+    <span role="img" aria-label="ARGOS" style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: size * 0.14 }}>
+      <img src={tone === 'light' ? '/img/argos-logo-light.png' : '/img/argos-logo-dark.png'} alt="" aria-hidden="true"
+        style={{ height, width: 'auto', display: 'block' }} />
+      {tagline && (
+        <span aria-hidden="true" style={{ color: soft, fontWeight: 400, fontSize: Math.max(10, size * 0.14), letterSpacing: '0.28em', whiteSpace: 'nowrap' }}>
+          SMARTER VISION. SAFER INDUSTRY.
+        </span>
+      )}
     </span>
   );
 }
+
+export const HovisLogo = ArgosLogo;
