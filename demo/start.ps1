@@ -6,6 +6,7 @@ chacun dans sa fenêtre, puis ouvre le navigateur.
     .\demo\start.ps1                # 1 poste actif (C3·P06), les 5 autres sans activité
     .\demo\start.ps1 -Stations 3    # 3 postes actifs : C3·P06, C3·P01, C3·P02
     .\demo\start.ps1 -Stations 6 -NoSafety   # sans l'analyse webcam EPI
+    .\demo\start.ps1 -Stations 3 -Mode auto  # NOK sans arrêt de la ligne (défaut : -Mode manuel)
 
 Postes activés dans cet ordre : C3·P06, P01, P02, P03, P04, P05.
 - P06 et P01 : Machine cell variant, vérification du poste KO, KO, puis OK ;
@@ -29,6 +30,7 @@ Si un port (8000 à 8006, 8040, 5173) est déjà pris, le processus qui l'occupe
 #>
 param(
     [ValidateRange(1, 6)][int]$Stations = 1,
+    [ValidateSet("manuel", "auto")][string]$Mode = "manuel",
     [switch]$NoSafety,
     [switch]$NoAiLeader
 )
@@ -64,6 +66,10 @@ foreach ($port in @(8000..8006) + 8040 + 5173) {
     }
 }
 
+# Mode NOK : manuel = une pièce NOK arrête la ligne jusqu'à la réponse de l'opérateur
+# (CONFIRMER / LAISSER PASSER) ; auto = l'opérateur n'est pas sollicité, la ligne continue.
+$qualityMode = if ($Mode -eq "auto") { "auto" } else { "manual" }
+
 # 1. Un serveur par poste actif (chacun charge ses modèles : environ 20 s)
 for ($k = 0; $k -lt $Stations; $k++) {
     $station = $order[$k]
@@ -71,7 +77,7 @@ for ($k = 0; $k -lt $Stations; $k++) {
     $safety = if ($k -eq 0 -and -not $NoSafety) { "1" } else { "0" }  # la webcam = C3·P06
     Start-Process powershell -WorkingDirectory $repo -ArgumentList @(
         "-NoExit", "-Command",
-        "`$Host.UI.RawUI.WindowTitle = 'HOVIS - poste $station ($port)'; `$env:STATION_ID = '$station'; `$env:PROFILE = '$k'; `$env:PORT = '$port'; `$env:SAFETY = '$safety'; & '$python' -m uvicorn demo.station_server:app --port $port --host 127.0.0.1"
+        "`$Host.UI.RawUI.WindowTitle = 'HOVIS - poste $station ($port)'; `$env:STATION_ID = '$station'; `$env:PROFILE = '$k'; `$env:PORT = '$port'; `$env:SAFETY = '$safety'; `$env:QUALITY_MODE = '$qualityMode'; & '$python' -m uvicorn demo.station_server:app --port $port --host 127.0.0.1"
     )
 }
 
@@ -105,6 +111,7 @@ Start-Process powershell -WorkingDirectory $ui -ArgumentList @(
 )
 
 Write-Host "Postes actifs : $($order[0..($Stations - 1)] -join ', ') ; les autres : pas d'activité."
+Write-Host "Mode NOK : $Mode$(if ($Mode -eq 'auto') { ' (la ligne continue, opérateur non sollicité)' } else { " (une pièce NOK attend CONFIRMER / LAISSER PASSER)" })"
 Write-Host "Démarrage... le navigateur s'ouvre dans quelques secondes (modèles prêts en ~20 s)."
 Write-Host "Connexion : n'importe quel identifiant = opérateur ; c.diaz@hutchinson.com = superviseur."
 Write-Host "Clic sur le logo HOVIS = lancer / relancer le poste affiché (chaque poste se lance à la main) ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant ; Ctrl+O = espace AI leader."

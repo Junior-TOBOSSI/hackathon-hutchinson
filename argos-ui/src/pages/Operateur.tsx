@@ -198,7 +198,7 @@ function PartPanel({ live, onConfirm, onRelease, onRequalify }: { live: StationL
         <img src={live.part.imageUrl} alt={ko ? `Pièce non conforme : ${live.part.jointsDetected} joints détectés, zone en défaut entourée de rouge` : 'Pièce conforme : un seul joint détecté'} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#0b1220', display: 'block' }} />
       </div>
       <div style={{ flex: 1, minHeight: 120, borderRadius: 20, background: c, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 22, padding: '0 20px' }}>
-        <span className="num" style={{ fontSize: 120, lineHeight: 0.9 }}>{ko ? 'KO' : 'OK'}</span>
+        <span className="num" style={{ fontSize: 120, lineHeight: 0.9 }}>{ko ? 'NOK' : 'OK'}</span>
       </div>
       {waiting && onConfirm && onRelease && (
         <div className="row" style={{ gap: 10 }}>
@@ -276,7 +276,7 @@ function StartupPanel({ startup }: { startup: WorkstationStartup }) {
         <img src={startup.imageUrl} alt={ok ? 'Photo du poste : conforme à la référence' : 'Photo du poste : écart encadré'} style={{ width: '100%', display: 'block' }} />
       </div>
       <div style={{ flex: 1, minHeight: 120, borderRadius: 20, background: c, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span className="num" style={{ fontSize: 120, lineHeight: 0.9 }}>{ok ? 'OK' : 'KO'}</span>
+        <span className="num" style={{ fontSize: 120, lineHeight: 0.9 }}>{ok ? 'OK' : 'NOK'}</span>
       </div>
     </>
   );

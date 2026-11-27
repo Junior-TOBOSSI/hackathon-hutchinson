@@ -27,6 +27,7 @@ argos-ui (5173) ──/api──> cellule C3 (8000) ──> poste C3·P06 (8001)
 .\demo\start.ps1                         # 1 poste actif (C3·P06)
 .\demo\start.ps1 -Stations 3             # 3 postes actifs : C3·P06, C3·P01, C3·P02
 .\demo\start.ps1 -Stations 6 -NoSafety   # 6 postes, sans la webcam EPI
+.\demo\start.ps1 -Stations 3 -Mode auto  # mode NOK automatique (défaut : -Mode manuel)
 .\demo\start.bat -Stations 3             # même chose par le .bat
 ```
 
@@ -61,6 +62,13 @@ Dès 3 postes actifs, au moins un a donc un poste de travail différent et déma
 | 3. Activité | une pièce toutes les 3 s ; KO décidés par la cellule (4e pièce, puis 2 au plus sur 200 pièces, tous postes) | quality (`qualite702 v1`) |
 | 4. Pièce KO | le défilement **s'arrête** : **CONFIRMER** (pièce au rebut) ou **LAISSER PASSER** (erreur modèle : la pièce compte comme bonne, le team leader reçoit une alerte à valider) | quality |
 
+## Mode NOK : manuel ou auto (au lancement)
+
+- **manuel** (défaut, `-Mode manuel`) : une pièce **NOK** arrête la ligne jusqu'à la réponse de l'opérateur, **CONFIRMER** (pièce au rebut) ou **LAISSER PASSER** (erreur modèle, le team leader reçoit une alerte à valider).
+- **auto** (`-Mode auto`, ou `./demo/start.sh 3 auto`) : l'opérateur n'est **pas** sollicité ; la pièce NOK s'affiche, est comptée et mise au rebut, et la ligne continue normalement. Pas d'alerte « en attente » chez le team leader.
+
+À l'écran, le verdict s'écrit **OK / NOK** (pièce et vérification du poste).
+
 ## Ce qui est réel et ce qui ne l'est pas
 
 - **Réel** : les verdicts du poste (analyseur workstation ; les photos jugées ne servent pas à apprendre la normalité) et les verdicts qualité (modèle de la branche `quality`, sur les seules photos des **rafales de validation** R08, R12, R14, R21, R26, R27, jamais vues à l'entraînement).
@@ -79,7 +87,8 @@ Repris de la branche `feat/hovis-unified` (groupe MLOps), **seulement la partie 
 - Installer l'environnement, une fois :
   ```powershell
   python -m venv .venv-mlops
-  .venv-mlops\Scripts\python.exe -m pip install -r mlopsequirements-lock.txt
+  .venv-mlops\Scripts\python.exe -m pip install -r mlops
+equirements-lock.txt
   .venv-mlops\Scripts\python.exe -m pip install -e . --no-deps
   ```
 - Sans ce serveur : `.\demo\start.ps1 -NoAiLeader` (ou `NO_AI_LEADER=1 ./demo/start.sh`).
@@ -99,6 +108,7 @@ Repris de la branche `feat/hovis-unified` (groupe MLOps), **seulement la partie 
 | `CHECK_PERIOD` | 2.5 | secondes par photo du poste |
 | `QUALITY_PERIOD` | 3 | secondes par pièce |
 | `VALIDATED_HOLD` | 3 | secondes d'affichage de « Poste validé » |
+| `QUALITY_MODE` | `manual` | `manual` : une pièce NOK attend l'opérateur ; `auto` : la ligne continue (fixé par `-Mode`) |
 | `CELL_URL` | `http://127.0.0.1:8000` | serveur de cellule qui décide des KO (sans lui : même règle, pour le poste seul) |
 | `SAFETY` | 0 | 1 = analyse webcam EPI (le script la met sur C3·P06) |
 

@@ -24,7 +24,9 @@ Scenario of the station (``PROFILE`` = its rank among the active stations, 0-5):
    validation-burst photos only. Good part or KO part: the CELL decides for all its
    stations (``CELL_URL``, at most 2 KO in any 200
    consecutive parts of the cell, the first on the part n° 4 of the first station).
-   A KO part WAITS: CONFIRMER, or LAISSER PASSER (model error).
+   ``QUALITY_MODE`` manual (default): a NOK part WAITS for the operator, CONFIRMER or
+   LAISSER PASSER (model error). auto: the operator is not asked, the NOK part is
+   scrapped and the line goes on.
 3. SAFETY (``SAFETY=1``, the station EPI's webcam watches): EPI's live analysis.
 
 Counters: the shift so far (EPI's simulation) frozen when the activity starts, plus the
@@ -79,6 +81,8 @@ CHECK_PERIOD = float(os.environ.get("CHECK_PERIOD", "2.5"))
 QUALITY_PERIOD = float(os.environ.get("QUALITY_PERIOD", "3"))
 VALIDATED_HOLD = float(os.environ.get("VALIDATED_HOLD", "3"))
 CELL_URL = os.environ.get("CELL_URL", "http://127.0.0.1:8000")  # decides the KO parts
+# manual: a NOK part stops the line until the operator answers; auto: it does not.
+QUALITY_MODE = "auto" if os.environ.get("QUALITY_MODE", "manual").lower() == "auto" else "manual"
 VAL_BURSTS = {"R08", "R12", "R14", "R21", "R26", "R27"}  # qualite702 v1 report
 
 log = logging.getLogger(f"poste {STATION}")
@@ -318,11 +322,17 @@ def loop() -> None:
             number = state["good"] + state["ko"] + 1
             state["good" if not ko else "ko"] += 1
             if ko:
+                wait = QUALITY_MODE == "manual"
                 state["events"].append({"part": number, "at": at, "released": False})
-                log.info("part %d KO (%s): waiting for the operator", number, res["defect"])
+                log.info(
+                    "part %d NOK (%s): %s",
+                    number,
+                    res["defect"],
+                    "waiting for the operator" if wait else "scrapped, the line goes on (auto)",
+                )
             state.update(
                 phase_since=time.monotonic(),
-                awaiting=ko,
+                awaiting=ko and QUALITY_MODE == "manual",
                 part_jpeg=_jpeg(_display_part(image), 480),
                 part={
                     "number": number,
@@ -393,7 +403,7 @@ def _start() -> None:
     load_models()
     reset()
     threading.Thread(target=loop, daemon=True).start()
-    log.info("ready: workstation %s, check %s", TITLE, CHECK_PHOTOS)
+    log.info("ready: workstation %s, check %s, NOK mode %s", TITLE, CHECK_PHOTOS, QUALITY_MODE)
     weights = REPO / epi.WEIGHTS
     if os.environ.get("SAFETY", "0") == "1" and weights.exists():
         threading.Thread(target=epi.loop, daemon=True).start()
@@ -603,7 +613,7 @@ def station_alerts() -> list:
                 "VALIDATE",
             )
         elif waiting:
-            title = f"Pièce n° {e['part']} KO, en attente de l’opérateur"
+            title = f"Pièce n° {e['part']} NOK, en attente de l’opérateur"
             detail, action = "Production arrêtée jusqu’à la confirmation", "NONE"
         else:
             continue  # KO confirmed by the operator: part scrapped, nothing to do
