@@ -65,6 +65,7 @@ EVALUATION_SPLITS = {"validation", "test"}
 VERSION_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,40}$")
 RESERVED = {"code", "runs", "_drafts", "_locks", "_families"}
 DRAFT_ID_RE = re.compile(r"^[0-9a-f]{12}$")
+GROUP_RE = re.compile(r"^[A-Za-z0-9_.\- ]{1,80}$")
 FILE_RE = re.compile(r"^[A-Za-z0-9_.\-/]{1,200}$")
 
 MAX_IMPORT_FILES = 50
@@ -219,6 +220,7 @@ def build_manifest(
                 "height": imp["height"],
                 "format": imp["format"],
                 "origin": {"import": imp["original_name"], "draft_id": draft["draft_id"]},
+                **({"group": imp["group"]} if imp.get("group") else {}),
                 "review": "imported",
                 "label_history": [
                     {"version": version, "label": imp["label"], "review": "imported"}
@@ -1113,9 +1115,14 @@ class DatasetStore:
         label: str,
         split: str,
         synthetic_attested: bool,
+        group: str | None = None,
     ) -> list[ImportResult]:
         """Bounded import of SYNTHETIC images into a draft. ``files`` yields (name, binary
-        stream); each file is read on its own (never all in memory)."""
+        stream); each file is read on its own (never all in memory). ``group`` (optional)
+        records the source group / burst of the batch: kept in the published manifest so
+        that related images can be kept in one split (leakage control)."""
+        if group is not None and not GROUP_RE.match(group):
+            raise InvalidDatasetRequest("invalid group (letters, digits, - _ . and spaces, 1-80)")
         from PIL import Image, UnidentifiedImageError
 
         if not synthetic_attested:
@@ -1205,6 +1212,7 @@ class DatasetStore:
                         "original_name": PurePosixPath(name.replace("\\", "/")).name[:120],
                         "imported_at": now(),
                         "synthetic_attested": True,
+                        **({"group": group} if group else {}),
                     }
                 )
                 results.append(ImportResult(name=name, accepted=True, sha256=digest))

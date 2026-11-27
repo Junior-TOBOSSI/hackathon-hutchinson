@@ -203,18 +203,25 @@ def import_plan(zip_path: Path, api: str) -> int:
     draft = _call(api, "POST", f"/mlops/datasets/{fam}/drafts", {"parent_version": None})
     did = draft["draft_id"]
     with zipfile.ZipFile(zip_path) as z:
-        for label, split in sorted({(i["label"], i["split"]) for i in plan["items"]}):
+        for label, split, source in sorted(
+            {(i["label"], i["split"], i["source"]) for i in plan["items"]}
+        ):
             batch = [
                 (i["name"], z.read(i["file"]))
                 for i in plan["items"]
-                if i["label"] == label and i["split"] == split
+                if (i["label"], i["split"], i["source"]) == (label, split, source)
             ]
             res = _call(
                 api,
                 "POST",
                 f"/mlops/datasets/{fam}/drafts/{did}/import",
                 form={
-                    "fields": {"label": label, "split": split, "synthetic_attested": "true"},
+                    "fields": {
+                        "label": label,
+                        "split": split,
+                        "synthetic_attested": "true",
+                        "group": source,
+                    },
                     "files": batch,
                 },
             )

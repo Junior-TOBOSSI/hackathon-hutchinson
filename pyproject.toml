@@ -41,7 +41,7 @@ testpaths = ["tests", "usecases"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["usecases/*/notebooks"]
+extend-exclude = ["usecases/*/notebooks", "mlops/pipelines/*/kit"]  # vendored group code, unmodified
 
 [tool.ruff.format]
 # Do not reformat code snippets inside documentation.

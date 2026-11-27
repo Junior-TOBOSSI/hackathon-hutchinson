@@ -3,7 +3,7 @@
 Steps: read the manifest and images from the Unity Catalog Volume, verify the splits and
 SHA-256, write the Delta tables ``annotations`` and ``dataset_versions``, train two real
 configurations, log them to MLflow, select on VALIDATION, evaluate the test split only
-afterwards, register both models in Unity Catalog with aliases champion / challenger, and
+afterwards, register both models in Unity Catalog as CANDIDATES (DBX-05D: no alias, no approval),
 write a JSON summary to the Volume.
 """
 
@@ -57,7 +57,13 @@ def parse_args() -> argparse.Namespace:
         "job-run-id",
     ):
         parser.add_argument(f"--{name}", required=True)
-    return parser.parse_args()
+    parser.add_argument("--request-id", default="", help="HOVIS launch request (exact link)")
+    args = parser.parse_args()
+    # A dynamic value reference not resolved by Databricks must never be stored as an id.
+    for name in ("job_id", "job_run_id", "request_id"):
+        if "{{" in getattr(args, name):
+            setattr(args, name, "")
+    return args
 
 
 def main() -> None:
@@ -206,16 +212,17 @@ def main() -> None:
     results = []
     for config in configs:
         with mlflow.start_run(run_name=config["run_name"]) as run:
-            mlflow.set_tags(
-                {
-                    "synthetic": "true",
-                    "argos.poc": "DBX-00",
-                    "argos.dataset_version": manifest["dataset_version"],
-                    "argos.manifest_sha256": manifest_sha,
-                    "databricks.job_id": args.job_id,
-                    "databricks.job_run_id": args.job_run_id,
-                }
-            )
+            tags = {
+                "synthetic": "true",
+                "argos.poc": "DBX-00",
+                "argos.dataset_version": manifest["dataset_version"],
+                "argos.manifest_sha256": manifest_sha,
+                "databricks.job_id": args.job_id,
+                "databricks.job_run_id": args.job_run_id,
+                "hovis.request_id": args.request_id,
+            }
+            # ids may be empty (not provided at run time): never store empty tags
+            mlflow.set_tags({k: v for k, v in tags.items() if v})
             mlflow.log_params(
                 {
                     "model": "StandardScaler + LogisticRegression",
@@ -323,14 +330,18 @@ def main() -> None:
     for result in results:  # registration in training order
         version = mlflow.register_model(result["model_uri"], args.model)
         # Unity Catalog tag keys cannot contain "." (run tags can): underscores here.
+        # DBX-05D: candidates only. The rank on validation is kept as an informative tag;
+        # aliases (champion / challenger) and approval are human decisions, never set here.
         for key, value in (
             ("argos_selection_role", result["role"]),
             ("databricks_job_run_id", args.job_run_id),
             ("argos_dataset_version", manifest["dataset_version"]),
+            ("hovis_candidate", "true"),
+            ("hovis_request_id", args.request_id),
             ("synthetic", "true"),
         ):
-            client.set_model_version_tag(args.model, version.version, key, value)
-        client.set_registered_model_alias(args.model, result["role"], version.version)
+            if value:
+                client.set_model_version_tag(args.model, version.version, key, value)
         result["version"] = version.version
         print(
             f"registered {args.model} v{version.version} ({result['role']}) "
@@ -348,7 +359,8 @@ def main() -> None:
         "duration_s": round(time.time() - started, 1),
         "runs": [{k: v for k, v in r.items() if k != "model"} for r in results],
     }
-    out = f"{os.path.dirname(args.dataset_dir)}/runs/{args.job_run_id}.json"
+    name = args.job_run_id or args.request_id or "run"
+    out = f"{os.path.dirname(args.dataset_dir)}/runs/{name}.json"
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=2, default=str)

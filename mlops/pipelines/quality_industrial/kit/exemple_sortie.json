@@ -1,0 +1,13 @@
+{
+  "cas_usage": "qualite",
+  "reference": "702",
+  "verdict": "NOK",
+  "type_defaut": "NOK_SANS",
+  "libelle": "aucun joint dans la gorge",
+  "score_nok": 0.9731,
+  "seuil_nok": 0.5,
+  "seuil_a_verifier": null,
+  "probabilites": {"NOK_DOUBLE": 0.0112, "NOK_SANS": 0.9619, "OK": 0.0269},
+  "modele": {"nom": "qualite702", "version": "v1", "fichier": "modele.pt"},
+  "latence_ms": 4.2
+}

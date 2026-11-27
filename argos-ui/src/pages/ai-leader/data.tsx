@@ -43,7 +43,7 @@ export interface Resource<T> {
 const NONE: Resource<never> = { data: null, error: null, loading: false, refreshing: false, staleError: null, fetchedAt: null, cache: null };
 
 /** Wraps an API read into a store loader carrying the response freshness. */
-const read = <T,>(fn: (o: ReadOpts) => Promise<T>): Loader<T> =>
+export const read = <T,>(fn: (o: ReadOpts) => Promise<T>): Loader<T> =>
   (o) => fn(o).then((data) => ({ data, meta: metaOf(data) }));
 
 /** Shared resource; `key` null = nothing to load (missing dependency). */

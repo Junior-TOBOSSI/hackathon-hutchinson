@@ -21,7 +21,7 @@ export const metaOf = (data: unknown): ResponseMeta =>
 
 const DEFAULT_TIMEOUT_MS = 30_000; // > backend request budget (25 s)
 
-async function call<T>(path: string, init?: RequestInit, opts: ReadOpts = {}): Promise<T> {
+export async function call<T>(path: string, init?: RequestInit, opts: ReadOpts = {}): Promise<T> {
   const url = BASE + path + (opts.fresh ? `${path.includes('?') ? '&' : '?'}fresh=true` : '');
   const controller = new AbortController();
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;

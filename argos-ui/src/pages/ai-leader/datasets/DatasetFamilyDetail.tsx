@@ -58,9 +58,9 @@ export default function DatasetFamilyDetail({ family, onClose }: { family: Datas
           options={[...index.versions].reverse().map((v, i) => [v.version, `Version ${v.version}${i === 0 ? ' · dernière publiée' : ''}`])} /></div>
           : <span className="muted">Aucune version publiée</span>}
         <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn btn-ghost" disabled={!version || !family.linked_models.length}
-            title={family.linked_models.length ? 'Ouvrir Training Factory avec cette version sélectionnée' : 'Aucun modèle lié : entraînement indisponible'}
-            onClick={() => patch({ section: 'training', model: family.linked_models[0], dataset: version?.version ?? null, version: null, tab: null, draft: null })}>Préparer entraînement</button>
+          <button className="btn btn-ghost" disabled={!version}
+            title="Ouvrir Training Factory avec cette version : la compatibilité est vérifiée pour chaque pipeline"
+            onClick={() => { const next = new URLSearchParams({ section: 'training', new: '1', dataset: family.dataset_id, dsversion: version?.version ?? '' }); setParams(next); }}>Préparer un entraînement</button>
           <button className="btn btn-primary" disabled={busy || !!draftId} onClick={newDraft}>{version ? 'Créer une nouvelle version' : 'Créer la première version'}</button>
         </div>
       </div>
