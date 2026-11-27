@@ -1,6 +1,9 @@
 # Use case: safety (missing PPE, phone use)
 
 # Class loaded by the registry ("module:Class"). Change this line to plug a real model.
+# Default: the fake analyzer, so the demo and the team's contract test need no weights.
+# Real model (needs `pip install -e ".[safety]"` and the weights in data/models/):
+#   analyzer_class: usecases.safety.yolo_analyzer:YoloSafetyAnalyzer
 analyzer_class: usecases.safety.analyzer:FakeSafetyAnalyzer
 
 # Decision layer: score < low -> conforme ; low <= score < high -> a_verifier ; score >= high -> anomalie
@@ -9,8 +12,25 @@ thresholds:
   high: 0.7
 
 params:
+  # --- FakeSafetyAnalyzer ---
   seed: 123
   anomaly_rate: 0.08
   min_latency_ms: 20
   max_latency_ms: 50
   max_persons: 3
+
+  # --- YoloSafetyAnalyzer (see usecases/safety/yolo_analyzer.py) ---
+  # PPE model: official SH17 yolov8n for now; our retrained one once copied from the GPU:
+  #   data/models/safety/sh17_ours_yolov8n_640.pt
+  weights: data/models/safety/sh17_yolov8n.pt
+  phone_weights: data/models/yolov8n_coco.pt   # generic COCO model, "cell phone" class only
+  detect_phone: true
+  imgsz: 640
+  conf: 0.25                 # default confidence threshold of a detection
+  class_conf: {}             # per-class threshold, e.g. {gloves: 0.3, hands: 0.3}
+  phone_conf: 0.30
+  required: [helmet, glasses, gloves, shoes]   # mandatory PPE at this workstation
+  smoothing_frames: 3        # alert only if the problem lasts 3 frames (1.5 s at 2 FPS)
+  shoes_absent_score: 0.5    # missing shoes inferred from a full body -> "a_verifier"
+  full_body_bottom: 0.97     # person box ending above this height = feet in the image
+  phone_margin: 0.5          # phone box widened by 50% to touch a hand or a head

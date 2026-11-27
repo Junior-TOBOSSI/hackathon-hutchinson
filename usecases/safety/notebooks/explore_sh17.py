@@ -1,8 +1,9 @@
 """Explore, check and clean the SH17 PPE dataset (YOLO format) before training.
 
 Usage (from the repository root):
-    python usecases/safety/notebooks/explore_sh17.py data/sh17
-    python usecases/safety/notebooks/explore_sh17.py data/sh17 --fix data/sh17_clean
+    python usecases/safety/notebooks/explore_sh17.py data/raw/safety/sh17
+    python usecases/safety/notebooks/explore_sh17.py data/raw/safety/sh17 \
+        --fix data/processed/safety/sh17_clean
 
 What it does:
 1. Understand: class counts, box sizes, persons per image, PPE-to-person association.
@@ -14,7 +15,7 @@ What it does:
 5. --fix: writes a CLEANED COPY (labels + image symlinks + split lists). The original
    dataset is never modified.
 
-Outputs go to data/sh17_report/ (git-ignored, stays on this machine).
+Outputs go to data/processed/safety/sh17_report/ (git-ignored, stays on this machine).
 """
 
 from __future__ import annotations
@@ -94,7 +95,7 @@ def load_class_names(root: Path) -> list[str]:
         if names:
             print(f"Class names read from {path}")
             return [normalise_name(n) for n in names]
-    print("No YAML with class names found: using the SH17 README order.")
+    print("No YAML with class names found: using the class order of the SH17 weights.")
     return list(SH17_DEFAULT_NAMES)
 
 
@@ -429,7 +430,9 @@ def write_clean_copy(data: dict, out_dir: Path) -> None:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("root", type=Path, help="dataset folder, e.g. data/sh17")
-    parser.add_argument("--report-dir", type=Path, default=Path("data/sh17_report"))
+    parser.add_argument(
+        "--report-dir", type=Path, default=Path("data/processed/safety/sh17_report")
+    )
     parser.add_argument("--previews", type=int, default=20, help="number of preview images")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--fix", type=Path, default=None, help="write a cleaned copy here")
