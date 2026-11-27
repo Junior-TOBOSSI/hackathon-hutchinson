@@ -336,7 +336,9 @@ class TrainingService:
             args = json.loads(task.notebook_task.base_parameters["args"])
             flag = spec.job["dataset_argument"]
             args[args.index(flag) + 1] = f"{root}/{record.dataset_version}"
-            args += ["--request-id", record.request_id]  # exact link even if ids stay unresolved
+            # Databricks refuses {{...}} references in run-time notebook parameters: they are
+            # blanked here and the run is linked exactly through the request id instead.
+            args = ["" if "{{" in a else a for a in args] + ["--request-id", record.request_id]
             return {
                 "notebook_params": {**task.notebook_task.base_parameters, "args": json.dumps(args)}
             }
@@ -364,16 +366,8 @@ class TrainingService:
         }
         store._upload(f"{base}/request.json", json.dumps(request, indent=2).encode())
         code_root = spec.job["code_root"]
-        args = [
-            "--request",
-            f"{base}/request.json",
-            "--code-root",
-            code_root,
-            "--job-id",
-            "{{job.id}}",
-            "--job-run-id",
-            "{{job.run_id}}",
-        ]
+        # No {{...}} reference (refused at run time): exact link through the request id.
+        args = ["--request", f"{base}/request.json", "--code-root", code_root]
         return {"notebook_params": {"script": spec.job["script"], "args": json.dumps(args)}}
 
     def cancel(self, job_run_id: int) -> None:

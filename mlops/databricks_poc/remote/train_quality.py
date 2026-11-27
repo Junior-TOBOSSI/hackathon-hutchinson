@@ -212,17 +212,17 @@ def main() -> None:
     results = []
     for config in configs:
         with mlflow.start_run(run_name=config["run_name"]) as run:
-            mlflow.set_tags(
-                {
-                    "synthetic": "true",
-                    "argos.poc": "DBX-00",
-                    "argos.dataset_version": manifest["dataset_version"],
-                    "argos.manifest_sha256": manifest_sha,
-                    "databricks.job_id": args.job_id,
-                    "databricks.job_run_id": args.job_run_id,
-                    "hovis.request_id": args.request_id,
-                }
-            )
+            tags = {
+                "synthetic": "true",
+                "argos.poc": "DBX-00",
+                "argos.dataset_version": manifest["dataset_version"],
+                "argos.manifest_sha256": manifest_sha,
+                "databricks.job_id": args.job_id,
+                "databricks.job_run_id": args.job_run_id,
+                "hovis.request_id": args.request_id,
+            }
+            # ids may be empty (not provided at run time): never store empty tags
+            mlflow.set_tags({k: v for k, v in tags.items() if v})
             mlflow.log_params(
                 {
                     "model": "StandardScaler + LogisticRegression",
