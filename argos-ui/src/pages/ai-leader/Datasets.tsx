@@ -6,7 +6,6 @@ import { Badge, Loading, Unavailable } from './common';
 import { errText, useDatasetCatalog, useHealth, useStore } from './data';
 import DatasetFamilyDetail from './datasets/DatasetFamilyDetail';
 import './datasets/catalog.css';
-import { usePipelines } from './training/shared';
 import { fr, Kpi, SearchField, SelectField } from './ui';
 
 const useCases = ['quality', 'workstation', 'safety'] as const;
@@ -15,7 +14,6 @@ const useCaseName: Record<string, string> = { quality: fr('quality'), workstatio
 
 export default function Datasets() {
   const catalog = useDatasetCatalog();
-  const pipelines = usePipelines();
   const health = useHealth();
   const store = useStore();
   const [params, setParams] = useSearchParams();
@@ -46,12 +44,6 @@ export default function Datasets() {
     ? null : families.reduce((sum, f) => sum + (f.latest_images ?? 0), 0);
   const versionCount = families.reduce((sum, f) => sum + f.version_count, 0);
   const totalDrafts = families.reduce((sum, f) => sum + f.draft_count, 0);
-  // Expected = declared by a training pipeline but not published yet (no hardcoded list).
-  const expected = (pipelines.data ?? []).flatMap((v) => v.spec.dataset.families.map((id) => ({
-    id, name: id, useCase: v.spec.use_case, status: `déclaré par le pipeline « ${v.spec.name} » — aucune version publiée`,
-  }))).filter((item, i, all) => all.findIndex((x) => x.id === item.id) === i)
-    .filter((item) => !families.some((family) => family.dataset_id === item.id))
-    .filter((item) => (!filter || item.useCase === filter) && (!query || `${item.name} ${item.id}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
 
   return <div className="dataset-catalog col" style={{ gap: 14 }}>
     <header className="card dataset-hero">
@@ -102,10 +94,6 @@ export default function Datasets() {
             <td className="opt">{f.linked_models.length ? f.linked_models.join(', ') : '—'}</td><td className="opt">{f.last_published_at ? new Date(f.last_published_at).toLocaleDateString('fr-FR') : '—'}</td><td className="opt"><button className="btn btn-ghost" onClick={() => select(f.dataset_id)}>Ouvrir</button></td>
           </tr>)}</tbody></table></div>
           {!filtered.length && <Unavailable tone="grey">Aucun dataset pour ces critères.</Unavailable>}
-          {expected.length > 0 && <div className="card col" style={{ gap: 8, padding: 14 }}><b>Jeux scientifiques attendus — non publiés</b>
-            <span className="muted">Ces entrées ne sont pas des versions Databricks et ne comptent pas dans les indicateurs du catalogue.</span>
-            {expected.map((item) => <span key={item.id}><b>{item.name}</b> · {item.id} — {item.status}</span>)}
-          </div>}
           {filtered.length > 10 && <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
             <button className="btn btn-ghost" disabled={!page} onClick={() => setPage(page - 1)}>Précédent</button>
             <span>{page + 1} / {Math.ceil(filtered.length / 10)}</span>
