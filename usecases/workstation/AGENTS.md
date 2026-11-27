@@ -15,14 +15,36 @@ Vérifier que le poste est configuré comme la référence : objets attendus pr�
   ```
 
 ## État actuel
-Faux analyseur (`analyzer.py:FakeWorkstationAnalyzer`) : résultats aléatoires mais plausibles, sans modèle.
+**Quatre sections** (27/11) : un poste par jeu `poste_*_5s_11`, un fichier de poste annoté en anglais par section dans `stations/`. Les jeux précédents sont supprimés. Analyseur `model.py:ZoneWorkstationAnalyzer` : alignement, normalité apprise, zones à garder libres, éléments à leur place, personnes autorisées par zone ou partout. Démo Streamlit avec choix de la section et de la photo. Résultat : 19/20 anomalies, 1/20 fausse alerte (démonstration, pas un chiffre de performance). Détails dans [README.md](README.md).
 
 ## Décisions prises
 <!-- Une ligne par décision : AAAA-MM-JJ HH:MM — décision — raison. -->
+- 2026-11-26 — Une **photo** au début de la prise de poste, comparée à la référence ; persistance 1.
+- 2026-11-27 — **Une section = un poste = un fichier de poste** ; quatre sections (`press_cell`, `machine_cell`, `machine_cell_variant`, `electrical_bench`) sur les jeux `poste_*_5s_11`. Noms des zones et éléments en **anglais**.
+- 2026-11-27 — Règles par section, d'après les README des jeux : tapis bleu interdit (press cell) ; passage central libre, tapis opérateur autorisé (machine cells) ; opérateur autorisé partout (electrical bench).
+- 2026-11-27 — Personnes autorisées : `zone_allowed_labels` (une zone) ou `ignore_labels` (partout) ; boîte agrandie de 15 % (le tabouret sous l'opérateur assis était signalé).
+- 2026-11-27 — Taille minimale d'un changement plafonnée à 150 pixels : un petit outil au sol passait sous le seuil de 1 % d'une grande zone.
+- 2026-11-27 — La zone « floor » du poste électrique est un simple rectangle, arrêté juste à gauche du tabouret (qui bouge quand l'opérateur s'assoit).
+- 2026-11-27 — **Toutes les boîtes sont des rectangles** (zones, éléments, objets), à la demande de l'équipe. Conséquence : le `workbench` du poste électrique commence à x = 355 pour éviter le tabouret, donc la partie gauche de l'établi n'est plus surveillée (la feuille de `good_03` n'y est plus signalée).
+- 2026-11-27 — Machine cell : `operator_mat` renommé `person_spot` (personne autorisée) ; le walkway devient un rectangle `forbidden_zone`, plus strict (`zone_min_score` 0,9 : tout ce qui y entre est NOK).
+- 2026-11-27 — Seuil à **hystérésis** pour la boîte d'un objet trouvé : le seuil strict décide, un seuil lâche (écart de couleur à la normale) donne l'étendue complète de l'objet (un bac coupé en deux par ses bords). Masquer les opérateurs pendant l'apprentissage donnait aussi des boîtes complètes, mais ajoutait une fausse alerte : abandonné.
+- 2026-11-27 — Seules les détections utiles sont dessinées (objets inconnus, personnes, objets en cause) : YOLO voyait la presse comme une « tv ».
+- 2026-11-26 — **Normalité apprise** (moyenne + dispersion par pixel) sur les photos conformes et la référence ; mesure en **validation croisée** (une photo conforme mise de côté à chaque fois).
+- 2026-11-26 — Le détecteur ne fait que **nommer** un changement, il ne déclenche jamais d'alerte seul.
+- 2026-11-26 — Différence en **couleur**, luminosité compensée ; alignement SIFT + RANSAC ; aucune modification du contrat (`"<label>@<zone>"` dans `misplaced`).
 
 ## Questions ouvertes
 <!-- Questions sur le besoin métier ou les données, à poser à l'équipe ou à Hutchinson. -->
+- Machine cell `anomaly_01` : quel est l'objet manquant ? Le seul écart visible avec la référence est aussi présent sur toutes les photos conformes.
+- Electrical bench : un document posé sur l'établi est-il autorisé (`good_03`) ?
+- Press cell : le tapis bleu est-il bien interdit pendant le contrôle de prise de poste (« hypothèse à valider » selon le README) ?
+- Les étiquettes sont indicatives : à faire confirmer avant de citer les chiffres.
+- En production : une référence et quelques photos conformes par caméra.
+- Contrat : un champ `foreign: list[str]` serait plus clair que `misplaced` (modification de `contracts.py`, à décider en équipe).
+- Racine du dépôt : extra `workstation` à passer à `ultralytics>=8.4` ; ajouter `*.ts` au `.gitignore`.
 
 ## Résultats
-<!-- À remplir : jeu de test utilisé (data/test/workstation, nombre d'images), seuils retenus (low / high) et pourquoi,
-     défauts détectés (rappel), fausses alertes (taux), latence moyenne sur CPU. -->
+Jeux `poste_*_5s_11`, validation croisée, YOLO26 COCO, seuils 0,4 / 0,7, CPU :
+- press_cell 5/5 anomalies, 0/5 fausse alerte ; machine_cell 4/5, 0/5 ; machine_cell_variant 5/5, 0/5 ; electrical_bench 5/5, 0/5 ;
+- total : 19/20 anomalies, 0/20 fausse alerte (zones rectangulaires) ; alignement : 0 échec ; ≈ 0,3 s par photo.
+- Ce n'est **pas** un chiffre de performance : 10 photos synthétiques par section.

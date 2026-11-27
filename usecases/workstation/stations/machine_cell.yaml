@@ -1,0 +1,36 @@
+# Section "Machine cell (top view)" (poste_bleu_5s_11, synthetic pilot, labels indicative).
+# VCRS machine seen from above. The operator is ALLOWED on his spot (person_spot,
+# no object there). The walkway in front of the machine is a FORBIDDEN zone
+# (forbidden_zone, a rectangle): any object or person in it is NOK at once.
+#
+# Paths are relative to --data-root. Coordinates are NORMALIZED [x, y] on the reference.
+# empty_zones  : nothing new may appear there (objects, and persons unless allowed)
+# element_slots: each element must stay in its place; they are the boxes shown on photos
+name: machine_cell
+title: Machine cell (top view)
+dataset: raw/workstation/poste_bleu_5s_11
+# Columns of labels.csv: file path, class (reference / good / anomaly), anomaly type.
+labels: {file: file, label: label, type: type_provisional}
+# Where each anomaly type must be found: a zone name, null (anything outside the
+# zones named here: bench, slots) or any (any finding).
+anomaly_types:
+  missing_object: null
+  moved_object: any
+  clutter: forbidden_zone
+  object_in_zone: person_spot
+  person_in_zone: forbidden_zone
+# Analyzer parameters specific to this section.
+params:
+  zone_allowed_labels:
+    person_spot: [person]
+  zone_min_score:
+    forbidden_zone: 0.9
+views:
+  - name: main
+    reference_image: raw/workstation/poste_bleu_5s_11/reference.png
+    empty_zones:
+      forbidden_zone: [[0.262, 0.369], [0.857, 0.369], [0.857, 0.985], [0.262, 0.985]]
+      person_spot: [[0.544, 0.123], [0.690, 0.123], [0.690, 0.345], [0.544, 0.345]]
+    element_slots:
+      rack_bin: [[0.867, 0.446], [0.948, 0.446], [0.948, 0.631], [0.867, 0.631]]
+      orange_crate: [[0.060, 0.754], [0.151, 0.754], [0.151, 0.969], [0.060, 0.969]]
