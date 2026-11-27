@@ -127,8 +127,11 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
           </div>
 
           {!consult && live.video?.available && (
-            <button onClick={playVideo} disabled={live.video.playing} className="cond" style={{ alignSelf: 'center', height: 40, padding: '0 22px', border: 'none', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontWeight: 700, fontSize: 16, letterSpacing: '0.05em', color: '#fff', background: live.video.playing ? 'var(--muted)' : 'var(--navy)' }}>
-              {live.video.playing ? 'VIDÉO EN COURS…' : '▶  LANCER LA VIDÉO'}
+            // Petit bouton caméra : lance la vidéo du poste (grisé pendant la lecture)
+            <button onClick={playVideo} disabled={live.video.playing}
+              aria-label={live.video.playing ? 'Vidéo en cours' : 'Lancer la vidéo'} title={live.video.playing ? 'Vidéo en cours' : 'Lancer la vidéo'}
+              style={{ alignSelf: 'flex-end', width: 36, height: 36, padding: 0, border: 'none', borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: live.video.playing ? 'var(--muted)' : 'var(--navy)', cursor: live.video.playing ? 'default' : 'pointer' }}>
+              <Icon d={ICONS.camera} size={20} color="currentColor" stroke={2} />
             </button>
           )}
           {!consult && (

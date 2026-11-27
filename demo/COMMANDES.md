@@ -14,7 +14,7 @@ Détails : [README.md](README.md).
 | **deux postes en mode auto** | `.\demo\start.ps1 -Stations 2 -Mode auto` |
 | tous les serveurs **dans mon terminal** (pas de fenêtres ; Ctrl+C arrête tout) | `.\demo\start.ps1 -Stations 2 -Mode auto -Here` |
 | choisir le **poste de travail** vérifié par chaque poste | `.\demo\start.ps1 -Stations 2 -Workstations press_cell:nok,electrical_bench` |
-| des **vidéos** à la place de la webcam (une par poste ; bouton « LANCER LA VIDÉO » sur l'écran opérateur, lecture unique) | `.\demo\start.ps1 -Stations 2 -Videos video1,video2` : vidéos rangées dans `data\raw\safety\videos`, ou un chemin vers le fichier |
+| des **vidéos** à la place de la webcam (une par poste ; petit bouton caméra sur l'écran opérateur, lecture unique) | `.\demo\start.ps1 -Stations 2 -Videos video1,video2` : vidéos rangées dans `data\raw\safety\videos`, ou un chemin vers le fichier |
 | sans l'analyse webcam EPI (sécurité) | `.\demo\start.ps1 -NoSafety` |
 | sans le serveur AI leader (Databricks) | `.\demo\start.ps1 -NoAiLeader` |
 | si PowerShell refuse le script | `powershell -ExecutionPolicy Bypass -File demo\start.ps1 -Stations 2 -Mode auto` |
@@ -56,7 +56,7 @@ Un nom par poste actif, dans l'ordre C3·P06, C3·P01, C3·P02, C3·P03, C3·P04
 | passer à l'écran opérateur du poste suivant | **Ctrl+P** |
 | ouvrir l'espace AI leader (cycle de vie des modèles) et revenir | **Ctrl+O** |
 | signaler un problème (Modèle Quality, Modèle Workspace, Modèle EPI, Problème machine) | bouton **SIGNALER UN PROBLÈME** |
-| jouer la vidéo du poste (démarré avec `-Videos`) | bouton **▶ LANCER LA VIDÉO** |
+| jouer la vidéo du poste (démarré avec `-Videos`) | petit **bouton caméra** rond, au-dessus de « Signaler un problème » |
 
 Lancer tous les postes d'un coup, sans cliquer sur chaque logo :
 
