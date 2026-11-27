@@ -1,0 +1,12 @@
+﻿image,classe,description
+reference.png,reference,aucune
+good/good_01.png,good,sans opérateur
+good/good_02.png,good,opérateur autorisé
+good/good_03.png,good,opérateur autorisé
+good/good_04.png,good,opérateur autorisé
+good/good_05.png,good,opérateur autorisé
+anomaly/anomaly_01.png,anomaly,bac manquant
+anomaly/anomaly_02.png,anomaly,bac déplacé au sol
+anomaly/anomaly_03.png,anomaly,établi désorganisé
+anomaly/anomaly_04.png,anomaly,bac sur tapis
+anomaly/anomaly_05.png,anomaly,déchet au sol

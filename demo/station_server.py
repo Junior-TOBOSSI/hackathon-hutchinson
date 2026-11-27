@@ -80,8 +80,8 @@ PROFILES = [  # (section, workstation check photos, title)
 SECTION, CHECK_PHOTOS, TITLE = PROFILES[PROFILE % len(PROFILES)]
 # WORKSTATION chooses the workstation this station checks, instead of its profile's:
 # "press_cell" (conforming photo: OK at once) or "press_cell:nok" (object in the
-# passage: NOK, NOK, then OK). anomaly_04 gives NOK and good_04 OK on all 4 workstations.
-SECTIONS = ("machine_cell_variant", "press_cell", "electrical_bench", "machine_cell")
+# passage: NOK, NOK, then OK). anomaly_04 gives NOK and good_04 OK on all 5 workstations.
+SECTIONS = ("machine_cell_variant", "press_cell", "electrical_bench", "machine_cell", "cnc_cell")
 if os.environ.get("WORKSTATION"):
     SECTION, _, START = os.environ["WORKSTATION"].strip().lower().partition(":")
     if SECTION not in SECTIONS or START not in ("", "ok", "nok"):

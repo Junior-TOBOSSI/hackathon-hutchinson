@@ -123,7 +123,7 @@ powershell -ExecutionPolicy Bypass -File demo\start.ps1 -Stations 2 -Mode auto  
 
 Git Bash / Linux : `./demo/start.sh 2 auto press_cell:nok,electrical_bench` (postes, mode, postes de travail) ; `VIDEO_SPEED=0.5` devant pour la vitesse des vidéos.
 
-- Postes de travail (`-Workstations`) : `machine_cell_variant`, `press_cell`, `electrical_bench`, `machine_cell` ; `:nok` = démarre avec un objet dans le passage (NOK, NOK puis OK).
+- Postes de travail (`-Workstations`) : `machine_cell_variant`, `press_cell`, `electrical_bench`, `machine_cell`, `cnc_cell` (même décor que les vidéos) ; `:nok` = démarre avec un objet dans le passage (NOK, NOK puis OK).
 - Vidéos (`-Videos`) : un nom rangé dans `data/raw/safety/videos/` (`video1`, `video2`, `video3`) ou un chemin ; une par poste actif, dans l'ordre C3·P06, C3·P01…
 - Dans l'interface (http://localhost:5173) : n'importe quel identifiant = opérateur ; **logo ARGOS** = lancer le poste affiché ; **Ctrl+M** = vue superviseur ; **Ctrl+P** = poste suivant ; **Ctrl+O** = espace AI leader ; bouton caméra **Lancer la vidéo** quand le poste a une vidéo.
 - Lancer tous les postes d'un coup : `curl.exe -X POST http://localhost:8000/api/scenario/restart`.

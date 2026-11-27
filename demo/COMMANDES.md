@@ -41,6 +41,7 @@ Un nom par poste actif, dans l'ordre C3·P06, C3·P01, C3·P02, C3·P03, C3·P04
 | `press_cell` | Press cell |
 | `electrical_bench` | Electrical bench |
 | `machine_cell` | Machine cell (vue de dessus) |
+| `cnc_cell` | CNC cell : le même décor que les vidéos EPI (`video1` à `video3`) |
 
 - `nom` (ou `nom:ok`) : photo conforme, poste **OK** tout de suite.
 - `nom:nok` : objet dans le passage, poste **NOK**, NOK, puis OK.

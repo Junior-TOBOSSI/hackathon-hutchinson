@@ -27,7 +27,7 @@ hovis.local.env à la racine, lignes CLE=VALEUR. -NoAiLeader : ne pas le démarr
 
 -Workstations : le poste de travail vérifié par chaque poste actif, dans l'ordre
 (C3·P06, P01, ...), séparés par des virgules : machine_cell_variant, press_cell,
-electrical_bench, machine_cell ; « :nok » = démarre avec un objet dans le passage (NOK,
+electrical_bench, machine_cell, cnc_cell ; « :nok » = démarre avec un objet dans le passage (NOK,
 NOK puis OK), sinon OK d'emblée. Les postes non cités gardent leur poste de travail.
     .\demo\start.ps1 -Stations 2 -Workstations press_cell:nok,electrical_bench
 
@@ -70,7 +70,7 @@ if (-not (Test-Path $python)) {
     exit 1
 }
 # -Workstations "a,b" ou a,b : un poste de travail par poste actif (vérifié avant tout lancement)
-$sections = @("machine_cell_variant", "press_cell", "electrical_bench", "machine_cell")
+$sections = @("machine_cell_variant", "press_cell", "electrical_bench", "machine_cell", "cnc_cell")
 $Workstations = @($Workstations | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 foreach ($w in $Workstations) {
     $name, $start = $w.ToLower() -split ':', 2

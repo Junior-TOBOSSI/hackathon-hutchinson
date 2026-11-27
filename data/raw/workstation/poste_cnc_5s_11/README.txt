@@ -1,0 +1,1 @@
+Dataset synthétique 5S CNC. Référence originale redimensionnée. Variantes issues d’une planche générée, recadrées et agrandies. Présence humaine autorisée. Tapis et passage à garder libres d’objets. Les différences de géométrie et les labels doivent être validés avant entraînement. Pas de bounding boxes fournies.
