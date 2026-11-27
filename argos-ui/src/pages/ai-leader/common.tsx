@@ -9,7 +9,7 @@ export type Section = 'overview' | 'datasets' | 'training' | 'registry' | 'deplo
 export const SECTIONS: { id: Section; label: string; scoped: boolean }[] = [
   { id: 'overview', label: "Vue d'ensemble", scoped: false },
   { id: 'datasets', label: 'Datasets', scoped: false },
-  { id: 'training', label: 'Training Factory', scoped: true },
+  { id: 'training', label: 'Training Factory', scoped: false },
   { id: 'registry', label: 'Model Registry', scoped: true },
   { id: 'deployment', label: 'Deployment Center', scoped: false },
   { id: 'monitoring', label: 'Monitoring', scoped: true },
