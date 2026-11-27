@@ -15,9 +15,15 @@ Détecter les pièces non conformes (rayures, manques, taches…) par détection
   ```
 
 ## État actuel
-Faux analyseur (`analyzer.py:FakeQualityAnalyzer`) : résultats aléatoires mais plausibles, sans modèle.
+Modèle réel branché (branche `integration`, 27/11) : `model702.py:Quality702Analyzer`, classification OK / NOK de la pièce 702 (modèle `qualite702 v1` de la branche `quality`, YOLO26n-cls, classes NOK_DOUBLE / NOK_SANS / OK). Score = somme des probabilités NOK ; seuils `low = high = 0,6365` (le `seuil_nok` du kit) : OK ou NOK, sans « à vérifier ». Le faux analyseur (`analyzer.py`) reste disponible.
+
+Données (jamais versionnées) : poids `data/models/quality/qualite702_v1/modele.pt`, photos `data/raw/quality/702/{OK,NOK}/` (471 OK, 368 NOK).
 
 ## Décisions prises
+- 2026-11-27 — Classification supervisée (kit `qualite702`) plutôt que détection d'anomalies : le jeu est étiqueté.
+- 2026-11-27 — Même pré- et post-traitement que le kit (`qualite702/inference.py`) ; garde-fou sur l'ordre des classes au chargement.
+- 2026-11-27 — Démo : uniquement les photos des rafales de validation (R08, R12, R14, R21, R26, R27), jamais vues à l'entraînement (le test a été fusionné à l'entraînement dans le kit). 103/103 OK et 67/67 NOK bien classés ; chiffre optimiste, car ces photos ont servi à choisir le seuil.
+- 2026-11-27 — Écran : photo éclaircie (CLAHE + gamma) et agrandie pour l'opérateur ; le modèle voit la photo d'origine.
 <!-- Une ligne par décision : AAAA-MM-JJ HH:MM — décision — raison. -->
 
 ## Questions ouvertes

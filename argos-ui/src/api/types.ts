@@ -37,6 +37,24 @@ export interface PartResult {
   score: number; // 0..1
   imageUrl: string; // photo prise au lancement du cycle, avec la zone en défaut dessinée si KO
   takenAt: string; // ISO
+  /** Pièce KO en attente : l'opérateur doit appuyer sur « Confirmer » avant la pièce suivante. */
+  awaitingConfirmation?: boolean;
+}
+
+/**
+ * Vérification de l'espace de travail à la prise de poste (cas d'usage workstation).
+ * Faite UNE fois, avant toute activité : tant qu'elle n'est pas validée, l'écran montre
+ * la photo du poste à la place de la pièce.
+ */
+export interface WorkstationStartup {
+  phase: 'CHECK' | 'VALIDATED' | 'RUNNING'; // RUNNING = poste validé, activité en cours
+  step: number; // photo n° step / steps
+  steps: number;
+  verdict: Verdict; // verdict de la photo affichée
+  findings: string[]; // écarts trouvés (anglais, noms des zones)
+  imageUrl: string; // photo du poste avec les zones et les écarts encadrés
+  validatedAt: string | null; // ISO, quand le poste a été validé
+  section: string; // « Machine cell variant »
 }
 
 /** Problème en cours au poste, déjà trié par le backend ou trié côté front (voir priority.ts). */
@@ -77,6 +95,8 @@ export interface StationLive {
   checks: { securite: boolean; poste: boolean; qualite: boolean; koRatePct: number };
   qualityModelVersion: string;
   partCameraOnline: boolean;
+  /** Absent = pas de vérification du poste (données de démonstration). */
+  startup?: WorkstationStartup;
 }
 
 /* ------------------------------------------------------------------ */

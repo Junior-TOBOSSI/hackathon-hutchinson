@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, USE_MOCK } from '../api/client';
 import type { Scenario } from '../api/mock';
-import type { Alert, StationLive } from '../api/types';
+import type { Alert, StationLive, WorkstationStartup } from '../api/types';
 import { useAuth } from '../auth';
 import { HourlyGauges, ProgressRing } from '../components/charts';
 import { operatorActions, type OperatorAction } from '../components/priority';
@@ -14,6 +14,10 @@ import { useApi } from '../hooks/useApi';
  * tout va bien · pièce KO · EPI ou poste en défaut · plusieurs problèmes en même temps.
  * En démo : ?scenario=ok|ko|epi|multi
  *
+ * Prise de poste : tant que l'espace de travail n'est pas validé (`live.startup`), la
+ * colonne de gauche montre la photo du poste à la place de la pièce. Une pièce KO en
+ * attente (`part.awaitingConfirmation`) affiche le bouton CONFIRMER.
+ *
  * Le même écran sert au team leader qui CONSULTE un poste depuis son PC (`consultStationId`) :
  * il voit exactement ce que voit l'opérateur, sans le bouton Signaler, avec en plus
  * les alertes du poste qu'il peut acquitter (« je m'en occupe »).
@@ -24,7 +28,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
   const scenario = (params.get('scenario') as Scenario) || 'ok';
   const consult = !!consultStationId;
   const stationId = consultStationId ?? user?.stationId ?? 'C3·P06';
-  const { data: live } = useApi(() => api.stationLive(stationId, scenario), [stationId, scenario], 2000);
+  const { data: live, reload } = useApi(() => api.stationLive(stationId, scenario), [stationId, scenario], 1000);
   const cellId = user?.cellId ?? 'C3';
   const { data: cellAlerts, setData: setCellAlerts } = useApi(() => (consult ? api.alerts(cellId) : Promise.resolve([] as Alert[])), [consult, cellId], 5000);
   const [reported, setReported] = useState(false);
@@ -35,6 +39,8 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
   const ko = live.part.verdict === 'KO';
   const multi = ko && envIssues.length > 0;
   const hour = new Date(live.now).getHours();
+  const startup = live.startup && live.startup.phase !== 'RUNNING' ? live.startup : null;
+  const confirm = async () => { await api.confirmPart(stationId); reload(); };
 
   const report = async () => { await api.reportProblem(stationId); setReported(true); setTimeout(() => setReported(false), 4000); };
   const stationAlerts = (cellAlerts ?? []).filter((a) => a.stationId === stationId);
@@ -58,13 +64,17 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
       <main className="row stack-mobile" style={{ flex: 1, alignItems: 'stretch', gap: 24, padding: '20px 28px 0' }}>
         {/* Colonne gauche : la pièce, ou l'image caméra si seul l'environnement est en défaut */}
         <section className="card-op col" style={{ width: 440, maxWidth: '100%', gap: 14 }}>
-          {!ko && envIssues.length > 0 && live.frontSnapshotUrl
-            ? <SnapshotPanel live={live} instruction={envIssues[0].instruction} />
-            : <PartPanel live={live} />}
+          {startup
+            ? <StartupPanel startup={startup} />
+            : !ko && envIssues.length > 0 && live.frontSnapshotUrl
+              ? <SnapshotPanel live={live} instruction={envIssues[0].instruction} />
+              : <PartPanel live={live} onConfirm={consult ? undefined : confirm} />}
         </section>
 
         <section className="col grow" style={{ gap: 18 }}>
-          {multi ? (
+          {startup ? (
+            <StartupCard startup={startup} />
+          ) : multi ? (
             <>
               <MultiCard live={live} actions={actions} />
               <ObjectiveStrip live={live} />
@@ -159,14 +169,15 @@ function ProblemBanner({ actions }: { actions: OperatorAction[] }) {
   );
 }
 
-function PartPanel({ live }: { live: StationLive }) {
+function PartPanel({ live, onConfirm }: { live: StationLive; onConfirm?: () => void }) {
   const ko = live.part.verdict === 'KO';
   const c = ko ? 'var(--red)' : 'var(--green)';
+  const waiting = ko && live.part.awaitingConfirmation;
   return (
     <>
       <span className="label-caps" style={{ textAlign: 'center', fontSize: 18 }}>Pièce en cours · n° {live.part.number}</span>
       <div style={{ height: ko ? 250 : 270, borderRadius: 18, overflow: 'hidden', border: `5px solid ${c}`, flexShrink: 0 }}>
-        <img src={live.part.imageUrl} alt={ko ? `Pièce non conforme : ${live.part.jointsDetected} joints détectés, zone en défaut entourée de rouge` : 'Pièce conforme : un seul joint détecté'} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        <img src={live.part.imageUrl} alt={ko ? `Pièce non conforme : ${live.part.jointsDetected} joints détectés, zone en défaut entourée de rouge` : 'Pièce conforme : un seul joint détecté'} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#0b1220', display: 'block' }} />
       </div>
       <div style={{ flex: 1, minHeight: 120, borderRadius: 20, background: c, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 22, padding: '0 20px' }}>
         <span className="num" style={{ fontSize: 96, lineHeight: 0.9 }}>{ko ? 'KO' : 'OK'}</span>
@@ -174,7 +185,63 @@ function PartPanel({ live }: { live: StationLive }) {
           {ko ? <>{live.part.jointsDetected === 0 ? 'Joint absent' : `${live.part.jointsDetected} joints détectés`}<br />Posez la pièce dans le bac rebuts</> : <>1 joint bleu détecté<br />Le cycle est parti</>}
         </span>
       </div>
+      {waiting && onConfirm && (
+        <button onClick={onConfirm} className="cond" style={{ height: 76, border: 'none', borderRadius: 20, background: 'var(--navy)', color: '#fff', fontWeight: 700, fontSize: 30, letterSpacing: '0.06em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+          <Icon d={ICONS.check} size={34} color="#fff" stroke={2.6} />
+          CONFIRMER
+          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: 0 }}>pièce au rebut · pièce suivante</span>
+        </button>
+      )}
     </>
+  );
+}
+
+/** Prise de poste : la photo du poste à la place de la pièce, avec son verdict. */
+function StartupPanel({ startup }: { startup: WorkstationStartup }) {
+  const ok = startup.verdict === 'OK';
+  const validated = startup.phase === 'VALIDATED';
+  const c = ok ? 'var(--green)' : 'var(--red)';
+  return (
+    <>
+      <span className="label-caps" style={{ textAlign: 'center', fontSize: 18 }}>
+        Vérification du poste · photo {startup.step} / {startup.steps}
+      </span>
+      <div style={{ borderRadius: 18, overflow: 'hidden', border: `5px solid ${c}`, lineHeight: 0 }}>
+        <img src={startup.imageUrl} alt={ok ? 'Photo du poste : conforme à la référence' : 'Photo du poste : écart encadré'} style={{ width: '100%', display: 'block' }} />
+      </div>
+      <div className="col" style={{ flex: 1, justifyContent: 'center', gap: 6, borderRadius: 20, background: c, color: '#fff', padding: '14px 20px' }}>
+        <span className="num" style={{ fontSize: 40, lineHeight: 1 }}>{validated ? 'POSTE VALIDÉ' : ok ? 'POSTE OK' : 'POSTE NON CONFORME'}</span>
+        <span style={{ fontSize: 17, fontWeight: 600 }}>
+          {validated ? "L'activité peut commencer" : ok ? 'Validation du poste…' : startup.findings.join(' · ') || 'Écart avec la référence'}
+        </span>
+      </div>
+    </>
+  );
+}
+
+/** Colonne de droite pendant la prise de poste : ce qui se passe et pourquoi. */
+function StartupCard({ startup }: { startup: WorkstationStartup }) {
+  const validated = startup.phase === 'VALIDATED';
+  return (
+    <div className="card-op col" style={{ gap: 14, padding: '22px 30px', flex: 1 }}>
+      <span className="label-caps" style={{ fontSize: 18 }}>Prise de poste</span>
+      <div className="num" style={{ fontSize: 44, lineHeight: 1.05, color: validated ? 'var(--green-text)' : 'var(--ink)' }}>
+        {validated ? "Poste validé : l'activité commence" : "Vérification de l'espace de travail"}
+      </div>
+      <span className="muted" style={{ fontSize: 18 }}>
+        Avant toute activité, la photo du poste est comparée à sa référence ({startup.section}) :
+        rien dans les zones interdites, chaque élément à sa place. Cette vérification n'est faite qu'une fois.
+      </span>
+      <div className="row" style={{ gap: 10 }}>
+        {Array.from({ length: startup.steps }, (_, i) => {
+          const done = i + 1 < startup.step || validated;
+          const current = i + 1 === startup.step && !validated;
+          const bg = current ? (startup.verdict === 'OK' ? 'var(--green)' : 'var(--red)') : done ? 'var(--navy)' : 'var(--op-bg)';
+          return <span key={i} style={{ width: 54, height: 12, borderRadius: 6, background: bg }} />;
+        })}
+        <span className="muted" style={{ fontSize: 15, fontWeight: 600 }}>photo {startup.step} / {startup.steps}</span>
+      </div>
+    </div>
   );
 }
 

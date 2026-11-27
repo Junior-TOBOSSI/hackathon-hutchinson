@@ -43,8 +43,11 @@ def test_cycle_runs_only_the_quality_analyzer(make_engine, spy):
     assert calls[UseCase.QUALITY] == ["cycle:WS-01:C-000001"]
     assert calls[UseCase.WORKSTATION] == calls[UseCase.SAFETY] == []
     assert part.trigger_source == "plc_simulated"
-    assert part.prediction.model_name == "fake-quality"
-    assert part.prediction.model_version == "0.1.0"
+    # The prediction carries the name of the quality analyzer that is configured
+    # (usecases/quality/config.yaml), whichever it is (fake or the real qualite702 model).
+    quality = engine.registry.get(UseCase.QUALITY)
+    assert part.prediction.model_name == quality.name
+    assert part.prediction.model_version == quality.version
     # The inference event is stored and readable by the historical store.
     event = engine.events.get(part.prediction.event_id)
     assert event.frame.frame_id == "cycle:WS-01:C-000001"

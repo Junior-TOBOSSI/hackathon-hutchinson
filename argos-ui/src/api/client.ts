@@ -41,6 +41,11 @@ export const api = {
     if (USE_MOCK) return later(M.mockStationLive(scenario, stationId));
     return http(`/stations/${encodeURIComponent(stationId)}/live`);
   },
+  /** POST /api/stations/{id}/parts/confirm -> 204. L'opérateur confirme la pièce KO : on passe à la suivante. */
+  confirmPart(stationId: string): Promise<void> {
+    if (USE_MOCK) return later(undefined);
+    return http(`/stations/${encodeURIComponent(stationId)}/parts/confirm`, { method: 'POST' });
+  },
   /** POST /api/stations/{id}/report -> 204. Crée une alerte SIGNALEMENT chez le team leader de la cellule. */
   reportProblem(stationId: string): Promise<void> {
     if (USE_MOCK) return later(undefined);

@@ -1,17 +1,21 @@
-# Use case: quality (anomaly detection on parts)
+# Use case: quality (part 702: OK / NOK classification of the quality camera photo)
 
-# Class loaded by the registry ("module:Class"). Change this line to plug a real model.
-analyzer_class: usecases.quality.analyzer:FakeQualityAnalyzer
+# Class loaded by the registry ("module:Class").
+# The fake analyzer is still available: usecases.quality.analyzer:FakeQualityAnalyzer
+analyzer_class: usecases.quality.model702:Quality702Analyzer
 
 # Decision layer: score < low -> conforme ; low <= score < high -> a_verifier ; score >= high -> anomalie
-# Initial values; they can be changed at runtime through PUT /thresholds/quality.
+# Score = sum of the NOK probabilities. low = high = the model threshold (seuil_nok of the
+# qualite702 v1 kit): OK / NOK only, no "to check" zone, exactly like the kit.
+# Can be changed at runtime through PUT /thresholds/quality.
 thresholds:
-  low: 0.4
-  high: 0.7
+  low: 0.6365
+  high: 0.6365
 
-# Free parameters passed to analyzer.load() (plus "device" from the global settings).
+# Parameters passed to analyzer.load() (plus "device" from the global settings).
+# Weights are never versioned: data/models/quality/qualite702_v1/modele.pt.
 params:
-  seed: 42
-  anomaly_rate: 0.08      # share of clearly anomalous frames
-  min_latency_ms: 20      # simulated inference time
-  max_latency_ms: 60
+  weights: data/models/quality/qualite702_v1/modele.pt
+  imgsz: 128                              # as in training (config_qualite702.yaml)
+  classes: [NOK_DOUBLE, NOK_SANS, OK]     # model order; checked at load
+  seuil_nok: 0.6365
