@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Icon, ICONS, TopBar } from '../../components/ui';
-import { SECTIONS, useNav } from './common';
+import { SECTIONS, useNav, type Section } from './common';
 import { MlopsDataProvider, useFreshness, useHealth, useStore } from './data';
 import Datasets from './Datasets';
 import Deployment from './Deployment';
@@ -9,6 +10,7 @@ import Overview from './Overview';
 import Registry from './Registry';
 import { PENDING_SLOTS, useSelection } from './selection';
 import Training from './Training';
+import './workspace.css';
 
 /** Espace de travail AI Leader (données réelles Databricks via le backend ARGOS). */
 export default function AiLeaderWorkspace() {
@@ -26,6 +28,11 @@ function Workspace() {
   const freshness = useFreshness();
   const [message, setMessage] = useState('');
   const scoped = SECTIONS.find((s) => s.id === section)?.scoped ?? false;
+  const [params, setParams] = useSearchParams();
+  const policies = section === 'training' && params.get('view') === 'policies';
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const closeMenu = () => { setMenuOpen(false); menuButton.current?.focus(); };
 
   const connection = health.error
     ? <span className="pill pill-solid-red" title={health.error}>Databricks indisponible</span>
@@ -34,27 +41,22 @@ function Workspace() {
   return (
     <div className="screen" style={{ background: 'var(--app-bg)' }}>
       <TopBar title="Fabrique de modèles" sub="AI Leader" right={connection} />
-      <nav style={{ background: '#fff', borderBottom: '1px solid var(--line)', position: 'sticky', top: 0, zIndex: 20 }}>
-        <div className="row" style={{ padding: '0 24px', gap: 4, overflowX: 'auto', flexWrap: 'nowrap' }}>
-          {SECTIONS.map((s) => {
-            const active = s.id === section;
-            return (
-              <button key={s.id} onClick={() => go(s.id, s.id === 'registry' ? null : undefined)} className="btn" aria-current={active ? 'page' : undefined}
-                style={{ background: 'none', borderRadius: 0, height: 52, whiteSpace: 'nowrap', color: active ? 'var(--ink)' : 'var(--muted)', borderBottom: `3px solid ${active ? 'var(--red)' : 'transparent'}` }}>
-                {s.label}
-              </button>
-            );
-          })}
-          <span style={{ flex: 1 }} />
-          {scoped && <ModelPicker />}
-          <FreshnessLabel f={freshness} />
-          <button className="btn btn-ghost" style={{ height: 38, whiteSpace: 'nowrap' }} disabled={freshness.refreshing > 0}
-            title="Relit dans Databricks les données affichées (les autres sections seront relues à leur ouverture)"
-            onClick={() => store.refresh()}>
-            <span className="row" style={{ gap: 6 }}><Icon d={ICONS.overview} size={16} />Actualiser</span>
-          </button>
-        </div>
+      <nav className="aw-bar" aria-label="Navigation AI Leader">
+        <button ref={menuButton} className="aw-burger" aria-label="Ouvrir le menu" aria-expanded={menuOpen} aria-controls="aw-menu" onClick={() => setMenuOpen(true)}>
+          <span /><span /><span />
+        </button>
+        <span className="aw-current">{policies ? 'Politiques de réentraînement' : SECTIONS.find((s) => s.id === section)?.label}</span>
+        <span style={{ flex: 1 }} />
+        {scoped && <ModelPicker />}
+        <FreshnessLabel f={freshness} />
+        <button className="btn btn-ghost" style={{ height: 38, whiteSpace: 'nowrap' }} disabled={freshness.refreshing > 0}
+          title="Relit dans Databricks les données affichées (les autres sections seront relues à leur ouverture)"
+          onClick={() => store.refresh()}>
+          <span className="row" style={{ gap: 6 }}><Icon d={ICONS.overview} size={16} />Actualiser</span>
+        </button>
       </nav>
+      {menuOpen && <SideMenu section={section} policies={policies} onClose={closeMenu}
+        onGo={(target) => { closeMenu(); if (target === 'policies') setParams(new URLSearchParams({ section: 'training', view: 'policies' })); else go(target, target === 'registry' ? null : undefined); }} />}
       <main className="col" style={{ padding: '20px clamp(14px, 1.6vw, 28px) 40px', gap: 18, width: '100%', maxWidth: 2400, margin: '0 auto', boxSizing: 'border-box' }}>
         {message && <div className="row between"><span className="muted" style={{ fontWeight: 600 }}>{message}</span><button className="btn" style={{ background: 'none', height: 'auto', padding: 0 }} onClick={() => setMessage('')}>×</button></div>}
         {section === 'overview' && <Overview />}
@@ -99,4 +101,42 @@ function FreshnessLabel({ f }: { f: ReturnType<typeof useFreshness> }) {
   if (f.staleAfterError) parts.push(`${f.staleAfterError} en échec : dernier résultat affiché`);
   if (!parts.length) return null;
   return <span className="muted" style={{ fontSize: 13, whiteSpace: 'nowrap' }} title="Date réelle de lecture dans Databricks des données affichées à l'écran">{parts.join(' · ')}</span>;
+}
+
+const MENU_ICONS: Record<Section, keyof typeof ICONS> = {
+  overview: 'home', datasets: 'db', training: 'play', registry: 'badge', deployment: 'monitor', monitoring: 'bars',
+};
+
+/** Menu latéral déployable : sections AI Leader (+ Politiques sous Training Factory).
+    Se ferme avec Échap, un clic à l'extérieur ou après une sélection. */
+function SideMenu({ section, policies, onClose, onGo }: { section: Section; policies: boolean; onClose: () => void; onGo: (s: Section | 'policies') => void }) {
+  const first = useRef<HTMLButtonElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    first.current?.focus(); // once, at opening (not at every data refresh)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close.current(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  const item = (id: Section | 'policies', label: string, icon: keyof typeof ICONS, active: boolean, sub = false) => (
+    <button key={id} ref={id === 'overview' ? first : undefined} className={`aw-item${active ? ' active' : ''}${sub ? ' sub' : ''}`}
+      aria-current={active ? 'page' : undefined} onClick={() => onGo(id)}>
+      <Icon d={ICONS[icon]} size={sub ? 16 : 19} /><span>{label}</span>
+    </button>
+  );
+  return (
+    <div className="aw-layer" role="presentation" onClick={onClose}>
+      <aside id="aw-menu" className="aw-menu" role="dialog" aria-modal="true" aria-label="Menu AI Leader" onClick={(e) => e.stopPropagation()}>
+        <div className="aw-menu-head">
+          <span>AI Leader</span>
+          <button className="aw-close" aria-label="Fermer le menu" onClick={onClose}>×</button>
+        </div>
+        {SECTIONS.map((s) => [
+          item(s.id, s.label, MENU_ICONS[s.id], s.id === section && !policies),
+          s.id === 'training' ? item('policies', 'Politiques de réentraînement', 'log', policies, true) : null,
+        ])}
+      </aside>
+    </div>
+  );
 }
