@@ -21,6 +21,7 @@ import time
 
 from fastapi import APIRouter, FastAPI
 
+from mlops.api.deployment_routes import create_deployment_router
 from mlops.api.routes import build_overview, create_mlops_router, default_connector
 from mlops.databricks.datasets import dataset_store
 from mlops.databricks.read_cache import read_scope
@@ -50,6 +51,7 @@ def create_platform_app() -> FastAPI:
     if collisions:
         raise RuntimeError(f"route collisions between Core and MLOps: {collisions}")
     application.include_router(router, prefix=PREFIX)
+    application.include_router(create_deployment_router(), prefix=PREFIX)
     return application
 
 

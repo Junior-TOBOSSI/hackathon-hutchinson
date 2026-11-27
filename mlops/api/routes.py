@@ -46,8 +46,9 @@ from mlops.databricks.datasets import (
     TrainingDataset,
     dataset_store,
 )
-from mlops.databricks.read_cache import BudgetExceeded, read_scope
+from mlops.databricks.read_cache import BudgetExceeded, fresh_reads, read_scope
 from mlops.databricks.training import DatabricksJobBackend
+from mlops.deployment.contracts import LifecycleError
 from visionhub.contracts import UseCase
 from visionhub.integration.mlops import ModelRef, RetrainingPolicy
 
@@ -109,6 +110,8 @@ def translate(fn: Callable) -> Callable:
         try:
             return fn(*args, **kwargs)
         except DatabricksConnectorError as exc:
+            raise HTTPException(exc.status_code, str(exc)) from exc
+        except LifecycleError as exc:
             raise HTTPException(exc.status_code, str(exc)) from exc
         except BudgetExceeded as exc:
             raise HTTPException(503, f"Databricks too slow: {exc}") from exc
@@ -273,7 +276,22 @@ def create_mlops_router(
     @router.post("/mlops/models/{model_id}/versions/{version}/approve")
     @translate
     def approve(model_id: str, version: str, c: Connector) -> VersionStatus:
-        return c.approve_version(model_id, version)
+        # Keep the existing response while recording the same decision as the new API.
+        from mlops.deployment.contracts import DecisionRequest, LifecycleError
+        from mlops.deployment.runtime import lifecycle_service
+
+        decision = lifecycle_service(c).decide(
+            model_id, version,
+            DecisionRequest(
+                decision="approved", reason="Legacy approval route",
+                author_declared="unknown", role_declared="ai_leader",
+            ),
+        )
+        if decision.status != "applied":
+            raise LifecycleError("approval outcome uncertain; inspect decision history", 503)
+        with fresh_reads():
+            status = c.model_status(model_id)
+        return next(v for v in status.versions if v.version.version == version)
 
     @router.get("/mlops/models/{model_id}/monitoring")
     @translate
