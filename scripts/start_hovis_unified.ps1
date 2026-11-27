@@ -6,7 +6,8 @@
 .DESCRIPTION
   - By default remote training launches stay DISABLED (HOVIS_TRAINING_REMOTE removed) and the
     retraining scheduler stays DISABLED (HOVIS_RETRAIN_SCHEDULER removed).
-  - -EnableRemoteTraining temporarily AUTHORIZES remote Databricks training launches for this
+  - HOVIS_ALLOW_REMOTE_TRAINING=1 in hovis.local.env (not versioned) makes it permanent on
+    that machine (standing confirmation). -EnableRemoteTraining temporarily AUTHORIZES remote Databricks training launches for this
     instance only, after an explicit confirmation (typed, or -ConfirmRemoteTraining AUTORISER).
     HOVIS_TRAINING_REMOTE=1 is given to the gateway process only (the one hosting
     TrainingService); Edge and UI never receive it. Nothing is launched automatically: a launch
@@ -98,6 +99,18 @@ if ($Status) {
 
 # ------------------------------------------------------------------ remote training authorization
 $ConfirmWord = 'AUTORISER'
+# Durable LOCAL authorization (never versioned): HOVIS_ALLOW_REMOTE_TRAINING=1 in hovis.local.env
+# of this machine is the operator's standing confirmation; the repository default stays OFF.
+$standing = $false
+$localEnvFile = Join-Path $Root 'hovis.local.env'
+if (Test-Path $localEnvFile) {
+    $standing = [bool](Get-Content $localEnvFile | Where-Object { $_ -match '^\s*HOVIS_ALLOW_REMOTE_TRAINING\s*=\s*1\s*$' })
+}
+if ($standing -and -not $Stop -and -not $Status -and -not $EnableRemoteTraining) {
+    $EnableRemoteTraining = [switch]$true
+    $ConfirmRemoteTraining = $ConfirmWord
+    Write-Host '[hovis] hovis.local.env: HOVIS_ALLOW_REMOTE_TRAINING=1 (standing local authorization)' -ForegroundColor Yellow
+}
 if ($ConfirmRemoteTraining -and -not $EnableRemoteTraining) {
     throw '-ConfirmRemoteTraining only makes sense with -EnableRemoteTraining'
 }

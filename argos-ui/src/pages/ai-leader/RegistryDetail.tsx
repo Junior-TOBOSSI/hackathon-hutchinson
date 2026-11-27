@@ -34,7 +34,7 @@ export default function RegistryDetail({ row, onClose, onMessage }: {
     <header className="between" style={{ gap: 10 }}><div className="col" style={{ gap: 4 }}>
       <h2 className="h2">{model.display_name}</h2><span className="muted">{model.uc_name}</span></div>
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        {model.synthetic && <Badge tone="amber">Démo synthétique</Badge>}
+        {model.synthetic && <Badge tone="amber">Données synthétiques</Badge>}
         <button className="btn btn-ghost" aria-label="Fermer le détail" onClick={onClose}>✕</button>
       </div></header>
     <div className="row dataset-detail-meta"><span>Usage : <b>{fr(model.argos_use_case)}</b></span>
@@ -203,7 +203,7 @@ function DecisionTab({ model, status, selected, version, onVersion, onMessage }:
       <Chip tone="blue">Champion {status?.aliases.champion === version ? `v${version}` : status?.aliases.champion ? `v${status.aliases.champion}` : '—'}</Chip>
       <Chip tone="amber">Serving {served ? `v${version}` : 'autre version / aucun'}</Chip></div>}
     <div className="lifecycle-form">
-      <b>Nouvelle décision motivée</b><span className="muted">Auteur et rôle déclarés pour la démonstration · identité authentifiée indisponible.</span>
+      <b>Nouvelle décision motivée</b><span className="muted">Auteur et rôle déclarés · identité authentifiée indisponible.</span>
       <div className="lifecycle-form-grid"><label>Décision<select className="input" value={choice} onChange={(event) => setChoice(event.target.value as DecisionValue)}>
         <option value="approved">Approuver</option><option value="rejected">Refuser</option></select></label>
         <label>Auteur déclaré<input className="input" value={author} onChange={(event) => setAuthor(event.target.value)} maxLength={100} placeholder="Nom affiché" /></label></div>
@@ -219,7 +219,7 @@ function DecisionTab({ model, status, selected, version, onVersion, onMessage }:
     </div>
     <div className="col" style={{ gap: 8 }}><h3>Historique des décisions</h3>
       {history.loading && <Loading />}{history.error && <Unavailable tone="red">{history.error}</Unavailable>}
-      {history.data?.length === 0 && <Unavailable tone="grey">Aucune décision HOVIS enregistrée pour cette version.</Unavailable>}
+      {history.data?.length === 0 && <Unavailable tone="grey">Aucune décision ARGOS enregistrée pour cette version.</Unavailable>}
       {history.data?.map((record) => <div className="lifecycle-event" key={record.decision_id}>
         <Chip tone={record.status === 'uncertain' ? 'amber' : record.decision === 'approved' ? 'green' : 'red'}>{record.decision === 'approved' ? 'Approuvée' : 'Refusée'} · {record.status === 'uncertain' ? 'incertaine' : record.status === 'applied' ? 'appliquée' : 'en cours'}</Chip>
         <b>{dateTime(record.created_at)}</b><span>{record.reason}</span><small>Auteur déclaré : {record.author_declared} · identité vérifiée : indisponible</small>

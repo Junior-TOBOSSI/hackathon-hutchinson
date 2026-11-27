@@ -43,9 +43,6 @@ export default function Login() {
           <Icon d={ICONS.badge} size={26} color="var(--primary)" />
           <span>Au poste : passez votre badge sur le lecteur</span>
         </div>
-        <span className="muted" style={{ fontSize: 12, textAlign: 'center' }}>
-          Démo : m.rojas@ (opérateur) · c.diaz@ (superviseur) · a.noui@ (AI Leader) · admin@ (admin), domaine hutchinson.com
-        </span>
       </form>
     </div>
   );
