@@ -281,11 +281,11 @@ def test_approval_invalidates_and_returns_the_real_state(api, connector):  # noq
 def test_alias_change_is_visible_immediately(api, connector):  # noqa: F811
     api.get("/api/mlops/models/q/status")
     connector.mlflow.get_registered_model.return_value = SimpleNamespace(
-        aliases={"champion": "1", "challenger": "2"}
+        aliases={"champion": "2", "challenger": "1"}
     )
-    moved = api.post("/api/models/q/promote", json={"version": "1"}).json()
-    assert moved["aliases"]["champion"] == "1"
-    assert api.get("/api/mlops/models/q/status").json()["aliases"]["champion"] == "1"
+    moved = api.post("/api/models/q/promote", json={"version": "2"}).json()  # v2 is approved
+    assert moved["aliases"]["champion"] == "2"
+    assert api.get("/api/mlops/models/q/status").json()["aliases"]["champion"] == "2"
 
 
 def test_databricks_down_serves_last_known_value_marked_stale(api, connector):  # noqa: F811

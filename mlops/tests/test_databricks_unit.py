@@ -139,10 +139,14 @@ def test_alias_guard_and_unknown_model(connector):
         connector.set_alias("q", "production", "1")
     with pytest.raises(ResourceNotFoundError):
         connector.model_status("unknown")
-    connector.set_alias("q", "champion", "1")
-    connector.mlflow.set_registered_model_alias.assert_called_once_with(
-        "cat.sch.q", "champion", "1"
-    )
+    with pytest.raises(ForbiddenOperationError):  # v1 is not approved: never champion
+        connector.set_alias("q", "champion", "1")
+    connector.set_alias("q", "challenger", "1")  # challenger needs no approval
+    connector.set_alias("q", "champion", "2")  # v2 approved
+    assert [c.args for c in connector.mlflow.set_registered_model_alias.call_args_list] == [
+        ("cat.sch.q", "challenger", "1"),
+        ("cat.sch.q", "champion", "2"),
+    ]
 
 
 def test_trigger_job_guards(connector, monkeypatch):
@@ -223,10 +227,13 @@ def test_routes_and_error_codes(api, connector):
         api.post("/api/mlops/models/q/aliases/production", json={"version": "1"}).status_code == 403
     )
     assert api.post("/api/mlops/jobs/other/run").status_code == 403
-    response = api.post("/api/models/q/promote", json={"version": "1"})
+    assert (
+        api.post("/api/models/q/promote", json={"version": "1"}).status_code == 403
+    )  # not approved
+    response = api.post("/api/models/q/promote", json={"version": "2"})
     assert response.status_code == 200 and response.json()["served"] == {"ep": "1"}
-    assert api.put("/api/models/retrain-mode", json={"mode": "AUTO"}).status_code == 204
-    assert api.get("/api/models/overview").json()["retrainMode"] == "AUTO"
+    assert api.put("/api/models/retrain-mode", json={"mode": "AUTO"}).status_code == 409
+    assert api.get("/api/models/overview").json()["retrainMode"] == "MANUEL"
     assert api.put("/api/models/retrain-mode", json={"mode": "MANUEL"}).status_code == 204
 
 

@@ -453,10 +453,19 @@ class DatabricksConnector:
             raise ForbiddenOperationError(f"alias must be one of {PROMOTABLE_ALIASES}")
         managed = self.managed(model_id)
         with self.reads.mutation(f"versions:{model_id}"):
-            self._call(
+            mv = self._call(
                 lambda: self.mlflow.get_model_version(managed.uc_name, version),
                 f"version {version}",
             )
+            # INT-GLOBAL-01: the champion is ALWAYS an approved version (server-side guard,
+            # read on the real registry; the UI check alone is not a guarantee).
+            if (
+                alias == "champion"
+                and (getattr(mv, "tags", None) or {}).get(APPROVAL_TAG) != "approved"
+            ):
+                raise ForbiddenOperationError(
+                    f"version {version} is not approved: it cannot become champion"
+                )
             self._call(
                 lambda: self.mlflow.set_registered_model_alias(managed.uc_name, alias, version),
                 "alias",

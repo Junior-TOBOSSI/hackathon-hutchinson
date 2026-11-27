@@ -53,8 +53,7 @@ from mlops.databricks.datasets import (
 from mlops.databricks.read_cache import BudgetExceeded, fresh_reads, read_scope
 from mlops.deployment.contracts import LifecycleError
 from mlops.training.service import LaunchRecord, remote_enabled
-from visionhub.contracts import UseCase
-from visionhub.integration.mlops import ModelRef, RetrainingPolicy
+from visionhub.integration.mlops import ModelRef
 
 HEALTH_THRESHOLD = 85
 
@@ -164,12 +163,20 @@ def served(c: DatabricksConnector, response: Response, fresh: bool, read: Callab
 Fresh = Annotated[bool, Query(description="true = bypass the server cache (real read)")]
 
 
-# In-memory retraining policies (one per ARGOS use case). Persisting them is the Core's job.
-_POLICIES: dict[str, RetrainingPolicy] = {}
+def _policy_mode(c: DatabricksConnector | None = None) -> Literal["MANUEL", "AUTO"]:
+    """Legacy ``retrainMode``, derived from the REAL retraining system (DBX-08): AUTO only when
+    an active automatic policy exists AND the scheduler is enabled; MANUEL otherwise."""
+    import os
 
+    if os.environ.get("HOVIS_RETRAIN_SCHEDULER") != "1" or c is None:
+        return "MANUEL"
+    try:
+        from mlops.api.retraining_routes import retraining_for
 
-def _policy_mode() -> Literal["MANUEL", "AUTO"]:
-    return "AUTO" if any(p.auto_train for p in _POLICIES.values()) else "MANUEL"
+        pols = retraining_for(c).store.policies()
+    except Exception:  # noqa: BLE001 - unknown state is never reported as automatic
+        return "MANUEL"
+    return "AUTO" if any(p.active and p.mode == "auto" for p in pols) else "MANUEL"
 
 
 def create_mlops_router(
@@ -219,11 +226,15 @@ def create_mlops_router(
     @router.put("/models/retrain-mode", status_code=204)
     @translate
     def retrain_mode(body: RetrainModeBody, c: Connector) -> None:
-        for managed in c.settings.models:
-            _POLICIES[managed.argos_use_case] = RetrainingPolicy(
-                use_case=UseCase(managed.argos_use_case),
-                enabled=True,
-                auto_train=body.mode == "AUTO",
+        """Legacy compatibility only. There is ONE retraining configuration system: the
+        versioned policies (/api/mlops/retraining). MANUEL is accepted (no effect, nothing is
+        ever launched by this route); AUTO is refused instead of pretending a global mode."""
+        if body.mode == "AUTO":
+            raise HTTPException(
+                409,
+                "no global automatic mode: configure an automatic retraining policy "
+                "(/api/mlops/retraining/policies); launches also need the scheduler and "
+                "HOVIS_TRAINING_REMOTE",
             )
 
     @router.post("/models/{model_id}/promote")
@@ -321,10 +332,13 @@ def create_mlops_router(
         from mlops.deployment.runtime import lifecycle_service
 
         decision = lifecycle_service(c).decide(
-            model_id, version,
+            model_id,
+            version,
             DecisionRequest(
-                decision="approved", reason="Legacy approval route",
-                author_declared="unknown", role_declared="ai_leader",
+                decision="approved",
+                reason="Legacy approval route",
+                author_declared="unknown",
+                role_declared="ai_leader",
             ),
         )
         if decision.status != "applied":
@@ -651,7 +665,7 @@ def create_mlops_router(
     # DBX-05 Training Factory (dedicated module, same connector and cache).
     router.include_router(create_training_router(get_connector))
     # DBX-07B Monitoring (dedicated module; local history only, GET never writes).
-    router.include_router(create_monitoring_router(get_connector, get_policy=_POLICIES.get))
+    router.include_router(create_monitoring_router(get_connector))
     # DBX-08 retraining policies (single launch path: TrainingService.launch).
     router.include_router(create_retraining_router(get_connector))
 
@@ -723,7 +737,7 @@ def build_overview(c: DatabricksConnector) -> dict[str, Any]:
                     "title": managed.display_name,
                     "detail": f"Dérive des données détectée : {alerts} (seuil 0,2)",
                     "healthPct": health,
-                    "mode": _policy_mode(),
+                    "mode": _policy_mode(c),
                 }
             )
         elif not monitoring.available:
@@ -741,7 +755,7 @@ def build_overview(c: DatabricksConnector) -> dict[str, Any]:
                         f"(lu le {snap.read_at:%d/%m/%Y %H:%M} UTC) : "
                         f"dérive des données {alerts} (seuil 0,2)",
                         "healthPct": health,
-                        "mode": _policy_mode(),
+                        "mode": _policy_mode(c),
                         "stale": True,
                     }
                 )
@@ -780,7 +794,7 @@ def build_overview(c: DatabricksConnector) -> dict[str, Any]:
         "drifts": drifts,
         "models": models,
         "training": training,
-        "retrainMode": _policy_mode(),
+        "retrainMode": _policy_mode(c),
         "dataStatus": {
             "source": "Databricks (MLflow, Unity Catalog, Jobs, Serving, Delta monitoring)",
             "healthPct": "labelled accuracy of the last monitoring window, "
