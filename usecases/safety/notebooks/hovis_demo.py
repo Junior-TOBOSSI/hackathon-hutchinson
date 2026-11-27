@@ -167,15 +167,14 @@ def live(station_id: str) -> dict:
         "product": "DÉMO SAFETY · production simulée",
         "shift": shift,
         "now": now,
-        "part": {"number": prod["good"] + prod["ko"] + 1, "verdict": "OK", "jointsDetected": 1, "score": 0.96,
-                 "imageUrl": "/img/demo-piece-ok.svg", "takenAt": now},
+        "part": current_part(prod["good"] + prod["ko"] + 1, now),
         "counters": {"good": prod["good"], "ko": prod["ko"]},
         "objective": {"shiftTarget": prod["shiftTarget"], "expectedNow": prod["expectedNow"], "perHour": PER_HOUR},
         "hourly": prod["hourly"],  # SIMULATED
         "issues": issues,
         "safetyPpe": ppe,  # helmet/glasses/gloves/shoes: absent | present | uncertain
         "frontSnapshotUrl": "/api/safety-demo/stream.mjpg" if n else None,  # same URL: the stream stays open
-        "checks": {**station_checks(issues), "qualite": True, "koRatePct": round(100 * prod["ko"] / max(1, prod["good"] + prod["ko"]), 1)},
+        "checks": {**station_checks(issues), "qualite": PART["verdict"] == "OK", "koRatePct": round(100 * prod["ko"] / max(1, prod["good"] + prod["ko"]), 1)},
         "qualityModelVersion": "simulé",
         "partCameraOnline": True,
     }
@@ -205,6 +204,41 @@ def mjpeg():
 def stream() -> StreamingResponse:
     return StreamingResponse(mjpeg(), media_type="multipart/x-mixed-replace; boundary=frame",
                              headers={"Cache-Control": "no-store"})
+
+
+# SIMULATED quality (no quality model here): a NOK part can be triggered for the demo, and the
+# operator can re-check it and requalify it OK (false alarm). In memory only.
+# The NOK photo is served by argos-ui (public/img/piece-nok.jpg): an industrial image, NEVER committed.
+PART = {"number": None, "verdict": "OK", "requalified": False}
+REQUALIFIED: list[dict] = []  # trace of requalifications (part number, time), in memory
+
+
+def current_part(number: int, now: str) -> dict:
+    """The part on screen: a simulated OK part, or the NOK part of the demo until the next one."""
+    if PART["number"] is not None and number > PART["number"] + 1:
+        PART.update(number=None, verdict="OK", requalified=False)  # the next part has arrived
+    ko = PART["verdict"] == "KO"
+    return {"number": PART["number"] or number, "verdict": PART["verdict"], "jointsDetected": 2 if ko else 1,
+            "score": 0.91 if ko else 0.96, "requalified": PART["requalified"],
+            "imageUrl": "/img/piece-nok.jpg" if ko or PART["requalified"] else "/img/demo-piece-ok.svg",  # same part "takenAt": now}
+
+
+@app.post("/api/safety-demo/part-nok", status_code=204)
+def part_nok() -> Response:
+    """Demo: a NOK part (2 joints) arrives."""
+    local = datetime.now().astimezone()
+    prod = simulated_production(local, current_shift(local)[1])
+    PART.update(number=prod["good"] + prod["ko"] + 1, verdict="KO", requalified=False)
+    return Response(status_code=204)
+
+
+@app.post("/api/stations/{station_id}/parts/{number}/requalify", status_code=204)
+def requalify(station_id: str, number: int) -> Response:
+    """The operator re-checked the NOK part: it is good (false alarm). Traced, never silent."""
+    if PART["verdict"] == "KO":
+        PART.update(verdict="OK", requalified=True)
+        REQUALIFIED.append({"part": number, "at": datetime.now().astimezone().isoformat()})
+    return Response(status_code=204)
 
 
 @app.post("/api/stations/{station_id}/report", status_code=204)
