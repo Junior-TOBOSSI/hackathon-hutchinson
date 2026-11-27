@@ -254,6 +254,7 @@ class YoloSafetyAnalyzer(Analyzer):
         )  # fmt: skip
         raw = [] if self.last_camera_blocked else self._predict(self.model, image, low)
         dets = [d for d in raw if d.conf >= class_conf.get(d.name, self.p["conf"])]
+        self.last_raw = raw  # every detection from the lowest threshold (diagnosis only)
         if self.p["require_head"]:
             dets = keep_real_persons(dets)
         # Privacy: faces must be hidden even when the model is unsure, so the boxes used
