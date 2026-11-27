@@ -224,6 +224,11 @@ class TrainingService:
         out = []
         for fam in self.resolver.families():
             same_classes = set(fam.classes) == set(spec.classes)
+            if (
+                spec.id in {"quality-industrial-binary", "workstation-industrial"}
+                and fam.dataset_id not in spec.dataset.families
+            ):
+                continue
             if fam.annotation_format == spec.dataset.annotation_format and (
                 fam.dataset_id in spec.dataset.families or same_classes
             ):
@@ -254,6 +259,7 @@ class TrainingService:
                 )
             )
         preview = None
+        manifest = None
         try:
             sha, manifest = self.resolver.manifest(dataset_id, version)
             preview = self.resolver.preview(dataset_id, version)
@@ -272,6 +278,40 @@ class TrainingService:
             )
         params, param_checks = effective_parameters(spec, overrides)
         checks += param_checks
+        if (
+            spec.id in {"quality-industrial-binary", "workstation-industrial"}
+            and dataset_id not in spec.dataset.families
+        ):
+            checks.append(
+                Check(
+                    id="scientific-family",
+                    label="Famille scientifique attendue",
+                    status="error",
+                    detail=f"{dataset_id} n'est pas une famille déclarée du pipeline",
+                )
+            )
+        if spec.id == "workstation-industrial" and manifest is not None:
+            from mlops.pipelines.workstation.run_pipeline import SECTIONS
+
+            section = params.get("station")
+            expected_family = SECTIONS.get(section, (None, None))[0]
+            assets = {a.get("file", "").rsplit("/", 1)[-1] for a in manifest.get("assets", [])}
+            if (
+                manifest.get("station") != section
+                or dataset_id != expected_family
+                or not {"reference.png", "labels.csv"}.issubset(assets)
+            ):
+                checks.append(
+                    Check(
+                        id="workstation-section",
+                        label="Section et fichiers de référence",
+                        status="error",
+                        detail=(
+                            "la section, labels.csv et reference.png doivent correspondre "
+                            "au dataset"
+                        ),
+                    )
+                )
         if spec.evaluation.get("threshold_split"):
             checks.append(
                 Check(
@@ -306,13 +346,19 @@ class TrainingService:
 
     @staticmethod
     def _command_preview(spec: PipelineSpec, dataset_id: str, version: str) -> list[str]:
-        if spec.id == "quality-industrial":
+        if spec.id in {"quality-industrial", "quality-industrial-binary"}:
             return [
                 "run_pipeline.py --request <Volume>/training/<request>/request.json",
                 "kit/train.py --dataset <isolé> --sortie <run>/modele --version <request>"
                 " --hyperparametres <effectif> --device cpu",
                 "kit/evaluer.py --config <run>/modele/config_qualite702.yaml"
                 " --images <isolé>/test --sortie <run>/test",
+            ]
+        if spec.id == "workstation-industrial":
+            return [
+                "run_pipeline.py --request <Volume>/training/<request>/request.json",
+                "usecases.workstation.evaluate : normalité statistique, SIFT/RANSAC, 5 plis",
+                f"section déclarée + dataset {dataset_id}/{version} + résultats MLflow",
             ]
         return [
             f"train_quality.py --dataset-dir <Volume>/{dataset_id}/{version}"
@@ -660,6 +706,30 @@ class TrainingService:
         return data
 
     def evaluation(self, run_id: str) -> dict[str, Any]:
+        workstation = self._artifact(run_id, "evaluation/results.csv")
+        if workstation is not None:
+            rows = list(csv.DictReader(io.StringIO(workstation.decode("utf-8"))))
+            measured = self._artifact(run_id, "evaluation/evaluation.json")
+            truth = ["good", "anomaly"]
+            columns = ["good", "A_VERIFIER", "anomaly"]
+            counts = {label: {column: 0 for column in columns} for label in truth}
+            for row in rows:
+                label = "good" if row["expected"] == "conforme" else "anomaly"
+                predicted = {"conforme": "good", "a_verifier": "A_VERIFIER", "anomalie": "anomaly"}[
+                    row["decision"]
+                ]
+                counts[label][predicted] += 1
+            return {
+                "available": True,
+                "kind": "workstation",
+                "source": "evaluation/results.csv",
+                "split": "cross-validation",
+                "metrics": json.loads(measured) if measured else {},
+                "truth_classes": truth,
+                "columns": columns,
+                "matrix": counts,
+                "n": len(rows),
+            }
         raw = self._artifact(run_id, "evaluation/metriques.json")
         preds = self._artifact(run_id, "evaluation/predictions.csv")
         if raw is None or preds is None:
@@ -688,6 +758,49 @@ class TrainingService:
         offset: int,
         limit: int,
     ) -> dict[str, Any]:
+        workstation = self._artifact(run_id, "evaluation/results.csv")
+        if workstation is not None:
+            rows = []
+            for source in csv.DictReader(io.StringIO(workstation.decode("utf-8"))):
+                truth = "good" if source["expected"] == "conforme" else "anomaly"
+                predicted = {"conforme": "good", "a_verifier": "A_VERIFIER", "anomalie": "anomaly"}[
+                    source["decision"]
+                ]
+                rows.append(
+                    {
+                        "fichier": source["file"],
+                        "vraie_classe": truth,
+                        "verdict": {"good": "OK", "anomaly": "NOK", "A_VERIFIER": "A_VERIFIER"}[
+                            predicted
+                        ],
+                        "type_defaut": source["type"] if truth == "anomaly" else "",
+                        "decision": predicted,
+                        "score_nok": float(source["score"]),
+                        "latence_ms": float(source["latency_ms"]),
+                        "correct": source["correct"].lower() == "true",
+                        "false_reject": truth == "good" and predicted != "good",
+                        "missed_defect": truth == "anomaly" and predicted == "good",
+                        "type_confusion": False,
+                        "to_check": predicted == "A_VERIFIER",
+                        "right_reason": source["right_reason"].lower() == "true",
+                        "alignment_failed": source["alignment_failed"].lower() == "true",
+                        "found": source["found"],
+                        "view": source["view"],
+                        "manifest_file": None,
+                        "annotated_path": f"evaluation/annotated/{source['file']}",
+                    }
+                )
+            selected = [row for row in rows if match(row, f)]
+            return {
+                "available": True,
+                "kind": "workstation",
+                "total": len(selected),
+                "offset": offset,
+                "limit": limit,
+                "items": selected[offset : offset + limit],
+                "dataset_id": dataset_id,
+                "version": version,
+            }
         preds = self._artifact(run_id, "evaluation/predictions.csv")
         if preds is None:
             return {"available": False, "total": 0, "items": []}

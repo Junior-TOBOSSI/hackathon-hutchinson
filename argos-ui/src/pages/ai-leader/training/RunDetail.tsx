@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { familyImageUrl, type RunSummary } from '../../../api/mlops';
-import { artifactUrl, training, type MlRun, type Point, type PredictionPage, type RunDetail as Detail } from '../../../api/training';
+import { artifactUrl, training, type Evaluation as EvaluationData, type MlRun, type Point, type PredictionPage, type RunDetail as Detail } from '../../../api/training';
 import { KV, Loading, Technical, Unavailable } from '../common';
 import { errText, useStore } from '../data';
 import { MetricsBlock } from '../Registry';
@@ -69,6 +69,7 @@ function metric(run: MlRun, ...keys: string[]) {
 }
 
 function Overview({ d, run }: { d: Detail; run: MlRun }) {
+  if (d.pipeline.use_case === 'workstation') return <WorkstationOverview d={d} run={run} />;
   const cards: [string, string, string?][] = [
     ['Exactitude (test)', pct(metric(run, 'test_accuracy'))],
     ['Rappel NOK (test)', pct(metric(run, 'test_rappel', 'test_recall_nok'))],
@@ -86,6 +87,22 @@ function Overview({ d, run }: { d: Detail; run: MlRun }) {
     <span className="muted" style={{ fontSize: 13 }}>Mesures par image sur le split test indépendant ; « — » = non mesuré par ce pipeline. Aucune conversion en mesure par pièce.
       {metric(run, 'early_stopped') ? ' Arrêt anticipé (patience atteinte).' : ''}</span>
     {metric(run, 'test_rappel', 'test_accuracy') == null && <Unavailable tone="grey">Aucune métrique de test pour ce run.</Unavailable>}
+  </div>;
+}
+
+function WorkstationOverview({ d, run }: { d: Detail; run: MlRun }) {
+  const cards = [
+    ['Rappel anomalies', pct(metric(run, 'cv_anomaly_recall'))],
+    ['Motif correct', pct(metric(run, 'cv_right_reason_recall'))],
+    ['Fausses alertes', pct(metric(run, 'cv_false_alarm_rate'))],
+    ['Échecs d’alignement', metric(run, 'cv_alignment_failures')?.toString() ?? '—'],
+    ['Latence moyenne', metric(run, 'cv_latency_mean_ms') != null ? `${metric(run, 'cv_latency_mean_ms')} ms` : '—'],
+    ['Latence P95', metric(run, 'cv_latency_p95_ms') != null ? `${metric(run, 'cv_latency_p95_ms')} ms` : '—'],
+    ['Modèle candidat', d.row.model_versions.length ? `v${d.row.model_versions.join(', v')}` : '—'],
+  ];
+  return <div className="col" style={{ gap: 12 }}>
+    <div className="tf-metric-grid">{cards.map(([label, value]) => <div key={label} className="tf-box"><span className="muted" style={{ fontSize: 13 }}>{label}</span><b style={{ fontSize: 22 }}>{value}</b></div>)}</div>
+    <span className="muted" style={{ fontSize: 13 }}>Photos conformes évaluées par validation croisée, anomalies évaluées sur la normalité apprise. Aucun entraînement neuronal.</span>
   </div>;
 }
 
@@ -142,6 +159,7 @@ function Evaluation({ run, onCell }: { run: MlRun; onCell: (truth: string, pred:
   if (ev.loading) return <Loading what="Lecture des sorties d'évaluation" />;
   if (ev.error) return <Unavailable tone="red">{ev.error}</Unavailable>;
   const e = ev.data;
+  if (e?.available && e.kind === 'workstation') return <WorkstationEvaluation e={e} onCell={onCell} />;
   if (!e?.available) return <div className="col" style={{ gap: 10 }}>
     <Unavailable tone="grey">Pas de fichiers d'évaluation (predictions.csv, metriques.json) pour ce run : matrice de confusion indisponible. Mesures enregistrées dans MLflow :</Unavailable>
     <MetricsBlock run={run as unknown as RunSummary} /></div>;
@@ -171,6 +189,27 @@ function Evaluation({ run, onCell }: { run: MlRun; onCell: (truth: string, pred:
 const KINDS: [string, string][] = [['correct', 'Correctes'], ['incorrect', 'Incorrectes'], ['false_reject', 'Faux rejets'], ['missed_defect', 'Défauts manqués'],
   ['type_confusion', 'Erreur de type de défaut'], ['to_check', 'À vérifier']];
 
+function WorkstationEvaluation({ e, onCell }: { e: EvaluationData; onCell: (truth: string, pred: string) => void }) {
+  const m = e.metrics ?? {};
+  const cards = [
+    ['Photos évaluées', String(e.n ?? '—')],
+    ['Rappel anomalies', pct(num(m.cv_anomaly_recall))],
+    ['Motif correct', pct(num(m.cv_right_reason_recall))],
+    ['Fausses alertes', pct(num(m.cv_false_alarm_rate))],
+    ['Échecs d’alignement', String(m.cv_alignment_failures ?? '—')],
+    ['Latence moyenne', `${m.cv_latency_mean_ms ?? '—'} ms`],
+    ['Latence P95', `${m.cv_latency_p95_ms ?? '—'} ms`],
+  ];
+  return <div className="col" style={{ gap: 14 }}>
+    <div className="tf-metric-grid">{cards.map(([label, value]) => <div key={label} className="tf-box"><span className="muted" style={{ fontSize: 13 }}>{label}</span><b style={{ fontSize: 20 }}>{value}</b></div>)}</div>
+    <Unavailable>Petit effectif du jeu de groupe : interpréter les mesures par image avec prudence.</Unavailable>
+    <div className="tf-box"><b>Décisions Workstation — validation croisée des conformes et évaluation des anomalies</b>
+      <div style={{ overflowX: 'auto' }}><table className="tf-matrix"><thead><tr><th>Classe réelle</th>{e.columns?.map((c) => <th key={c}>{c}</th>)}</tr></thead>
+        <tbody>{e.truth_classes?.map((truth) => <tr key={truth}><th>{truth}</th>{e.columns?.map((pred) => <td key={pred}><button title="Voir les images" onClick={() => onCell(truth, pred)}>{e.matrix?.[truth]?.[pred] ?? 0}</button></td>)}</tr>)}</tbody></table></div>
+    </div>
+  </div>;
+}
+
 function Predictions({ run, d, filter, setFilter }: { run: MlRun; d: Detail; filter: Record<string, string>; setFilter: (f: Record<string, string>) => void }) {
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState<PredictionPage | null>(null);
@@ -197,11 +236,13 @@ function Predictions({ run, d, filter, setFilter }: { run: MlRun; d: Detail; fil
       <span className="muted" style={{ fontSize: 13 }}>{page.total} prédiction(s) · split test · bordure verte = décision juste, rouge = erreur ; la pastille donne le verdict industriel.</span>
       <div className="tf-gallery">{page.items.map((p) => (
         <div key={`${p.vraie_classe}/${p.fichier}`} className={`tf-pred ${p.correct ? 'ok' : 'ko'}`}>
-          {p.manifest_file && datasetId && version ? <img loading="lazy" decoding="async" alt={p.fichier} src={familyImageUrl(datasetId, version, p.manifest_file)} />
+          {p.annotated_path ? <img loading="lazy" decoding="async" alt={p.fichier} src={artifactUrl(run.run_id, p.annotated_path)} />
+            : p.manifest_file && datasetId && version ? <img loading="lazy" decoding="async" alt={p.fichier} src={familyImageUrl(datasetId, version, p.manifest_file)} />
             : <div className="ph">image non reliée au manifeste</div>}
           <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}><Chip tone={p.verdict === 'OK' ? 'green' : p.verdict === 'NOK' ? 'red' : 'amber'}>{p.verdict}</Chip>{p.type_defaut && <Chip tone="grey">{p.type_defaut}</Chip>}</div>
           <span>Réel : <b>{p.vraie_classe}</b> · décision : <b>{p.decision}</b></span>
-          <span className="muted">Score NOK {p.score_nok?.toFixed(3) ?? '—'} · {p.latence_ms ?? '—'} ms</span>
+          <span className="muted">{page.kind === 'workstation' ? 'Score anomalie' : 'Score NOK'} {p.score_nok?.toFixed(3) ?? '—'} · {p.latence_ms ?? '—'} ms</span>
+          {page.kind === 'workstation' && <span className="muted">Vue {p.view ?? '—'} · Motif correct {p.right_reason ? 'oui' : 'non'} · Alignement {p.alignment_failed ? 'échoué' : 'OK'} · {p.found || 'aucun écart décrit'}</span>}
           <span className="muted" title={p.fichier} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.fichier}</span>
         </div>))}</div>
       {page.total > 24 && <div className="row" style={{ gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>

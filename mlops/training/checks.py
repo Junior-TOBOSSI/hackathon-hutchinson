@@ -153,6 +153,16 @@ def effective_parameters(
                 )
             )
             continue
+        if p.choices and value not in p.choices:
+            checks.append(
+                Check(
+                    id=f"param:{name}",
+                    label=p.label,
+                    status="error",
+                    detail=f"choisir parmi : {', '.join(p.choices)}",
+                )
+            )
+            continue
         values[name] = value
     if spec.parameters:
         changed = [p.label for p in spec.parameters if values[p.name] != p.default]

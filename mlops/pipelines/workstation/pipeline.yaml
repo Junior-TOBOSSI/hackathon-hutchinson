@@ -1,0 +1,60 @@
+# Statistical normality is learned by the group's unchanged Workstation code.
+# A YOLO26 COCO detector only names objects; it does not train a neural model here.
+id: workstation-industrial
+name: Gestion de poste 5S — normalité et zones (groupe Workstation)
+use_case: workstation
+task: anomaly-detection
+architecture: SIFT + RANSAC + normalité statistique + zones + YOLO26 COCO
+description: >-
+  Une section et son vrai jeu de 11 images, évalués par validation croisée selon
+  usecases.workstation.evaluate. Aucun entraînement neuronal n'est revendiqué.
+code:
+  repo: github.com/Junior-TOBOSSI/hackathon-hutchinson
+  branch: workstation
+  commit: f1680324858e9184a797e27bbb0b9432df468598
+  path: mlops/pipelines/workstation/kit
+  version: workstation kit @f168032
+classes: [good, anomaly]
+dataset:
+  families: [poste-5s-11, poste-bleu-5s-11, poste-variante-5s-11, poste-electrique-5s-11]
+  annotation_format: classification
+  image_extensions: [.png, .jpg, .jpeg]
+  required_splits: [train, test]
+  split_names: {train: train, validation: validation, test: test}
+parameters:
+  - name: station
+    type: str
+    default: press_cell
+    level: basic
+    label: Section du poste
+    choices: [press_cell, machine_cell, machine_cell_variant, electrical_bench]
+  - {name: folds, type: int, default: 5, min: 5, max: 5, level: imposed, label: Plis de validation croisée}
+  - {name: detector, type: str, default: coco, level: imposed, label: Détecteur YOLO26 COCO}
+  - {name: device, type: str, default: cpu, level: imposed, label: Calcul CPU}
+  - {name: annotate, type: bool, default: true, level: imposed, label: Images annotées}
+compute:
+  kind: serverless-cpu
+  gpu: false
+  environment: [numpy==1.26.4, scipy==1.13.1, pillow==10.3.0, torch==2.5.1,
+                torchvision==0.20.1, ultralytics==8.4.219, opencv-python==4.11.0.86,
+                mlflow==3.18.0, pyyaml]
+job:
+  name: hovis-workstation-training
+  dataset_argument: null
+  runs_root: /Volumes/workspace/argos_poc/images/runs/hovis
+  code_root: /Volumes/workspace/argos_poc/images/runs/hovis/code
+  script: /Volumes/workspace/argos_poc/images/runs/hovis/code/mlops/pipelines/workstation/run_pipeline.py
+  base_weights: /Volumes/workspace/argos_poc/images/runs/hovis/weights/yolo26n.pt
+  launcher: /Shared/ARGOS-POC/run_volume_script
+entrypoints:
+  evaluate: kit/usecases/workstation/evaluate.py
+  model: kit/usecases/workstation/model.py
+  station: kit/usecases/workstation/station.py
+outputs: [results.csv, annotated, preview, normality, evaluation.json]
+mlflow:
+  experiment: /Shared/HOVIS/workstation-industrial
+  registered_model: workspace.argos_poc.workstation_industrial
+evaluation:
+  split: cross-validation
+  independent: true
+  unit: image

@@ -25,6 +25,7 @@ class ParamSpec(BaseModel):
     level: Literal["basic", "advanced", "imposed"]
     label: str
     help: str | None = None
+    choices: list[str] = Field(default_factory=list)
 
 
 class DatasetRequirement(BaseModel):
@@ -87,15 +88,23 @@ def load_specs(root: Path = PIPELINES_DIR) -> list[PipelineSpec]:
 def requirements(spec: PipelineSpec, job_names: set[str] | None) -> list[Requirement]:
     """Real checks only. ``job_names`` = names of the existing Databricks jobs (None: unknown)."""
     out = []
-    kit = Path(spec.folder) / "kit"
-    if (Path(spec.folder) / "kit").exists() or spec.code.get("repo") != "local":
-        needed = [e.split(" ")[0] for e in spec.entrypoints.values() if e.startswith("kit/")]
-        missing = [n for n in needed if not (Path(spec.folder) / n).is_file()]
+    kit = (
+        Path(__file__).resolve().parents[2] / spec.code["path"]
+        if spec.code.get("path")
+        else Path(spec.folder) / "kit"
+    )
+    needed = [
+        e.split(" ")[0].removeprefix("kit/")
+        for e in spec.entrypoints.values()
+        if e.startswith("kit/")
+    ]
+    if needed or spec.code.get("repo") != "local":
+        missing = [n for n in needed if not (kit / n).is_file()]
         out.append(
             Requirement(
                 id="code",
                 label="Code du pipeline présent",
-                ok=not missing and (spec.code.get("repo") == "local" or kit.is_dir()),
+                ok=not missing and kit.is_dir(),
                 detail=f"manquant : {', '.join(missing)}" if missing else spec.code.get("version"),
             )
         )

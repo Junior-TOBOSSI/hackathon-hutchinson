@@ -58,9 +58,14 @@ def synthetic():
 # ------------------------------------------------------------------ pipelines and provenance
 
 
-def test_two_declared_pipelines_and_group_defaults_are_preserved():
+def test_declared_pipelines_and_group_defaults_are_preserved():
     ids = [s.id for s in load_specs()]
-    assert ids == ["quality-demo", "quality-industrial"]
+    assert ids == [
+        "quality-demo",
+        "quality-industrial",
+        "quality-industrial-binary",
+        "workstation-industrial",
+    ]
     q = spec("quality-industrial")
     group_defaults = yaml.safe_load((KIT / "hyperparametres.yaml").read_text(encoding="utf-8"))
     assert {p.name: p.default for p in q.parameters if p.name in group_defaults} == group_defaults
@@ -419,7 +424,7 @@ def test_catalogue_links_job_runs_mlflow_runs_and_versions_by_tags_only(tmp_path
         and rows[42].dataset_version is None
     )
     k = s.kpis()
-    assert k.running == 1 and k.pipelines_total == 2 and k.pipelines_executable == 1
+    assert k.running == 1 and k.pipelines_total == 4 and k.pipelines_executable == 1
 
 
 def test_launch_is_refused_without_authorization(tmp_path, monkeypatch):

@@ -89,7 +89,7 @@ export default function NewTraining() {
           {view && !view.executable && <Unavailable>Pipeline non exécutable : {view.requirements.filter((r) => !r.ok).map((r) => `${r.label} (${r.detail ?? 'non satisfait'})`).join(' ; ')}</Unavailable>}
           <SelectField label="Dataset" icon="none" allLabel="Choisir un dataset compatible" value={datasetId} onChange={(v) => { setDatasetId(v); setVersion(''); }}
             options={(compat.data ?? []).map((d) => [d.family.dataset_id, `${d.family.name} (${d.family.dataset_id})${d.family.version_count ? '' : ' — aucune version'}`])} />
-          {compat.data && compat.data.length === 0 && <Unavailable tone="grey">Aucun dataset publié compatible (classes {spec?.classes.join(', ')}).</Unavailable>}
+          {compat.data && compat.data.length === 0 && <Unavailable tone="grey">Aucun dataset publié compatible (classes {spec?.classes.join(', ')}). Familles attendues : {spec?.dataset.families.join(', ') || 'aucune'}.</Unavailable>}
           <SelectField label="Version du dataset" icon="none" allLabel="Choisir une version" value={version} onChange={setVersion}
             options={[...(family.data?.versions ?? [])].reverse().map((v) => [v.version, `${v.version} (${v.ref.num_samples} images)`])} />
           {spec && <Params specs={spec.parameters} values={values} onChange={setValues} />}
@@ -122,8 +122,15 @@ function Params({ specs, values, onChange }: { specs: ParamSpec[]; values: Recor
   if (!specs.length) return <div className="tf-box"><b>Paramètres d'entraînement</b><span className="muted">Ce pipeline n'expose aucun hyperparamètre : sa configuration est fixée par son code.</span></div>;
   const field = (p: ParamSpec) => (
     <label key={p.name} title={p.help ?? undefined}>{p.label}
-      <input type="number" step={p.type === 'float' ? 0.01 : 1} min={p.min ?? undefined} max={p.max ?? undefined}
-        value={String(values[p.name] ?? p.default)} onChange={(e) => onChange({ ...values, [p.name]: p.type === 'int' ? Number.parseInt(e.target.value, 10) : Number(e.target.value) })} />
+      {p.type === 'str' && p.choices?.length ?
+        <select value={String(values[p.name] ?? p.default)} onChange={(e) => onChange({ ...values, [p.name]: e.target.value })}>
+          {p.choices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
+        </select> : p.type === 'str' ?
+          <input type="text" value={String(values[p.name] ?? p.default)} onChange={(e) => onChange({ ...values, [p.name]: e.target.value })} />
+          : p.type === 'bool' ?
+            <input type="checkbox" checked={Boolean(values[p.name] ?? p.default)} onChange={(e) => onChange({ ...values, [p.name]: e.target.checked })} />
+            : <input type="number" step={p.type === 'float' ? 0.01 : 1} min={p.min ?? undefined} max={p.max ?? undefined}
+              value={String(values[p.name] ?? p.default)} onChange={(e) => onChange({ ...values, [p.name]: p.type === 'int' ? Number.parseInt(e.target.value, 10) : Number(e.target.value) })} />}
     </label>);
   return <div className="tf-box"><b>Paramètres d'entraînement</b>
     <div className="tf-params">{specs.filter((p) => p.level === 'basic').map(field)}</div>
