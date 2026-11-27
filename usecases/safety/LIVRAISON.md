@@ -100,7 +100,8 @@ station_live["checks"].update(station_checks(station_live["issues"]))
 | Revérification d'une pièce KO : bouton « Revérifier la pièce », confirmation, pièce requalifiée OK et tracée (`POST /stations/{id}/parts/{n}/requalify`) | `pages/Operateur.tsx`, `api/client.ts`, `api/types.ts` (`PartResult.requalified`) |
 | État des EPI du poste, champ facultatif `safetyPpe` (casque, lunettes, gants, chaussures) | `api/types.ts`, `api/mock.ts` |
 | Démo locale seulement : bouton « simuler une pièce NOK », visible quand le modèle qualité est « simulé » | `pages/Operateur.tsx`, `api/client.ts` |
-| Démo locale seulement : sélecteur de vue « Opérateur | Manager » (sans se déconnecter), visible en mode démo ou avec `VITE_DEMO_VIEWS=true` | `App.tsx`, `vite-env.d.ts` |
+| Graphique « Production de la cellule » : corrigé pour un shift qui passe minuit (shift C, 21 h → 5 h : axe 21 h … 5 h, plus de courbe qui repart en arrière) | `components/charts.tsx` |
+| Démo locale seulement : sélecteur de vue « Opérateur | Team leader » (sans se déconnecter), visible en mode démo ou avec `VITE_DEMO_VIEWS=true` | `App.tsx`, `vite-env.d.ts` |
 
 Côté serveur, la démo `notebooks/hovis_demo.py` fournit ces routes, et aussi celles de la vue manager : vue de la cellule (`/cells/{id}/overview`, poste C3·P06 réel, les 11 autres simulés et signalés comme tels), alertes (problèmes Safety du poste, signalements de l'opérateur, pièces requalifiées à confirmer), acquittement, décision, historique du poste (`/stations/{id}/detail`, épisodes Safety réels du shift). Une photo de pièce NOK peut être placée dans `argos-ui/public/img/piece-nok.jpg` pour la démo : **image industrielle, à ne jamais versionner**.
 

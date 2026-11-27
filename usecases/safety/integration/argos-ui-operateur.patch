@@ -1,5 +1,5 @@
 diff --git a/argos-ui/src/App.tsx b/argos-ui/src/App.tsx
-index 6834017..84727f4 100644
+index 6834017..b4ebf13 100644
 --- a/argos-ui/src/App.tsx
 +++ b/argos-ui/src/App.tsx
 @@ -1,6 +1,7 @@
@@ -17,14 +17,14 @@ index 6834017..84727f4 100644
  const CELL_ROLES: Role[] = ['TEAM_LEADER', 'AI_LEADER'];
  
 +/**
-+ * DÉMO uniquement : passer de la vue opérateur (poste C3·P06) à la vue manager (team leader
-+ * de la cellule C3) sans se déconnecter. Visible en mode démo ou avec VITE_DEMO_VIEWS=true ;
++ * DÉMO uniquement : passer de la vue opérateur (poste C3·P06) à la vue team leader
++ * (cellule C3) sans se déconnecter. Visible en mode démo ou avec VITE_DEMO_VIEWS=true ;
 + * en production, chacun se connecte avec son propre compte.
 + */
 +const DEMO_VIEWS = USE_MOCK || import.meta.env.VITE_DEMO_VIEWS === 'true';
 +const DEMO_USERS: { role: Role; label: string; user: User }[] = [
 +  { role: 'OPERATEUR', label: 'Opérateur', user: { id: 'demo', name: 'Opérateur démo', role: 'OPERATEUR', stationId: 'C3·P06', cellId: 'C3' } },
-+  { role: 'TEAM_LEADER', label: 'Manager', user: { id: 'demo-tl', name: 'Team leader démo', role: 'TEAM_LEADER', cellId: 'C3' } },
++  { role: 'TEAM_LEADER', label: 'Team leader', user: { id: 'demo-tl', name: 'Team leader démo', role: 'TEAM_LEADER', cellId: 'C3' } },
 +];
 +
 +function DemoViewSwitch() {
@@ -94,7 +94,7 @@ index c1b98d8..40728ee 100644
  }
  
 diff --git a/argos-ui/src/components/charts.tsx b/argos-ui/src/components/charts.tsx
-index cfed526..986b36c 100644
+index cfed526..6a8ff07 100644
 --- a/argos-ui/src/components/charts.tsx
 +++ b/argos-ui/src/components/charts.tsx
 @@ -1,5 +1,5 @@
@@ -104,7 +104,39 @@ index cfed526..986b36c 100644
  import { deltaText, fmt } from './ui';
  
  /* ------------------------------------------------------------------ */
-@@ -161,71 +161,36 @@ export function ProgressRing({ value, target, expected, size = 220 }: { value: n
+@@ -44,10 +44,12 @@ export function CumulativeChart({ hourly, target, expectedNow, shiftStart, shift
+   // Points du réel : 0 au début du shift, puis le cumul à chaque heure pleine, puis maintenant.
+   const points: { x: number; y: number }[] = [{ x: shiftStart, y: 0 }];
+   let cum = 0;
++  // Un shift peut passer minuit (21 h → 5 h) : après minuit, 0 h compte comme 24 h, 1 h comme 25 h…
++  const cont = (hour: number) => (hour < shiftStart ? hour + 24 : hour);
+   for (const h of hourly) {
+     if (h.good === null) break;
+     cum += h.good;
+-    if (h.hour + 1 <= now) points.push({ x: h.hour + 1, y: cum });
++    if (cont(h.hour) + 1 <= now) points.push({ x: cont(h.hour) + 1, y: cum });
+   }
+   points.push({ x: now, y: total });
+ 
+@@ -71,7 +73,7 @@ export function CumulativeChart({ hourly, target, expectedNow, shiftStart, shift
+     points.forEach((p, i) => { if (Math.abs(X(p.x) - px) < Math.abs(X(points[best].x) - px)) best = i; });
+     setHover(best);
+   };
+-  const hhmm = (x: number) => `${Math.floor(x)}:${String(Math.round((x % 1) * 60)).padStart(2, '0')}`;
++  const hhmm = (x: number) => `${Math.floor(x) % 24}:${String(Math.round((x % 1) * 60)).padStart(2, '0')}`;
+ 
+   return (
+     <div ref={ref} style={{ position: 'relative' }}>
+@@ -89,7 +91,7 @@ export function CumulativeChart({ hourly, target, expectedNow, shiftStart, shift
+           </g>
+         ))}
+         {Array.from({ length: shiftHours + 1 }, (_, i) => shiftStart + i).map((h) => (
+-          <text key={h} x={X(h)} y={height - 10} textAnchor="middle" fontSize="12" fill="var(--muted)" fontWeight={Math.floor(now) === h ? 700 : 400}>{h} h</text>
++          <text key={h} x={X(h)} y={height - 10} textAnchor="middle" fontSize="12" fill="var(--muted)" fontWeight={Math.floor(now) === h ? 700 : 400}>{h % 24} h</text>
+         ))}
+         {/* Réel */}
+         <path d={area} fill="var(--chart-real)" opacity="0.1" />
+@@ -161,71 +163,36 @@ export function ProgressRing({ value, target, expected, size = 220 }: { value: n
   *  - tronçon entamé de l'heure en cours ou à venir : vert clair (en cours).
   */
  export function HourlyGauges({ hours, perHour, currentHour, expected, height = 32 }: { hours: { hour: number; good: number | null }[]; perHour: number; currentHour: number; expected?: number; height?: number }) {
@@ -268,14 +300,14 @@ index 6f36356..6fdd57a 100644
    );
  }
 diff --git a/argos-ui/src/vite-env.d.ts b/argos-ui/src/vite-env.d.ts
-index 73d2b55..7c7c754 100644
+index 73d2b55..f3b517c 100644
 --- a/argos-ui/src/vite-env.d.ts
 +++ b/argos-ui/src/vite-env.d.ts
 @@ -2,6 +2,8 @@
  
  interface ImportMetaEnv {
    readonly VITE_USE_MOCK?: string;
-+  /** "true" : sélecteur de vue Opérateur | Manager en démo locale */
++  /** "true" : sélecteur de vue Opérateur | Team leader en démo locale */
 +  readonly VITE_DEMO_VIEWS?: string;
    readonly VITE_API_URL?: string;
  }
