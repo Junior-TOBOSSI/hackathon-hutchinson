@@ -542,7 +542,7 @@ index 89edae1..09c58d6 100644
        </main>
      </div>
 diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
-index 1642809..c003e5d 100644
+index 1642809..61457de 100644
 --- a/argos-ui/src/pages/TeamLeader.tsx
 +++ b/argos-ui/src/pages/TeamLeader.tsx
 @@ -88,7 +88,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
@@ -565,14 +565,14 @@ index 1642809..c003e5d 100644
          </div>
          <StationTable stations={cell.stations} alerts={alerts} />
        </div>
-@@ -119,128 +119,122 @@ const DOT: Record<StationStatus, string> = {
+@@ -119,128 +119,121 @@ const DOT: Record<StationStatus, string> = {
    OK: 'var(--green)', SECURITE: 'var(--red)', QUALITE: 'var(--red)', RYTHME: 'var(--amber)', CAMERA: 'var(--amber)', OBJET: 'var(--amber)',
  };
  
 -const PAGE_SIZE = 6;
 +/** Fond très léger de la carte, selon l'état du poste (la pastille et le libellé restent l'info principale). */
 +const TINT: Record<StationStatus, string> = {
-+  OK: '#e6f5ec', SECURITE: '#fbe4e8', QUALITE: '#fbe4e8', RYTHME: '#fdf0dc', CAMERA: '#fdf0dc', OBJET: '#fdf0dc',
++  OK: '#d5eedf', SECURITE: '#f8d3da', QUALITE: '#f8d3da', RYTHME: '#fbe3c0', CAMERA: '#fbe3c0', OBJET: '#fbe3c0',
 +};
  
  /**
@@ -760,10 +760,9 @@ index 1642809..c003e5d 100644
 +        <button onClick={onClose} className="icon-btn" aria-label="Fermer le détail" title="Fermer">✕</button>
 +      </div>
 +      <div className="col" style={{ gap: 6 }}>
-+        <div className="between"><span className="muted" style={{ fontSize: 14 }}>Avancement du shift · trait noir = attendu maintenant ({fmt(s.expectedNow)})</span><span style={{ fontWeight: 700 }}>{fmt(s.good)} / {fmt(s.target)}</span></div>
++        <div className="between"><span className="muted" style={{ fontSize: 14 }}>Avancement du shift · attendu maintenant : {fmt(s.expectedNow)}</span><span style={{ fontWeight: 700 }}>{fmt(s.good)} / {fmt(s.target)}</span></div>
 +        <div className="track" style={{ height: 12, overflow: 'visible' }}>
 +          <div className="fill" style={{ width: `${(s.good / s.target) * 100}%`, background: delta >= 0 ? 'var(--green)' : 'var(--amber)' }} />
-+          <div style={{ position: 'absolute', left: `${(s.expectedNow / s.target) * 100}%`, top: -4, width: 3, height: 20, borderRadius: 2, background: 'var(--navy)' }} />
 +        </div>
 +      </div>
 +      <div className="row" style={{ gap: 28, flexWrap: 'wrap' }}>
