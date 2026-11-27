@@ -127,7 +127,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
           </div>
 
           {!consult && live.video?.available && (
-            <button onClick={playVideo} disabled={live.video.playing} className="cond" style={{ height: 64, border: 'none', borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, fontWeight: 700, fontSize: 26, letterSpacing: '0.06em', color: '#fff', background: live.video.playing ? 'var(--muted)' : 'var(--navy)' }}>
+            <button onClick={playVideo} disabled={live.video.playing} className="cond" style={{ alignSelf: 'center', height: 40, padding: '0 22px', border: 'none', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontWeight: 700, fontSize: 16, letterSpacing: '0.05em', color: '#fff', background: live.video.playing ? 'var(--muted)' : 'var(--navy)' }}>
               {live.video.playing ? 'VIDÉO EN COURS…' : '▶  LANCER LA VIDÉO'}
             </button>
           )}

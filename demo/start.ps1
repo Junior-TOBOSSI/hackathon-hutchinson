@@ -33,9 +33,10 @@ NOK puis OK), sinon OK d'emblée. Les postes non cités gardent leur poste de tr
 
 -Videos : des fichiers vidéo à la place de la webcam, un par poste actif dans l'ordre
 (C3·P06, P01, ...), séparés par des virgules ; un vide = pas de vidéo pour ce poste. Chaque
-poste qui a une vidéo a sa propre analyse EPI (visages floutés), la vidéo tourne en boucle.
+poste qui a une vidéo a sa propre analyse EPI (visages floutés), la vidéo joue une fois avec le bouton « LANCER LA VIDÉO ».
 Sans vidéo, C3·P06 garde la webcam (sauf -NoSafety).
-    .\demo\start.ps1 -Stations 2 -Videos dataaw\safetyideos\p06.mp4,dataaw\safetyideos\p01.mp4
+    .\demo\start.ps1 -Stations 2 -Videos video1,video2      # data\raw\safety\videos\video1.mp4...
+    .\demo\start.ps1 -Stations 2 -Videos D:\films\casque.mp4  # ou un chemin
 
 -Here : tous les serveurs dans CE terminal (journaux mêlés, chaque ligne préfixée par le
 serveur), au lieu d'une fenêtre par serveur. Ctrl+C arrête alors tout.
@@ -77,10 +78,19 @@ foreach ($w in $Workstations) {
 
 # -Videos : chemins vérifiés et rendus absolus (le serveur du poste travaille à la racine)
 $Videos = @($Videos | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() })
+$videoDir = Join-Path $repo "data\raw\safety\videos"
 for ($i = 0; $i -lt $Videos.Count; $i++) {
     if (-not $Videos[$i]) { continue }
+    # Un simple nom (video1, video2...) : la vidéo de ce nom rangée dans data\raw\safety\videos
+    if ($Videos[$i] -match '^[\w-]+$') {
+        $found = Get-ChildItem -LiteralPath $videoDir -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.BaseName -eq $Videos[$i] -and $_.Extension -match '^\.(mp4|avi|mov|mkv|webm)$' } |
+            Select-Object -First 1
+        if ($found) { $Videos[$i] = $found.FullName }
+    }
     if (-not (Test-Path -LiteralPath $Videos[$i] -PathType Leaf)) {
-        Write-Error "Vidéo introuvable : '$($Videos[$i])'"
+        $known = (Get-ChildItem -LiteralPath $videoDir -File -ErrorAction SilentlyContinue | ForEach-Object { $_.BaseName }) -join ', '
+        Write-Error "Vidéo introuvable : '$($Videos[$i])' (vidéos rangées dans data\raw\safety\videos : $known)"
         exit 1
     }
     $Videos[$i] = (Resolve-Path -LiteralPath $Videos[$i]).Path
