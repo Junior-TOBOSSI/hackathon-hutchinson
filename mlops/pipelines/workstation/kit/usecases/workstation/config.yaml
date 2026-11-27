@@ -1,0 +1,55 @@
+# Use case: workstation (5S). ONE photo at the start of the shift, compared with the
+# station's reference: what is not in its place, and zones with neither object nor person.
+
+# Class loaded by the registry ("module:Class").
+# The fake analyzer is still available: usecases.workstation.analyzer:FakeWorkstationAnalyzer
+analyzer_class: usecases.workstation.model:ZoneWorkstationAnalyzer
+
+# Decision layer: score < low -> conforme ; low <= score < high -> a_verifier ; score >= high -> anomalie
+thresholds:
+  low: 0.4
+  high: 0.7
+
+params:
+  # --- Station: THE description of the workstation (views, boxes, conforming photos) -----
+  # One station file per section (stations/*.yaml); the demo switches between them.
+  # data_root holds raw/ (images are never versioned): "data" on the PC, ~/data on the cluster.
+  station: press_cell
+  data_root: data
+
+  # --- Detector: only NAMES what changed (never raises an alert on its own) ------------
+  # none  : no model, only the comparison with normal
+  # coco  : YOLO26 pre-trained on COCO (default: names the PERSONS in the red zone)
+  # yoloe : YOLOE open-vocabulary, looks for the names listed in prompts (in English)
+  detector: coco
+  weights: data/models/workstation/yolo26n.pt   # yoloe: data/models/workstation/yoloe-26s-seg.pt
+  prompts: []                                   # yoloe only, e.g. [cardboard box, rag, screw]
+  conf: 0.35                                    # minimum detection confidence
+  imgsz: 640                                    # inference size; 960 or 1280 for small objects
+  ignore_labels: []                             # labels never judged in zones (a person IS a violation)
+  expected_objects: []                          # detector labels that must be visible
+
+  # --- Alignment of the photo onto the reference views (SIFT + RANSAC) ------------------
+  align: true
+  min_inliers: 25               # fewer consistent matches -> alignment_failed (a_verifier)
+  alignment_failed_score: 0.5
+
+  # --- What counts as a change ---------------------------------------------------------
+  # A pixel changed if it differs from the NORMAL (mean of the conforming photos) by more
+  # than max(diff_threshold, normal_k x its normal spread). See normal.py.
+  diff_threshold: 25        # minimum colour difference (0-255)
+  normal_k: 4.0             # how many normal spreads a change must exceed
+
+  # --- Zones (nothing may appear there) and slots (each element in its place) -----------
+  min_overlap: 0.15         # share of a detected box inside a zone to count it as "in"
+  min_box_fill: 0.05        # a detection names a change only if the change fills 5 % of its box
+  min_blob_area: 0.01       # smallest changed region, as a share of the zone area
+  min_blob_pixels: 150      # ...capped at this many pixels (small tool in a large zone)
+  group_px: 10              # pieces of change closer than this form one object
+  ignore_box_margin: 0.15   # allowed persons: box grown by 15 % (stool, shadow)
+  full_blob_area: 0.05      # changed region giving a confidence of 1 (share of the zone)
+  unknown_min_score: 0.45   # any change in a zone is at least worth a check (> low)
+  slot_min_change: 0.25     # share of a slot that must change for "not in its place"
+  slot_full_change: 0.6     # changed share giving a score of 1
+  missing_score: 0.5        # score of a missing expected detector label
+  persistence_frames: 1     # one photo per check; >1 only for a video stream

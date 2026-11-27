@@ -2,9 +2,9 @@
 
 interface ImportMetaEnv {
   readonly VITE_USE_MOCK?: string;
-  /** "true" : sélecteur de vue Opérateur | Team leader en démo locale */
-  readonly VITE_DEMO_VIEWS?: string;
   readonly VITE_API_URL?: string;
+  readonly VITE_LIVE_AI_LEADER?: string;
+  readonly VITE_LIVE_INDUSTRIAL?: string;
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv;

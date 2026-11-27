@@ -30,7 +30,7 @@ free_port() {
     lsof -ti "tcp:$port" | xargs -r kill -9 && echo "Port $port libéré." || true
   fi
 }
-for port in 8000 8001 8002 8003 8004 8005 8006 5173; do free_port "$port"; done
+for port in 8000 8001 8002 8003 8004 8005 8006 8040 5173; do free_port "$port"; done
 sleep 1
 
 cd "$REPO"
@@ -45,10 +45,22 @@ for ((k = 0; k < STATIONS; k++)); do
 done
 ACTIVE_STATIONS="$STATIONS" "$PYTHON" -m uvicorn demo.cell_server:app --port 8000 --host 127.0.0.1 &
 PIDS+=($!)
+# Espace AI leader (mlops/, port 8040, Ctrl+O) : son propre venv .venv-mlops, lit Databricks
+# (databricks auth login --profile ARGOS). NO_AI_LEADER=1 : ne pas le démarrer.
+if [ -x "$REPO/.venv-mlops/Scripts/python.exe" ]; then MLOPS_PY="$REPO/.venv-mlops/Scripts/python.exe"
+elif [ -x "$REPO/.venv-mlops/bin/python" ]; then MLOPS_PY="$REPO/.venv-mlops/bin/python"; else MLOPS_PY=""; fi
+if [ "${NO_AI_LEADER:-0}" != "1" ]; then
+  if [ -n "$MLOPS_PY" ]; then
+    ( [ -f hovis.local.env ] && set -a && . ./hovis.local.env && set +a; MLFLOW_DISABLE_AGENT_HINT=1       exec "$MLOPS_PY" -m uvicorn mlops.api.app:app --port 8040 --host 127.0.0.1 ) &
+    PIDS+=($!)
+  else
+    echo "Espace AI leader non démarré : .venv-mlops absent (voir demo/README.md)." >&2
+  fi
+fi
 
 cd "$REPO/argos-ui"
 [ -d node_modules ] || npm install --no-audit --no-fund
 echo "Postes actifs : ${ORDER[*]:0:$STATIONS} ; les autres : pas d'activité."
 echo "Interface : http://localhost:5173 (les serveurs des postes mettent environ 20 s à charger les modèles)"
-echo "Clic sur le logo HOVIS = lancer / relancer le poste affiché (chaque poste se lance à la main) ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant."
+echo "Clic sur le logo HOVIS = lancer / relancer le poste affiché (chaque poste se lance à la main) ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant ; Ctrl+O = espace AI leader."
 VITE_USE_MOCK=false npx vite --port 5173 --host 127.0.0.1

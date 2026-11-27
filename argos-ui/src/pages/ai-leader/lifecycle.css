@@ -1,0 +1,47 @@
+/* Registry and Deployment reuse the DBX-04 catalogue grid, cards, filters and tabs. */
+.lifecycle-catalog { min-width: 0; }
+.lifecycle-catalog button:disabled { opacity: .5; cursor: not-allowed; }
+.lifecycle-fresh { display: block; margin-top: 8px; font-size: 13px; }
+.lifecycle-table td { overflow-wrap: anywhere; }
+.dataset-layout:not(.dataset-layout-full) .lifecycle-registry-table th:nth-child(2),
+.dataset-layout:not(.dataset-layout-full) .lifecycle-registry-table td:nth-child(2),
+.dataset-layout:not(.dataset-layout-full) .lifecycle-registry-table th:nth-child(5),
+.dataset-layout:not(.dataset-layout-full) .lifecycle-registry-table td:nth-child(5),
+.dataset-layout:not(.dataset-layout-full) .lifecycle-deployment-table th:nth-child(2),
+.dataset-layout:not(.dataset-layout-full) .lifecycle-deployment-table td:nth-child(2) { display: none; }
+.lifecycle-detail { overflow: hidden; }
+.lifecycle-states { gap: 7px; flex-wrap: wrap; }
+.lifecycle-pagination { justify-content: flex-end; align-items: center; gap: 8px; }
+.lifecycle-link { color: var(--primary); font-weight: 700; overflow-wrap: anywhere; }
+.lifecycle-form { display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 14px; }
+.lifecycle-form label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; }
+.lifecycle-form label.row { flex-direction: row; align-items: flex-start; font-weight: 500; }
+.lifecycle-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.lifecycle-textarea { min-height: 80px; padding-top: 9px !important; resize: vertical; }
+.lifecycle-event { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; border-left: 3px solid var(--primary); padding: 8px 12px; background: var(--surface-soft); border-radius: 0 10px 10px 0; overflow-wrap: anywhere; }
+.lifecycle-event small { color: var(--muted); }
+.lifecycle-confusion { display: grid; grid-template-columns: minmax(100px, 1fr) repeat(2, minmax(90px, 1fr)); gap: 4px; max-width: 530px; font-size: 13px; }
+.lifecycle-confusion > * { padding: 10px; text-align: center; background: var(--surface-soft); border-radius: 8px; }
+.lifecycle-confusion > b:first-child, .lifecycle-confusion > b:nth-child(4), .lifecycle-confusion > b:nth-child(7) { text-align: left; }
+.lifecycle-status-uncertain { border-left-color: var(--amber); }
+.lifecycle-status-failed { border-left-color: var(--red); }
+.lifecycle-status-succeeded { border-left-color: var(--green); }
+.lifecycle-operation-row { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.lifecycle-operation-panel { min-width: 0; }
+.lifecycle-timeline { list-style: none; padding: 0 0 0 10px; margin: 0; display: flex; flex-direction: column; gap: 7px; }
+.lifecycle-timeline li { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; padding: 8px 12px; border-left: 3px solid var(--primary); background: var(--surface-soft); border-radius: 0 8px 8px 0; }
+.lifecycle-timeline li small { color: var(--muted); }
+.lifecycle-overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(7, 26, 57, .62); }
+.lifecycle-wizard { width: min(100%, 880px); max-height: calc(100vh - 32px); overflow: auto; }
+.lifecycle-steps { display: flex; gap: 8px; flex-wrap: wrap; }
+.lifecycle-steps span { flex: 1 1 145px; padding: 8px 10px; border-radius: 10px; background: var(--surface-soft); color: var(--muted); font-size: 13px; font-weight: 700; }
+.lifecycle-steps span.active { background: var(--primary-soft); color: var(--primary); }
+.lifecycle-config { max-width: 100%; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lifecycle-fleet-table { min-width: 1340px; }
+.lifecycle-fleet-table td:nth-child(n+5):nth-child(-n+7) { min-width: 185px; }
+.lifecycle-fleet-table td small { margin-top: 5px; }
+.lifecycle-fleet-table input[type="checkbox"], .lifecycle-wizard input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px; }
+.lifecycle-fleet-drawer { position: absolute; right: 0; top: 0; bottom: 0; width: min(780px, 58vw); max-height: 100vh; overflow-y: auto; border-radius: 18px 0 0 18px; padding: 24px; box-sizing: border-box; }
+.lifecycle-fleet-drawer .dataset-mini b { font-size: 16px; }
+@media (max-width: 720px) { .lifecycle-form-grid { grid-template-columns: 1fr; } .lifecycle-table { min-width: 680px; } }
+@media (max-width: 900px) { .lifecycle-fleet-drawer { width: min(100%, 680px); padding: 16px; } }

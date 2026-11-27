@@ -18,17 +18,25 @@ Dans la fenêtre de chaque poste, on voit chaque appel aux modèles :
 Si PowerShell refuse le script : double-cliquer sur demo\start.bat, ou
     powershell -ExecutionPolicy Bypass -File demo\start.ps1 -Stations 3
 
+Espace AI leader (cycle de vie des modèles, Ctrl+O dans l'interface) : son serveur
+(mlops/, port 8040) démarre aussi, avec son propre environnement Python .venv-mlops
+(mlflow, databricks-sdk). Il lit l'espace Databricks de l'équipe : se connecter une fois
+avec  databricks auth login --profile ARGOS . Réglages locaux éventuels (jamais versionnés) :
+hovis.local.env à la racine, lignes CLE=VALEUR. -NoAiLeader : ne pas le démarrer.
+
 Pour arrêter : fermer les fenêtres (ou Ctrl+C dans chacune).
-Si un port (8000 à 8006, 5173) est déjà pris, le processus qui l'occupe est arrêté d'abord.
+Si un port (8000 à 8006, 8040, 5173) est déjà pris, le processus qui l'occupe est arrêté d'abord.
 #>
 param(
     [ValidateRange(1, 6)][int]$Stations = 1,
-    [switch]$NoSafety
+    [switch]$NoSafety,
+    [switch]$NoAiLeader
 )
 
 $repo = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $repo ".venv\Scripts\python.exe"
 $ui = Join-Path $repo "argos-ui"
+$mlopsPython = Join-Path $repo ".venv-mlops\Scripts\python.exe"
 $order = @("C3·P06", "C3·P01", "C3·P02", "C3·P03", "C3·P04", "C3·P05")
 
 if (-not (Test-Path $python)) {
@@ -37,7 +45,7 @@ if (-not (Test-Path $python)) {
 }
 # Ports déjà pris (ancienne démo restée ouverte, autre serveur) : on arrête le processus
 # qui les occupe, puis on les réutilise.
-foreach ($port in @(8000..8006) + 5173) {
+foreach ($port in @(8000..8006) + 8040 + 5173) {
     $owners = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
         Select-Object -ExpandProperty OwningProcess -Unique
     foreach ($id in $owners) {
@@ -73,7 +81,19 @@ Start-Process powershell -WorkingDirectory $repo -ArgumentList @(
     "`$Host.UI.RawUI.WindowTitle = 'HOVIS - cellule C3 (8000)'; `$env:ACTIVE_STATIONS = '$Stations'; & '$python' -m uvicorn demo.cell_server:app --port 8000 --host 127.0.0.1"
 )
 
-# 3. Interface argos-ui en mode live (installe les dépendances la première fois)
+# 3. Serveur AI leader (mlops/, port 8040) : cycle de vie des modèles, lu dans Databricks
+if (-not $NoAiLeader) {
+    if (Test-Path $mlopsPython) {
+        Start-Process powershell -WorkingDirectory $repo -ArgumentList @(
+            "-NoExit", "-Command",
+            "`$Host.UI.RawUI.WindowTitle = 'HOVIS - AI leader (8040)'; `$env:MLFLOW_DISABLE_AGENT_HINT = '1'; if (Test-Path hovis.local.env) { Get-Content hovis.local.env | Where-Object { `$_ -match '^\s*[A-Z_][A-Z0-9_]*\s*=' } | ForEach-Object { `$k, `$v = `$_ -split '=', 2; Set-Item -Path ('Env:' + `$k.Trim()) -Value `$v.Trim() } }; & '$mlopsPython' -m uvicorn mlops.api.app:app --port 8040 --host 127.0.0.1"
+        )
+    } else {
+        Write-Warning "Espace AI leader non démarré : environnement $mlopsPython absent (voir demo\README.md)."
+    }
+}
+
+# 4. Interface argos-ui en mode live (installe les dépendances la première fois)
 if (-not (Test-Path (Join-Path $ui "node_modules"))) {
     Push-Location $ui
     npm install --no-audit --no-fund
@@ -87,6 +107,6 @@ Start-Process powershell -WorkingDirectory $ui -ArgumentList @(
 Write-Host "Postes actifs : $($order[0..($Stations - 1)] -join ', ') ; les autres : pas d'activité."
 Write-Host "Démarrage... le navigateur s'ouvre dans quelques secondes (modèles prêts en ~20 s)."
 Write-Host "Connexion : n'importe quel identifiant = opérateur ; c.diaz@hutchinson.com = superviseur."
-Write-Host "Clic sur le logo HOVIS = lancer / relancer le poste affiché (chaque poste se lance à la main) ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant."
+Write-Host "Clic sur le logo HOVIS = lancer / relancer le poste affiché (chaque poste se lance à la main) ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant ; Ctrl+O = espace AI leader."
 Start-Sleep -Seconds 8
 Start-Process "http://localhost:5173"

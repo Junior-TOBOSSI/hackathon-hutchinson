@@ -38,6 +38,8 @@ const DEMO_USERS: { role: Role; label: string; user: User }[] = [
   { role: 'OPERATEUR', label: 'Opérateur', user: { id: 'demo', name: 'Opérateur démo', role: 'OPERATEUR', stationId: 'C3·P06', cellId: 'C3' } },
   { role: 'TEAM_LEADER', label: 'Team leader', user: { id: 'demo-tl', name: 'Team leader démo', role: 'TEAM_LEADER', cellId: 'C3' } },
 ];
+/** Ctrl+O : l'AI leader (cycle de vie des modèles). */
+const AI_LEADER_USER: User = { id: 'demo-ai', name: 'AI leader démo', role: 'AI_LEADER', cellId: 'C3' };
 
 /** Les 6 postes de la cellule de démo (C3·P06 = poste du scénario, les autres simulés). */
 const DEMO_STATIONS = ['C3·P01', 'C3·P02', 'C3·P03', 'C3·P04', 'C3·P05', 'C3·P06'];
@@ -47,6 +49,8 @@ const DEMO_STATIONS = ['C3·P01', 'C3·P02', 'C3·P03', 'C3·P04', 'C3·P05', 'C
  * - Ctrl+M : vue opérateur <-> vue team leader (superviseur) ;
  * - Ctrl+P : écran opérateur du poste suivant de la cellule (P06 -> P01 -> … -> P06).
  *   Ctrl+P remplace ici l'impression du navigateur.
+ * - Ctrl+O : espace AI leader (cycle de vie des modèles) ; Ctrl+O à nouveau : retour à
+ *   l'écran opérateur. Ctrl+O remplace ici l'ouverture de fichier du navigateur.
  */
 function DemoShortcut() {
   const { user, setUser } = useAuth();
@@ -68,6 +72,15 @@ function DemoShortcut() {
         } else {
           setUser(DEMO_USERS[1].user);
           nav(homeFor.TEAM_LEADER);
+        }
+      } else if (key === 'o') {
+        e.preventDefault(); // pas de fenêtre « ouvrir un fichier »
+        if (user?.role === 'AI_LEADER') {
+          setUser(operatorOf(lastStation.current));
+          nav(homeFor.OPERATEUR);
+        } else {
+          setUser(AI_LEADER_USER);
+          nav(homeFor.AI_LEADER);
         }
       } else if (key === 'p') {
         e.preventDefault(); // pas de fenêtre d'impression

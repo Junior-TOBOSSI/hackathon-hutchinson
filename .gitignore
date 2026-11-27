@@ -58,3 +58,9 @@ mlartifacts/
 .DS_Store
 Thumbs.db
 .claude/settings.local.json
+
+# INT-GLOBAL-01 local configuration of the start script (never versioned)
+hovis.local.env
+
+# Separate Python environment of the MLOps backend (mlflow, databricks-sdk)
+.venv-mlops/

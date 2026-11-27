@@ -38,6 +38,9 @@ N_ACTIVE = max(1, min(len(ORDER), int(os.environ.get("ACTIVE_STATIONS", "1"))))
 FIRST_PORT = int(os.environ.get("FIRST_STATION_PORT", "8001"))
 PORTS = {sid: FIRST_PORT + k for k, sid in enumerate(ORDER[:N_ACTIVE])}  # active stations
 CAMERA_STATION = ORDER[0]  # the station EPI's webcam watches (if its server has SAFETY=1)
+# AI leader backend (model lifecycle, feat/hovis-unified mlops/): every /api route this
+# server does not know (/api/models/*, /api/mlops/*...) is forwarded to it.
+MLOPS_URL = os.environ.get("MLOPS_URL", "http://127.0.0.1:8040")
 
 KO_MAX = int(os.environ.get("KO_MAX", "2"))  # at most KO_MAX KO...
 KO_WINDOW = int(os.environ.get("KO_WINDOW", "200"))  # ...in any KO_WINDOW consecutive parts
@@ -370,3 +373,30 @@ async def station_detail(station_id: str) -> dict:
 @app.get("/api/scenario/status")
 async def status() -> dict:
     return {"active": {sid: PORTS[sid] for sid in PORTS}, "stations": await summaries()}
+
+
+# ------------------------------------------------------------------ AI leader (forwarded)
+
+mlops = httpx.AsyncClient(base_url=MLOPS_URL, timeout=120)  # Databricks reads can be slow
+KEPT_HEADERS = ("content-type", "cache-control", "x-hovis-fetched-at")
+
+
+@app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def to_mlops(path: str, request: Request) -> Response:
+    """Declared LAST: the AI leader screens' routes go to the MLOps backend, as they are."""
+    try:
+        r = await mlops.request(
+            request.method,
+            f"/api/{path}",
+            params=list(request.query_params.multi_items()),
+            content=await request.body(),
+            headers={k: v for k, v in request.headers.items() if k.lower() == "content-type"},
+        )
+    except httpx.HTTPError:
+        return Response(
+            '{"detail": "backend AI leader (mlops) injoignable sur ' + MLOPS_URL + '"}',
+            status_code=503,
+            media_type="application/json",
+        )
+    headers = {k: v for k, v in r.headers.items() if k.lower() in KEPT_HEADERS}
+    return Response(r.content, status_code=r.status_code, headers=headers)

@@ -68,10 +68,27 @@ Dès 3 postes actifs, au moins un a donc un poste de travail différent et déma
 - **Compteurs** : la production du shift jusqu'au démarrage (simulée par le code d'EPI), plus les pièces de la démo. Le plan n'avance **que pendant que la ligne produit**. Le shift (A 5-13 h, B 13-21 h, C 21-5 h) suit l'heure.
 - **Sécurité (EPI)** : l'analyse webcam d'EPI tourne dans le serveur de C3·P06 si ses poids sont présents (`data/models/safety/sh17_ours_yolov8s_640.pt`, `data/models/yolov8n_coco.pt`) et qu'une webcam est branchée. Sans EPI, la tuile Sécurité passe au rouge et l'image caméra (visage flouté) remplace la pièce. `-NoSafety` / `SAFETY=0` la coupe.
 
+## Espace AI leader : cycle de vie des modèles (Ctrl+O)
+
+Repris de la branche `feat/hovis-unified` (groupe MLOps), **seulement la partie AI leader** : écrans `argos-ui/src/pages/ai-leader/` (vue d'ensemble, jeux de données, Training Factory et politiques de réentraînement, registre, déploiement, monitoring) et leur backend `mlops/` (inchangés). Les écrans opérateur et superviseur de la démo ne changent pas.
+
+- **Serveur** : `mlops.api.app` sur le port **8040**, lancé par les scripts avec les autres, dans son propre environnement `.venv-mlops` (mlflow, databricks-sdk : jamais dans `.venv`). L'interface l'atteint par le serveur de cellule, qui lui relaie toutes les routes `/api` qu'il ne connaît pas (`/api/models/*`, `/api/mlops/*`).
+- **Données** : le backend lit l'espace **Databricks** de l'équipe (registre Unity Catalog, MLflow, jobs, monitoring). Il faut le **CLI Databricks** (`winget install Databricks.DatabricksCLI`), puis une connexion une fois par machine : `databricks auth login --profile ARGOS` (accès à l'espace de l'équipe). Sans connexion, le backend répond 500 (« cannot configure default credentials, profile=ARGOS »). Sans connexion, les écrans AI leader affichent une erreur de connexion ; le reste de la démo marche. Réglages locaux éventuels (jamais versionnés) : `hovis.local.env` à la racine, lignes `CLE=VALEUR` (voir `mlops/databricks/settings.py`).
+- **Garde-fous du groupe MLOps** conservés : aucun lancement d'entraînement distant ni planificateur de réentraînement (verrou fermé, réponses 403 / 409).
+- **Non repris** : le Core et l'Edge de la branche (onglet « Flotte » du déploiement, `/api/v1/stations` : vide ici).
+- Installer l'environnement, une fois :
+  ```powershell
+  python -m venv .venv-mlops
+  .venv-mlops\Scripts\python.exe -m pip install -r mlopsequirements-lock.txt
+  .venv-mlops\Scripts\python.exe -m pip install -e . --no-deps
+  ```
+- Sans ce serveur : `.\demo\start.ps1 -NoAiLeader` (ou `NO_AI_LEADER=1 ./demo/start.sh`).
+
 ## Vues et raccourcis
 
 - **Ctrl+M** : écran opérateur ↔ vue team leader. Aucun signe à l'écran.
 - **Ctrl+P** : écran opérateur du poste suivant (C3·P01 → … → P06). Remplace l'impression du navigateur.
+- **Ctrl+O** : espace AI leader (cycle de vie des modèles) ; Ctrl+O à nouveau : retour à l'écran opérateur. Remplace l'ouverture de fichier du navigateur.
 - Ou se connecter avec `c.diaz@hutchinson.com` (ou un identifiant contenant « leader », « manager » ou « chef »).
 
 ## Réglages (variables d'environnement d'un serveur de poste)

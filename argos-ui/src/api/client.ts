@@ -12,6 +12,8 @@ import type {
 } from './types';
 
 export const USE_MOCK = (import.meta.env.VITE_USE_MOCK ?? 'true') !== 'false';
+/** AI Leader branché sur le backend réel (Databricks) même si les autres écrans restent en démo. */
+export const LIVE_AI_LEADER = !USE_MOCK || import.meta.env.VITE_LIVE_AI_LEADER === 'true';
 const BASE = import.meta.env.VITE_API_URL ?? '/api';
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {

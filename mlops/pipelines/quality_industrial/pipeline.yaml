@@ -1,0 +1,72 @@
+# Pipeline quality-industrial : véritable modèle du groupe Quality (YOLO26n-cls, 3 classes).
+# Code du groupe intégré sans modification dans kit/ (voir kit/PROVENANCE.md).
+id: quality-industrial
+name: Qualité 702 — YOLO26n-cls (groupe Quality)
+use_case: quality
+task: classification
+architecture: yolo26n-cls (Ultralytics)
+description: >-
+  Classification OK / NOK_SANS / NOK_DOUBLE. score_nok = P(NOK_SANS) + P(NOK_DOUBLE) ; seuil choisi
+  sur la validation (rappel visé). Prétraitement et post-traitement du groupe conservés.
+code:
+  repo: github.com/Junior-TOBOSSI/hackathon-hutchinson
+  branch: quality
+  commit: 394a86a9376a36bc013ae7c089580cad122fafe2
+  path: mlops/pipelines/quality_industrial/kit
+  version: qualite702 kit @394a86a
+classes: [OK, NOK_SANS, NOK_DOUBLE]
+dataset:
+  families: [quality-industrial, quality-synthetic-3c]
+  annotation_format: classification
+  image_extensions: [.jpg]
+  required_splits: [train, validation, test]
+  split_names: {train: train, validation: val, test: test}
+  group_field: group          # rafale : une pièce photographiée plusieurs fois
+  group_required: true
+# Valeurs par défaut = hyperparametres.yaml du groupe (inchangées).
+parameters:
+  - {name: epochs, type: int, default: 30, min: 1, max: 300, level: basic, label: Époques (maximum)}
+  - {name: patience, type: int, default: 10, min: 1, max: 100, level: basic, label: Patience (arrêt anticipé)}
+  - {name: batch, type: int, default: 32, min: 1, max: 256, level: basic, label: Taille de batch}
+  - {name: seed, type: int, default: 0, min: 0, max: 100000, level: basic, label: Graine aléatoire}
+  - {name: imgsz, type: int, default: 128, min: 32, max: 640, level: advanced, label: Taille d'entrée (px), help: Modifie aussi l'inférence (config_qualite702.yaml)}
+  - {name: erasing, type: float, default: 0.0, min: 0.0, max: 1.0, level: advanced, label: Effacement aléatoire, help: Le groupe le désactive (il pourrait effacer le joint)}
+  - {name: flipud, type: float, default: 0.5, min: 0.0, max: 1.0, level: advanced, label: Retournement vertical}
+  - {name: hsv_v, type: float, default: 0.6, min: 0.0, max: 1.0, level: advanced, label: Variation de luminosité}
+  - {name: scale, type: float, default: 0.6, min: 0.0, max: 1.0, level: advanced, label: Zoom aléatoire}
+  - {name: rappel_vise, type: float, default: 0.90, min: 0.5, max: 1.0, level: advanced, label: Rappel NOK visé (choix du seuil)}
+  - {name: modele_base, type: str, default: yolo26n-cls.pt, level: imposed, label: Modèle pré-entraîné}
+  - {name: fusionner_test, type: bool, default: false, level: imposed, label: Fusion du test dans l'entraînement, help: Désactivée pour garder un test indépendant}
+compute:
+  kind: serverless-cpu
+  gpu: false
+  # DBX-05D-FIX: resolved with uv for Linux aarch64 / CPython 3.12 (serverless environment 3).
+  # Core packages kept at their preinstalled versions (numpy, protobuf, pyarrow, grpcio, scipy,
+  # pillow, matplotlib); opencv 4.11.0.86 is the last series compatible with numpy 1.x; onnx 1.17 /
+  # onnxruntime 1.20.1 accept protobuf 5; aarch64 PyPI torch is CPU-only (no CUDA libraries).
+  # pandas is not pinned: only mlflow needs it (<4) and the preinstalled 1.5.3 satisfies it.
+  environment: [numpy==1.26.4, protobuf==5.29.4, pyarrow==15.0.2, grpcio==1.71.0, grpcio-status==1.71.0,
+                scipy==1.13.1, pillow==10.3.0, matplotlib==3.8.4, torch==2.5.1, torchvision==0.20.1,
+                ultralytics==8.4.219, opencv-python==4.11.0.86, onnx==1.17.0, onnxruntime==1.20.1,
+                onnxslim==0.1.98, mlflow==3.18.0, pyyaml]
+job:
+  name: hovis-quality-industrial-training
+  dataset_argument: null
+  runs_root: /Volumes/workspace/argos_poc/images/runs/hovis
+  code_root: /Volumes/workspace/argos_poc/images/runs/hovis/code
+  script: /Volumes/workspace/argos_poc/images/runs/hovis/code/mlops/pipelines/quality_industrial/run_pipeline.py
+  base_weights: /Volumes/workspace/argos_poc/images/runs/hovis/weights/yolo26n-cls.pt
+  launcher: /Shared/ARGOS-POC/run_volume_script
+entrypoints:
+  train: kit/train.py
+  evaluate: kit/evaluer.py (split test indépendant)
+  export: kit/export_onnx.py (si onnx / onnxruntime disponibles)
+outputs: [modele.pt, config_qualite702.yaml, rapport_entrainement.md, entrainement/results.csv, test/metriques.json, test/predictions.csv, test/rapport_evaluation.md, modele.onnx]
+mlflow:
+  experiment: /Shared/HOVIS/quality-industrial
+  registered_model: workspace.argos_poc.quality_industrial
+evaluation:
+  split: test
+  independent: true
+  unit: image
+  threshold_split: validation   # seuil et meilleure époque choisis sur val : métriques val optimistes

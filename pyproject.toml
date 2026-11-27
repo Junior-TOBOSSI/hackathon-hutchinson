@@ -42,7 +42,7 @@ testpaths = ["tests", "usecases"]
 line-length = 100
 target-version = "py311"
 # kit_integration_qualite702: standalone quality kit (branch quality), not loaded by the platform
-extend-exclude = ["usecases/*/notebooks", "kit_integration_qualite702"]
+extend-exclude = ["usecases/*/notebooks", "kit_integration_qualite702", "mlops/pipelines/*/kit"]
 
 [tool.ruff.format]
 # Do not reformat code snippets inside documentation.
