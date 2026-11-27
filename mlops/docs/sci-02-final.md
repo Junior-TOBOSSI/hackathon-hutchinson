@@ -190,3 +190,15 @@ $env:HOVIS_TRAINING_REMOTE_SETUP = '1'
 #    de chaque section, envoi de yolo26n.pt dans runs/hovis/weights/, puis
 #    install_job --pipeline workstation-industrial.
 ```
+
+## Métriques de décision Quality (Exactitude, F1 NOK…)
+- **Source :** le fichier `evaluation/predictions.csv` produit par `evaluer.py` du groupe, une ligne par photo de test. Aucun modèle n'est relancé et aucun seuil n'est modifié (`mlops/pipelines/quality_industrial/decision_metrics.py`).
+- **Convention (NOK = positif, cohérente avec `metriques.json` du groupe) :** TP = NOK→NOK, FN = NOK→OK, TN = OK→OK, FP = OK→NOK. Le verdict `A_VERIFIER` est compté à part (`a_verifier_nok`, `a_verifier_ok`) et reste dans les dénominateurs. Il n'est donc jamais compté comme correct.
+  - exactitude = (TP + TN) / n ;
+  - précision NOK = TP / (TP + FP) ;
+  - rappel NOK = TP / n_NOK, soit le `rappel` du groupe ;
+  - taux de faux rejets = FP / n_OK, soit les `faux_rejets` du groupe ;
+  - métriques par classe sur les mêmes colonnes que la matrice de confusion affichée.
+- **Runs futurs :** les clés `test_accuracy`, `test_precision_nok`, `test_recall_nok`, `test_f1_nok`, `test_false_reject_rate`, `test_tp/tn/fp/fn`, `test_a_verifier_*` et `test_class_<classe>_*` sont journalisées dans MLflow. Il faut d'abord renvoyer `run_pipeline.py` et `decision_metrics.py` dans le `code_root` du Volume (`install_job --execute`, ou un envoi de ces deux fichiers).
+- **Runs historiques :** les métriques manquantes sont calculées à la lecture depuis l'artefact du run et marquées `hovis.metrics_derived_from`. Le run MLflow n'est jamais modifié.
+- **Monitoring :** « Faux rejets » et « Défauts manqués » affichent désormais des nombres (FP, FN), et non plus des taux affichés comme des entiers.

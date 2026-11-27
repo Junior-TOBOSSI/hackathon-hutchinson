@@ -152,31 +152,23 @@ function CreateFamily({ onCreated, onError }: { onCreated: (id: string) => void;
   </form>;
 }
 
-/* Lifecycle of a dataset version, as implemented by the catalogue: draft (editable) ->
-   annotation review -> publication (integrity checks on Databricks) -> published (immutable). */
-const FILE = 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z M14 3v5h5 M9 13h6 M9 17h4';
-const CLOUD_UP = 'M7 18a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.5 1.5A3.75 3.75 0 0 1 17.5 18 M12 12v8 M9 15l3-3 3 3';
+/* Lifecycle of a dataset version, as implemented by the catalogue: a draft (import, annotation,
+   checks) is published through the integrity checks into an immutable, versioned version. */
+const EDIT = 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4 M14 3v5h5 M19 8v2 M14.5 21l1-3.5 5.5-5.5a1.4 1.4 0 0 1 2 2L17.5 20z';
 const STEPS = [
-  { tone: 'amber', icon: FILE, title: 'Brouillon', text: 'Création ou mise à jour (modifiable)', legend: 'en préparation, modifiable' },
-  { tone: 'blue', icon: ICONS.log, title: 'Validation', text: 'Revue des annotations et corrections', legend: 'en cours de revue des annotations' },
-  { tone: 'violet', icon: CLOUD_UP, title: 'Publication', text: 'Contrôles d’intégrité (manifeste, empreinte)', legend: 'transfert et vérifications (Databricks)' },
-  { tone: 'green', icon: ICONS.check, title: 'Publié', text: 'Version finalisée et immuable (utilisable pour l’entraînement)', legend: 'disponible et versionné' },
+  { tone: 'amber', icon: EDIT, title: 'Brouillon', text: 'Importation, annotation et vérification' },
+  { tone: 'blue', icon: ICONS.db, title: 'Enregistrement', text: 'Contrôles d’intégrité et versionnement' },
+  { tone: 'green', icon: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M8 12l3 3 5-6', title: 'Disponible', text: 'Version figée, utilisable pour l’entraînement' },
 ] as const;
 
 function Lifecycle() {
   return <section className="card dataset-lifecycle">
-    <div className="dataset-lifecycle-intro">
-      <span className="dataset-lifecycle-icon"><Icon d={ICONS.layers} size={22} /></span>
-      <div><h2 className="h2" style={{ fontSize: 20 }}>Cycle de vie d’un dataset</h2><p className="muted">Étapes et statuts, de la préparation à la publication.</p></div>
-    </div>
+    <h2 className="h2" style={{ fontSize: 20 }}>Cycle de vie d’une version</h2>
     <ol className="dataset-lifecycle-steps">{STEPS.map((step, i) => <li key={step.title} className="row">
       {i > 0 && <span className="dataset-lifecycle-arrow" aria-hidden>→</span>}
       <div className={`dataset-step ${step.tone}`}>
-        <b><Icon d={step.icon} size={18} />{step.title}</b><span>{step.text}</span>
+        <Icon d={step.icon} size={24} /><b>{step.title}</b><span>{step.text}</span>
       </div>
     </li>)}</ol>
-    <div className="dataset-lifecycle-legend"><b>Statuts des versions</b>
-      {STEPS.map((step) => <span key={step.title}><i className={`dot ${step.tone}`} /><b>{step.title}</b> : {step.legend}</span>)}
-    </div>
   </section>;
 }

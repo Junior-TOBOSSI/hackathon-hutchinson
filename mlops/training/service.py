@@ -667,10 +667,50 @@ class TrainingService:
 
     # ------------------------------------------------------------------ results
 
+    def with_decision_metrics(self, run):
+        """Historical Quality kit runs logged before the decision metrics existed: the missing
+        ``test_*`` metrics are computed from the run's OWN evaluation/predictions.csv artefact
+        (read-only; the MLflow run is never modified). Returns a copy, marked with the
+        ``hovis.metrics_derived_from`` tag (local to the response). Any other run is unchanged."""
+        tags = run.tags or {}
+        if (
+            not str(tags.get("hovis.pipeline", "")).startswith("quality-industrial")
+            or tags.get("hovis.evaluation_split") != "test"
+            or "test_accuracy" in run.metrics
+            or run.status not in ("FINISHED",)
+        ):
+            return run
+        try:
+            raw = self._artifact(run.run_id, "evaluation/predictions.csv")
+        except Exception:  # noqa: BLE001 - unreadable artefact: the run stays as logged
+            return run
+        if raw is None:
+            return run
+        from mlops.pipelines.quality_industrial.decision_metrics import (
+            mlflow_test_metrics,
+            rows_from_csv,
+        )
+
+        derived = {
+            k: v for k, v in mlflow_test_metrics(rows_from_csv(raw)).items() if k not in run.metrics
+        }
+        if not derived:
+            return run
+        return run.model_copy(
+            update={
+                "metrics": {**run.metrics, **derived},
+                "tags": {
+                    **tags,
+                    "hovis.metrics_derived_from": "evaluation/predictions.csv",
+                    "hovis.metrics_derived": ",".join(sorted(derived)),
+                },
+            }
+        )
+
     def detail(self, job_run_id: int) -> dict[str, Any]:
         row = self.row(job_run_id)
         spec = self.spec(row.pipeline_id)
-        runs = [self.c.get_run(r) for r in row.mlflow_runs]
+        runs = [self.with_decision_metrics(self.c.get_run(r)) for r in row.mlflow_runs]
         return {
             "row": row.model_dump(),
             "pipeline": spec.model_dump(),

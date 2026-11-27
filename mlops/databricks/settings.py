@@ -75,6 +75,19 @@ DEFAULT_MODELS = [
         training_job="hovis-quality-industrial-training",
         synthetic=True,
     ),
+    # SCI-02: binary OK / NOK model of the same kit, trained on the industrial 702 folds. A
+    # SEPARATE registered model: never compared with nor promoted over the 3-class model.
+    ManagedModel(
+        id="quality-industrial-binary",
+        display_name="Qualité 702 binaire — YOLO26n-cls (groupe Quality)",
+        use_case="Qualité",
+        argos_use_case="quality",
+        scope="Candidats OK / NOK entraînés par Training Factory sur les plis industriels 702",
+        uc_name="workspace.argos_poc.quality_industrial_binary",
+        endpoint=None,
+        training_job="hovis-quality-industrial-binary-training",
+        synthetic=False,
+    ),
 ]
 
 
