@@ -127,11 +127,11 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
           </div>
 
           {!consult && live.video?.available && (
-            // Petit bouton caméra : lance la vidéo du poste (grisé pendant la lecture)
+            // Petit bouton caméra + texte : lance la vidéo du poste (grisé pendant la lecture)
             <button onClick={playVideo} disabled={live.video.playing}
-              aria-label={live.video.playing ? 'Vidéo en cours' : 'Lancer la vidéo'} title={live.video.playing ? 'Vidéo en cours' : 'Lancer la vidéo'}
-              style={{ alignSelf: 'flex-end', width: 36, height: 36, padding: 0, border: 'none', borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: live.video.playing ? 'var(--muted)' : 'var(--navy)', cursor: live.video.playing ? 'default' : 'pointer' }}>
-              <Icon d={ICONS.camera} size={20} color="currentColor" stroke={2} />
+              style={{ alignSelf: 'flex-end', height: 32, padding: '0 14px 0 10px', border: 'none', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 7, fontWeight: 600, fontSize: 14, color: '#fff', background: live.video.playing ? 'var(--muted)' : 'var(--navy)', cursor: live.video.playing ? 'default' : 'pointer' }}>
+              <Icon d={ICONS.camera} size={17} color="currentColor" stroke={2} />
+              {live.video.playing ? 'Vidéo en cours…' : 'Lancer la vidéo'}
             </button>
           )}
           {!consult && (

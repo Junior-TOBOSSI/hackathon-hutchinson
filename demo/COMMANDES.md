@@ -56,7 +56,7 @@ Un nom par poste actif, dans l'ordre C3·P06, C3·P01, C3·P02, C3·P03, C3·P04
 | passer à l'écran opérateur du poste suivant | **Ctrl+P** |
 | ouvrir l'espace AI leader (cycle de vie des modèles) et revenir | **Ctrl+O** |
 | signaler un problème (Modèle Quality, Modèle Workspace, Modèle EPI, Problème machine) | bouton **SIGNALER UN PROBLÈME** |
-| jouer la vidéo du poste (démarré avec `-Videos`) | petit **bouton caméra** rond, au-dessus de « Signaler un problème » |
+| jouer la vidéo du poste (démarré avec `-Videos`) | petit bouton **caméra « Lancer la vidéo »**, au-dessus de « Signaler un problème » |
 
 Lancer tous les postes d'un coup, sans cliquer sur chaque logo :
 
