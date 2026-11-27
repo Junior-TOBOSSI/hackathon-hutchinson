@@ -111,25 +111,6 @@ export default function OverviewPage() {
           hint={mon.data?.data ? `${n(mon.data.data.drift_alerts)} alerte(s) de dérive · ${n(mon.data.data.insufficient_coverage)} à couverture insuffisante` : undefined} />
       </div>
 
-      <section className="card ov-card">
-        <div className="ov-card-head"><span className="ov-card-icon"><Icon d={ICONS.flag} size={18} /></span><h2>Accès rapides</h2></div>
-        <div className="ov-quick">
-          {([
-            ['db', 'Datasets', 'Importer, versionner et valider les jeux de données', { section: 'datasets' }],
-            ['play', 'Nouvel entraînement', 'Assistant : cas d’usage, modèle, dataset, version', { section: 'training', new: '1' }],
-            ['layers', 'Training Factory', 'Suivre les entraînements Databricks et leurs résultats', { section: 'training' }],
-            ['badge', 'Model Registry', 'Comparer, approuver et promouvoir les versions', { section: 'registry' }],
-            ['monitor', 'Deployment Center', 'Déployer, suivre et revenir en arrière', { section: 'deployment' }],
-            ['bars', 'Monitoring', 'Inférences, dérives et retours humains', { section: 'monitoring' }],
-            ['log', 'Politiques de réentraînement', 'Conditions, propositions et garde-fous', { section: 'training', view: 'policies' }],
-          ] as [IconName, string, string, Record<string, string>][]).map(([icon, title, text, params]) => (
-            <button key={title} className="ov-quick-item" onClick={() => goto(params)}>
-              <span className="ov-quick-icon"><Icon d={ICONS[icon]} size={20} /></span>
-              <b>{title}</b><span className="muted">{text}</span><span className="ov-arrow">→</span>
-            </button>
-          ))}
-        </div>
-      </section>
 
       <div className="ov-grid">
         <Card title="Activité récente" icon="log" sub="Événements réels datés, avec leur provenance" res={act}><Activity res={act} goto={goto} /></Card>
