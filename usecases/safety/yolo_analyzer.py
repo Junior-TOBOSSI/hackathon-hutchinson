@@ -15,8 +15,10 @@ the evidence, so the decision layer (thresholds 0.4 / 0.7) turns weak evidence i
 "a_verifier" and strong evidence into "anomalie". Missing shoes inferred from a fully
 visible body only get ``shoes_absent_score`` (0.5 = "a_verifier"): the model finds only
 about half of the shoes, a red alert would be wrong too often. The frame score is the
-worst person; it is then smoothed: the returned score is the MINIMUM of the last
-``smoothing_frames`` scores, so an alert needs the problem on several frames in a row.
+worst person; it is then smoothed: the returned score is the MEDIAN of the last
+``smoothing_frames`` scores. With 3 frames, a single wrong frame never raises an alert,
+and a problem seen on 2 frames out of 3 does (a phone half hidden by the hand is often
+missed on one frame: requiring every frame would drop real alerts).
 
 Privacy: the result only holds PPE states and person boxes. No image, no face.
 """
@@ -210,11 +212,14 @@ class YoloSafetyAnalyzer(Analyzer):
         if self.phone_model is not None:
             phones = self._predict(self.phone_model, image, self.p["phone_conf"], [self.phone_id])
 
+        # Kept for overlays (e.g. a debug view drawing boxes) without a second inference.
+        self.last_detections, self.last_phones = dets, phones
         assessed, raw_score = assess_frame(dets, phones, self.p)
         self.recent.append(raw_score)
-        # Smoothing: the problem must last the whole window. While the window is not full
-        # yet (start-up), no alert: one frame alone is never enough.
-        score = min(self.recent) if len(self.recent) == self.recent.maxlen else 0.0
+        # Smoothing: median of the window. While the window is not full yet (start-up),
+        # no alert: one frame alone is never enough.
+        full = len(self.recent) == self.recent.maxlen
+        score = float(np.median(list(self.recent))) if full else 0.0
 
         persons = []
         has_shoes_field = "shoes" in PersonPPE.model_fields  # once the contract has it

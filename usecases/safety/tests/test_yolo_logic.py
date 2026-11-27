@@ -155,3 +155,11 @@ def test_no_alert_at_start_up_before_the_window_is_full():
     scores = [analyzer.analyze(IMAGE, meta(i)).score for i in range(3)]
     assert scores[0] == 0.0 and scores[1] == 0.0
     assert decide(scores[2], THRESHOLDS) == Decision.ANOMALIE
+
+
+def test_problem_seen_on_two_frames_out_of_three_still_alerts():
+    """A phone or a hand half hidden is often missed on one frame: the alert must stay."""
+    analyzer = make_analyzer([BARE_HAND, GOOD, BARE_HAND, BARE_HAND])
+    scores = [analyzer.analyze(IMAGE, meta(i)).score for i in range(4)]
+    assert decide(scores[2], THRESHOLDS) == Decision.ANOMALIE
+    assert decide(scores[3], THRESHOLDS) == Decision.ANOMALIE

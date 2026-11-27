@@ -26,7 +26,7 @@
 - **Ce que l'on sait** : sur une image isolée, le modèle ne voit pas environ un EPI sur deux à deux sur cinq (rappel de 0,45 à 0,60 selon l'EPI). Sans protection, cela produirait des fausses alertes du type « lunettes absentes » alors que la personne les porte.
 - **Ce qui limite déjà ces fausses alertes** :
   - **la règle de preuve** : un EPI n'est déclaré absent que si la partie du corps qu'il protège est visible (main nue, tête, visage). Une main cachée donne « non vérifié », jamais une alerte ;
-  - **le lissage** : une alerte demande que le problème soit vu sur 3 images de suite (1,5 s). Une erreur isolée ne déclenche rien ;
+  - **le lissage** : une alerte demande que le problème soit vu sur au moins 2 des 3 dernières images. Une erreur isolée ne déclenche rien, un objet manqué sur une seule image n'annule pas l'alerte ;
   - **deux niveaux d'alerte** : une preuve faible donne « à vérifier » (orange), seule une preuve nette donne « anomalie » (rouge).
 - **Comment nous le mesurerons** : une vidéo d'un opérateur équipé de tous ses EPI pendant une durée fixe ; toute alerte est alors une fausse alerte. Résultat exprimé en **fausses alertes par heure et par poste**. **[à compléter]**
 - **Leviers si le taux est trop élevé**, sans réentraîner : recadrer l'image sur la zone du poste (les EPI deviennent plus gros), allonger le lissage (5 images = 2,5 s), ajuster les seuils de confiance par EPI. Avec réentraînement : **les images de votre atelier**, qui sont le levier le plus fort.

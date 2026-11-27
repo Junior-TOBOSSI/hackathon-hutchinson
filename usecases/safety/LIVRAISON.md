@@ -76,7 +76,7 @@ Règles appliquées : rien n'est affiché si l'image est « conforme » (score l
 
 - Un EPI est `absent` seulement si la partie du corps protégée est visible sans lui (main nue, tête, visage, corps entier sans chaussures). Sinon `uncertain`.
 - Score : `0,4 + 0,6 × confiance de la preuve` ; chaussures déduites du corps entier : 0,5 (« à vérifier »).
-- Lissage : le score retenu est le minimum des 3 dernières images (pas d'alerte sur une image isolée).
+- Lissage : le score retenu est la médiane des 3 dernières images : une image isolée ne déclenche rien, un problème vu sur 2 images sur 3 déclenche l'alerte (un téléphone en main est souvent manqué sur une image).
 - Le gilet n'est pas vérifié (`vest = uncertain`).
 - Les événements Safety sont continus (pas une pièce par cycle).
 
