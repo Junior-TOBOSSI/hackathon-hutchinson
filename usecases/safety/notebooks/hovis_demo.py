@@ -39,7 +39,10 @@ from webcam_preview import draw, hide_faces  # noqa: E402
 
 STATION = "C3·P06"
 CAMERA = int(os.environ.get("CAMERA", "0"))
-WEIGHTS = os.environ.get("WEIGHTS", "data/models/safety/sh17_ours_yolov8s_640.pt")
+# Chosen model: YOLO26s; YOLOv8s while its file is not on this machine yet.
+_CHOSEN = "data/models/safety/sh17_ours_yolo26s_640.pt"
+_FALLBACK = "data/models/safety/sh17_ours_yolov8s_640.pt"
+WEIGHTS = os.environ.get("WEIGHTS", _CHOSEN if (REPO / _CHOSEN).is_file() else _FALLBACK)
 PERIOD = 1 / float(os.environ.get("FPS", "4"))  # analyses per second
 
 state = {"issues": [], "ppe": {}, "jpeg": None, "n": 0, "error": None}

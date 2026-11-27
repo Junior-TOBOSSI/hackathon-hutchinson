@@ -12,8 +12,8 @@
 | Élément | Choix actuel |
 |---|---|
 | EPI obligatoires | casque, lunettes, gants, chaussures de sécurité ; téléphone interdit |
-| Modèle | YOLOv8s entraîné sur 9 classes (11,1 M paramètres), repli YOLOv8n (3,1 M) |
-| Score moyen (mAP50, validation) | 0,68 (YOLOv8s), 0,63 (YOLOv8n) |
+| Modèle | YOLO26s entraîné sur 9 classes (≈ 9,5 M paramètres) ; version légère YOLO26n (2,4 M) pour un boîtier sans accélérateur |
+| Score moyen (mAP50, validation) | 0,70 (YOLO26s), 0,65 (YOLO26n) ; quatre modèles comparés |
 | Temps d'analyse | ~80 ms par image sur un ordinateur portable, téléphone compris |
 | Vie privée | visages pixellisés, aucune image enregistrée, fonctionnement 100 % local |
 
@@ -60,8 +60,8 @@
 
 | Configuration | Modèle | Cadence |
 |---|---|---|
-| Raspberry Pi 5 + refroidissement actif | YOLOv8s à 1 image/s, ou YOLOv8n à 2 images/s | suffisante pour des EPI |
-| Raspberry Pi 5 + accélérateur IA (Hailo) | YOLOv8s | 2 images/s ou plus |
+| Raspberry Pi 5 + accélérateur IA (Hailo) | **YOLO26s** (recommandé) | 2 images/s ou plus |
+| Raspberry Pi 5 + refroidissement actif | YOLO26s si le test donne ≥ 1 image/s, sinon YOLO26n | suffisante pour des EPI |
 | Raspberry Pi 4 | YOLOv8n | ~1 image/s |
 
 - **Délai d'alerte** : environ 1,5 à 3 s (cadence + lissage sur 3 images). Le temps du modèle n'en représente qu'une petite partie.
@@ -76,13 +76,13 @@
 | Protection | boîtier IP65 ou plus |
 | Connexion | caméra branchée directement au boîtier (module caméra Raspberry Pi ou USB) : pas de réseau, plus simple et plus sûr |
 
-- **Piste d'amélioration** : la génération YOLO26 annonce environ 2 fois plus de vitesse sur processeur que YOLOv8 à taille égale (chiffre du fabricant). Elle sera entraînée avec le même protocole, pour comparaison. **[à compléter]**
+- **Choix du modèle** : quatre modèles entraînés avec le même protocole. YOLO26s est le plus précis sur chaque EPI (gants 0,62 contre 0,53 pour YOLOv8s) et n'a pas d'étape NMS, ce qui le rend plus rapide sur processeur à taille égale (annonce du fabricant). Sa vitesse reste à mesurer sur le boîtier. **[à compléter]**
 
 ## 5. « Et le casque ? Son chiffre est-il fiable ? »
 
 **Réponse courte : c'est le chiffre le moins fiable, faute d'exemples ; les images de l'usine le corrigeront.**
 
-- Le casque est rare dans SH17 : 773 exemples à l'entraînement, **70 en validation**. Son score (0,61 pour YOLOv8s) a donc une forte marge d'incertitude.
+- Le casque est rare dans SH17 : 773 exemples à l'entraînement, **70 en validation**. Son score (0,68 pour YOLO26s) a donc une forte marge d'incertitude.
 - La preuve associée, la tête, est très bien détectée (score 0,89, 86 % des têtes trouvées) : quand une tête est visible sans casque, l'alerte est fiable.
 - **Amélioration prévue** : des images de vos opérateurs casqués lors du réentraînement ; mesure sur le jeu de test et sur le site. **[à compléter]**
 
