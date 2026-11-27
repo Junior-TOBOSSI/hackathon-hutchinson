@@ -542,7 +542,7 @@ index 89edae1..09c58d6 100644
        </main>
      </div>
 diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
-index 1642809..61457de 100644
+index 1642809..632a546 100644
 --- a/argos-ui/src/pages/TeamLeader.tsx
 +++ b/argos-ui/src/pages/TeamLeader.tsx
 @@ -88,7 +88,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
@@ -565,7 +565,7 @@ index 1642809..61457de 100644
          </div>
          <StationTable stations={cell.stations} alerts={alerts} />
        </div>
-@@ -119,128 +119,121 @@ const DOT: Record<StationStatus, string> = {
+@@ -119,128 +119,124 @@ const DOT: Record<StationStatus, string> = {
    OK: 'var(--green)', SECURITE: 'var(--red)', QUALITE: 'var(--red)', RYTHME: 'var(--amber)', CAMERA: 'var(--amber)', OBJET: 'var(--amber)',
  };
  
@@ -573,6 +573,10 @@ index 1642809..61457de 100644
 +/** Fond très léger de la carte, selon l'état du poste (la pastille et le libellé restent l'info principale). */
 +const TINT: Record<StationStatus, string> = {
 +  OK: '#d5eedf', SECURITE: '#f8d3da', QUALITE: '#f8d3da', RYTHME: '#fbe3c0', CAMERA: '#fbe3c0', OBJET: '#fbe3c0',
++};
++/** Contour de la carte : la même couleur que le fond, un ton plus soutenu. */
++const EDGE: Record<StationStatus, string> = {
++  OK: '#9fd6b6', SECURITE: '#eb99a7', QUALITE: '#eb99a7', RYTHME: '#efbf78', CAMERA: '#efbf78', OBJET: '#efbf78',
 +};
  
  /**
@@ -705,7 +709,6 @@ index 1642809..61457de 100644
 +      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12 }}>
 +        {filtered.map((s) => {
 +          const delta = s.good - s.expectedNow;
-+          const hot = s.status === 'SECURITE' || s.status === 'QUALITE';
 +          const isSel = s.id === selected;
 +          return (
 +            <button
@@ -715,7 +718,7 @@ index 1642809..61457de 100644
 +              aria-label={`Poste ${shortId(s.id)} : ${STATUS[s.status][0]}, ${deltaText(delta, true)}, ${s.ko} pièces NOK. Voir le détail`}
 +              className="col"
 +              style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px', borderRadius: 16, background: TINT[s.status],
-+                border: isSel ? '2px solid var(--navy)' : hot ? '2px solid var(--red)' : '1px solid var(--line)' }}
++                border: isSel ? '2px solid var(--navy)' : `2px solid ${EDGE[s.status]}` }}
 +            >
 +              <span className="cond" style={{ fontWeight: 700, fontSize: 26, lineHeight: 1 }}>{shortId(s.id)}</span>
 +              <span className="row" style={{ gap: 8, fontWeight: 600, fontSize: 15 }}>
