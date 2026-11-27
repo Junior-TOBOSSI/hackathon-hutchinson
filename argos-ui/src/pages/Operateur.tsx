@@ -47,6 +47,8 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
   const multi = ko && envIssues.length > 0;
   const hour = new Date(live.now).getHours();
   const startup = live.startup && live.startup.phase !== 'RUNNING' ? live.startup : null;
+  // Seul l'environnement est en défaut : l'image caméra remplace la pièce (colonne élargie).
+  const camera = !startup && !ko && envIssues.length > 0 && !!live.frontSnapshotUrl;
   const confirm = async () => { await api.confirmPart(stationId); reload(); };
   const release = async () => { await api.releasePart(stationId); reload(); };
   const restartDemo = async () => { await api.restartScenario(stationId); reload(); };
@@ -79,10 +81,11 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
 
       <main className="row stack-mobile" style={{ flex: 1, alignItems: 'stretch', gap: 24, padding: '20px 28px 0' }}>
         {/* Colonne gauche : la pièce, ou l'image caméra si seul l'environnement est en défaut */}
-        <section className="card-op col" style={{ width: 440, maxWidth: '100%', gap: 14 }}>
+        {/* Flux caméra affiché : colonne élargie pour bien voir ce qui manque */}
+        <section className="card-op col" style={{ width: camera ? 760 : 440, maxWidth: '100%', gap: 14, transition: 'width 0.25s ease' }}>
           {startup
             ? <StartupPanel startup={startup} />
-            : !ko && envIssues.length > 0 && live.frontSnapshotUrl
+            : camera
               ? <SnapshotPanel live={live} instruction={envIssues[0].instruction} />
               : <PartPanel live={live} onConfirm={consult ? undefined : confirm} onRelease={consult ? undefined : release} onRequalify={consult ? undefined : requalify} />}
         </section>
@@ -328,7 +331,7 @@ function SnapshotPanel({ live, instruction }: { live: StationLive; instruction: 
 function MultiCard({ live, actions }: { live: StationLive; actions: OperatorAction[] }) {
   return (
     <div className="card-op row stack-mobile" style={{ flex: 1, border: '3px solid var(--red)', padding: '16px 20px', gap: 18, alignItems: 'stretch' }}>
-      <div className="col" style={{ width: 340, maxWidth: '100%', flexShrink: 0, gap: 8 }}>
+      <div className="col" style={{ width: 480, maxWidth: '100%', flexShrink: 0, gap: 8 }}>
         <span className="label-caps">Ce que la caméra a vu</span>
         {live.frontSnapshotUrl && <img src={live.frontSnapshotUrl} alt="Image caméra frontale, visage flouté, manquements encadrés en rouge" style={{ width: '100%', borderRadius: 14 }} />}
       </div>
