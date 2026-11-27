@@ -221,3 +221,12 @@ def test_only_the_station_operator_is_checked_not_people_behind():
     assert len(assessed) == 1 and assessed[0].states["glasses"] == PPEState.PRESENT
     everyone, score = assess_frame(dets, [], {**P, "required": ["glasses"], "operator_only": False})
     assert len(everyone) == 2 and score > 0  # without the option, the person behind alerts
+
+
+def test_a_hand_box_on_a_glove_box_is_a_gloved_hand_not_a_bare_one():
+    """The model often sees a gloved hand twice (gloves + hands): that is not a bare hand."""
+    glove = Det("gloves", 0.6, (0.32, 0.50, 0.36, 0.55))
+    same_hand = Det("hands", 0.8, (0.32, 0.50, 0.36, 0.56))
+    other_bare_hand = Det("hands", 0.8, (0.50, 0.50, 0.54, 0.55))
+    assert states([glove, same_hand]).states["gloves"] == PPEState.PRESENT
+    assert states([glove, same_hand, other_bare_hand]).states["gloves"] == PPEState.ABSENT
