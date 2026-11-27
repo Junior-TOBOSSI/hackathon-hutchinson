@@ -10,7 +10,7 @@
 | `usecases/safety/hovis.py` | Traduction d'un résultat Safety en problèmes HOVIS (`StationIssue` d'argos-ui) |
 | `usecases/safety/config.yaml` | Réglages (modèles, EPI obligatoires, seuils, lissage). Le faux analyseur reste par défaut |
 | `usecases/safety/tests/test_yolo_logic.py` | 18 tests des règles métier, sans modèle |
-| `usecases/safety/tests/test_hovis.py` | 15 tests de la traduction vers HOVIS |
+| `usecases/safety/tests/test_hovis.py` | 16 tests de la traduction vers HOVIS |
 | `usecases/safety/notebooks/` | Préparation des données, entraînement, évaluation, aperçu webcam (outils, hors plateforme) |
 | `usecases/safety/notebooks/hovis_demo.py` | Démo locale : webcam + vrai modèle -> écran opérateur argos-ui (flux vidéo floutée, production simulée) |
 | `usecases/safety/AGENTS.md` | Décisions prises et questions ouvertes |
@@ -52,7 +52,8 @@ from usecases.safety.hovis import StationIssueTracker
 
 tracker = StationIssueTracker(station_id="C3·P06")   # un par poste, gardé en mémoire
 issues = tracker.update(safety_result,                # AnalysisResult du dernier passage
-                        idle_phone=bool(analyzer.last_idle_phones))
+                        idle_phone=bool(analyzer.last_idle_phones),
+                        person_states=analyzer.last_states)  # chaussures comprises
 station_live["issues"] += issues
 ```
 
@@ -99,7 +100,7 @@ station_live["checks"].update(station_checks(station_live["issues"]))
 
 ## 6. Demandes à l'intégration
 
-1. **Contrat** : ajouter `shoes: PPEState = PPEState.UNCERTAIN` à `PersonPPE` (`visionhub/contracts.py`). Rétrocompatible. Tant que ce n'est pas fait, les chaussures comptent dans le score mais ne sont ni transmises au Core ni affichées.
+1. **Contrat** : ajouter `shoes: PPEState = PPEState.UNCERTAIN` à `PersonPPE` (`visionhub/contracts.py`). Rétrocompatible. Tant que ce n'est pas fait, les chaussures comptent dans le score et **s'affichent dans HOVIS** (via `person_states=analyzer.last_states`), mais ne sont pas enregistrées par le Core.
 2. **Téléphone** : la branche `detection-telephone` contient un autre modèle de téléphone. Décider lequel garder pour éviter deux détections concurrentes. Le téléphone posé sur le poste relève normalement du groupe Workstation : se mettre d'accord pour ne pas le signaler deux fois.
 3. **Remontée au Core** : vérifier que les inférences Safety continues sont bien transmises (point ouvert du document de passation, section 16).
 

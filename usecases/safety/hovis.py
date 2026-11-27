@@ -21,7 +21,9 @@ Rules:
 - a problem ends only after ``hold_s`` seconds (5 s) without being seen: a detection that
   flickers (gloves seen, missed, seen) stays ONE episode and does not blink on screen, so the
   team leader is not spammed. Cost: the issue stays ~5 s after the operator fixed it.
-- shoes appear as soon as ``PersonPPE`` has a ``shoes`` field (contract change pending);
+- shoes: ``PersonPPE`` (contract) has no ``shoes`` field yet, so pass the analyzer's
+  ``last_states`` (``person_states``), which has them: shoes then raise issues like the
+  other PPE. Only the Core storage still waits for the contract change;
 - a phone lying on the station (seen, touching nobody) gives a POSTE issue "Téléphone sur
   le poste" when seen on 2 of the last 3 frames. This is workstation tidiness: to be agreed
   with the Workstation group so that the same phone is not reported twice.
@@ -47,18 +49,29 @@ DEFAULT_REQUIRED = ("helmet", "glasses", "gloves", "shoes")
 
 
 def current_problems(
-    result: AnalysisResult, low: float = 0.4, required: tuple[str, ...] = DEFAULT_REQUIRED
+    result: AnalysisResult,
+    low: float = 0.4,
+    required: tuple[str, ...] = DEFAULT_REQUIRED,
+    person_states: list[dict[str, PPEState]] | None = None,
 ) -> list[tuple[str, str, str, str]]:
-    """Problems of one frame: (key, category, label, instruction), station level, sorted."""
+    """Problems of one frame: (key, category, label, instruction), station level, sorted.
+
+    ``person_states``: the analyzer's ``last_states`` (shoes included). Without it, the PPE
+    states are read from the contract, which has no shoes yet.
+    """
     if result.details.kind != "safety" or result.score < low:
         return []
+    if person_states is None:
+        person_states = [
+            {item: getattr(p, item, None) for item in required} for p in result.details.persons
+        ]  # fmt: skip
     keys: set[str] = set()
-    for person in result.details.persons:
+    for states in person_states:
         for item in required:
-            if getattr(person, item, None) == PPEState.ABSENT:  # field may not exist yet
+            if states.get(item) == PPEState.ABSENT:
                 keys.add(item)
-        if person.phone:
-            keys.add("phone")
+    if any(person.phone for person in result.details.persons):
+        keys.add("phone")
     problems = []
     for key in sorted(keys):
         if key == "phone":
@@ -88,16 +101,20 @@ class StationIssueTracker:
         self._idle_phone = deque(maxlen=3)  # phone lying on the station, last 3 frames
 
     def update(
-        self, result: AnalysisResult, now: datetime | None = None, idle_phone: bool = False
+        self,
+        result: AnalysisResult,
+        now: datetime | None = None,
+        idle_phone: bool = False,
+        person_states: list[dict[str, PPEState]] | None = None,
     ) -> list[dict]:
         """Issues to display after this frame, in the argos-ui ``StationIssue`` format.
 
         ``idle_phone``: a phone was seen on the station, touching nobody (analyzer's
-        ``last_idle_phones``).
+        ``last_idle_phones``). ``person_states``: analyzer's ``last_states`` (for shoes).
         """
         now = now or datetime.now(UTC)
         stamp = now.isoformat()
-        problems = current_problems(result, self.low, self.required)
+        problems = current_problems(result, self.low, self.required, person_states)
         self._idle_phone.append(idle_phone)
         in_use = any(key == "phone" for key, *_ in problems)
         if sum(self._idle_phone) >= 2 and not in_use:  # 2 of the last 3 frames

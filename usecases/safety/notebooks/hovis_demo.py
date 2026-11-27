@@ -75,7 +75,11 @@ def loop() -> None:
         frame = frame.copy()
         meta = FrameMeta(frame_id=f"demo-{n}", workstation_id=STATION, camera_id="front")
         result = analyzer.analyze(frame, meta)
-        issues = tracker.update(result, idle_phone=bool(analyzer.last_idle_phones))
+        issues = tracker.update(
+            result,
+            idle_phone=bool(analyzer.last_idle_phones),
+            person_states=analyzer.last_states,  # shoes included
+        )
         # Snapshot: reuse the analyzer's detections (no second inference); faces hidden FIRST.
         h, w = frame.shape[:2]
         def px(d):

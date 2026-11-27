@@ -132,3 +132,13 @@ def test_station_ppe_agrees_with_the_issues():
     # One person without it is enough to lose "present"; no one in view: nothing known.
     assert station_ppe([worn, {**worn, "helmet": U}], [])["helmet"] == "uncertain"
     assert set(station_ppe([], []).values()) == {"uncertain"}
+
+
+def test_shoes_raise_an_issue_from_the_analyzer_states_without_contract_change():
+    states = [{"helmet": P, "glasses": P, "gloves": P, "shoes": A}]
+    tracker = StationIssueTracker("P1")
+    issues = tracker.update(result(0.5, [person()]), T0, person_states=states)
+    assert [(i["category"], i["label"]) for i in issues] == [
+        ("SECURITE_EPI", "Chaussures de sécurité non détectées")
+    ]
+    assert station_ppe(states, issues)["shoes"] == "absent"
