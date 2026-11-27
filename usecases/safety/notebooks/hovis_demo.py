@@ -11,8 +11,8 @@ needs in live mode, to test the Safety model end to end on a laptop.
 
 Run, from the repo root (webcam access needed):
     YOLO_OFFLINE=1 uvicorn hovis_demo:app --port 8000 --app-dir usecases/safety/notebooks
-then argos-ui (branch ``interface``) with ``VITE_USE_MOCK=false npx vite``. For a fluid
-display, set the Operator page refresh to 500 ms (argos-ui ``pages/Operateur.tsx``).
+then argos-ui (branch ``interface``) with ``VITE_USE_MOCK=false npx vite``. The video is a
+stream, fluid whatever the page refresh (argos-ui keeps 2 s, on purpose, against blinking).
 Options (environment): CAMERA (0), WEIGHTS, FPS (analyses per second, 4).
 """
 

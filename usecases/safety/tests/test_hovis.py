@@ -103,3 +103,19 @@ def test_phone_in_hand_turns_the_securite_tile_red_and_lying_phone_the_poste_til
     other.update(result(0.1, [person()]), T0, idle_phone=True)
     lying = other.update(result(0.1, [person()]), T0, idle_phone=True)
     assert station_checks(lying) == {"securite": True, "poste": False}
+
+
+def test_flickering_detection_stays_one_episode_and_does_not_blink():
+    """Gloves missed on a few frames: the issue stays on screen with the same start."""
+    tracker = StationIssueTracker("P1", hold_s=5)
+    tracker.update(result(0.9, [person(gloves=A)]), T0)
+    gap = tracker.update(result(0.1, [person()]), T0 + timedelta(seconds=2))
+    back = tracker.update(result(0.9, [person(gloves=A)]), T0 + timedelta(seconds=4))
+    assert [i["label"] for i in gap] == ["Gants absents"]
+    assert back[0]["since"] == T0.isoformat()
+
+
+def test_problem_ends_after_the_hold_time():
+    tracker = StationIssueTracker("P1", hold_s=5)
+    tracker.update(result(0.9, [person(gloves=A)]), T0)
+    assert tracker.update(result(0.1, [person()]), T0 + timedelta(seconds=6)) == []
