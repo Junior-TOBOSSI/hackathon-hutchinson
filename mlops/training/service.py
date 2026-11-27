@@ -404,7 +404,7 @@ class TrainingService:
                 continue
             mlruns = self._mlflow_runs(spec)
             versions = self._versions(spec)
-            for jr in self.c.job_runs(job.job_id, 50):
+            for jr in self.c.job_runs(job.job_id, 25):  # Databricks API maximum
                 linked = [
                     r
                     for r in mlruns
@@ -489,6 +489,8 @@ class TrainingService:
         cache = HOME / "cache" / "artifacts" / run_id / path
         if cache.is_file():
             return cache.read_bytes()
+        if path not in self._folder(run_id, path.rsplit("/", 1)[0] if "/" in path else None):
+            return None  # folder listed once (cached): no slow download attempt for an absent file
         try:
             local = self.c._call(
                 lambda: self.c.mlflow.download_artifacts(run_id, path, str(cache.parent.parent)),
@@ -496,6 +498,10 @@ class TrainingService:
             )
         except ResourceNotFoundError:
             return None
+        except DatabricksConnectorError as exc:
+            if "Failed to download artifacts" in str(exc) or "does not exist" in str(exc):
+                return None  # absent artefact = "unavailable", not an error
+            raise
         data = Path(local).read_bytes()
         cache.parent.mkdir(parents=True, exist_ok=True)
         if Path(local) != cache:
@@ -506,6 +512,15 @@ class TrainingService:
         raw = self._artifact(run_id, "evaluation/metriques.json")
         preds = self._artifact(run_id, "evaluation/predictions.csv")
         if raw is None or preds is None:
+            own = self._artifact(run_id, "reports/confusion_matrix_test.json")
+            if own is not None:  # pipeline's own test confusion matrix (quality-demo / DBX-00)
+                matrix = from_matrix(json.loads(own))
+                return {
+                    "available": True,
+                    "source": "reports/confusion_matrix_test.json",
+                    "metrics": {},
+                    **matrix,
+                }
             return {
                 "available": False,
                 "reason": "no evaluation artefacts (metriques.json / predictions.csv) for this run",
@@ -552,7 +567,25 @@ class TrainingService:
             "version": version,
         }
 
+    def _folder(self, run_id: str, folder: str | None) -> set[str]:
+        """Paths of ONE artefact folder (shallow listing, cached 1 h)."""
+
+        def listing() -> set[str]:
+            return {
+                a.path
+                for a in self.c._call(
+                    lambda: self.c.mlflow.list_artifacts(run_id, folder), "artifacts"
+                )
+            }
+
+        return self.c._cached(f"training:artdir:{run_id}:{folder}", listing, ttl=3600)
+
     def artifacts(self, run_id: str) -> list[dict[str, Any]]:
+        return self.c._cached(
+            f"training:artlist:{run_id}", lambda: self._artifacts(run_id), ttl=3600
+        )
+
+    def _artifacts(self, run_id: str) -> list[dict[str, Any]]:
         out, stack = [], [None]
         while stack and len(out) < 200:
             path = stack.pop()
@@ -652,4 +685,31 @@ def confusion(rows: list[dict[str, str]]) -> dict[str, Any]:
         "matrix": counts,
         "per_class": per_class,
         "n": len(rows),
+    }
+
+
+def from_matrix(data: dict[str, Any]) -> dict[str, Any]:
+    """{labels, matrix, split} written by a pipeline -> same shape as ``confusion``."""
+    labels = list(data["labels"])
+    counts = {
+        t: {c: int(data["matrix"][i][j]) for j, c in enumerate(labels)}
+        for i, t in enumerate(labels)
+    }
+    per_class = {}
+    for c in labels:
+        tp, support = counts[c][c], sum(counts[c].values())
+        predicted = sum(counts[t][c] for t in labels)
+        precision = tp / predicted if predicted else None
+        recall = tp / support if support else None
+        f1 = 2 * precision * recall / (precision + recall) if precision and recall else None
+        per_class[c] = {"support": support, "precision": precision, "recall": recall, "f1": f1}
+    n = sum(sum(r.values()) for r in counts.values())
+    split = data.get("split", "test")
+    return {
+        "split": split,
+        "truth_classes": labels,
+        "columns": labels,
+        "matrix": counts,
+        "per_class": per_class,
+        "n": n,
     }

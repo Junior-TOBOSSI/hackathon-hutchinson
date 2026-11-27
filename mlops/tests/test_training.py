@@ -518,3 +518,15 @@ def test_real_group_scripts_are_importable_and_unmodified_entrypoints_exist():
     )
     assert out.returncode == 0
     assert io.StringIO  # keep import used
+
+
+def test_pipeline_own_confusion_matrix_is_read_as_is():
+    out = svc.from_matrix({"labels": ["OK", "NOK"], "matrix": [[17, 3], [3, 17]], "split": "test"})
+    assert (
+        out["matrix"] == {"OK": {"OK": 17, "NOK": 3}, "NOK": {"OK": 3, "NOK": 17}}
+        and out["n"] == 40
+    )
+    assert (
+        out["per_class"]["NOK"]["recall"] == 17 / 20
+        and out["per_class"]["NOK"]["precision"] == 17 / 20
+    )
