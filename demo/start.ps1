@@ -63,6 +63,6 @@ Start-Process powershell -WorkingDirectory $ui -ArgumentList @(
 
 Write-Host "Démarrage... le navigateur s'ouvre dans quelques secondes."
 Write-Host "Connexion : n'importe quel identifiant = opérateur ; c.diaz@hutchinson.com = superviseur."
-Write-Host "Clic sur le logo HOVIS = lancer / relancer la simulation ; Ctrl+M = vue superviseur."
+Write-Host "Clic sur le logo HOVIS = lancer / relancer la simulation ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant."
 Start-Sleep -Seconds 8
 Start-Process "http://localhost:5173"

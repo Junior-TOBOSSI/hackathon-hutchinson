@@ -36,5 +36,5 @@ trap 'kill $SERVER 2>/dev/null' EXIT
 cd "$REPO/argos-ui"
 [ -d node_modules ] || npm install --no-audit --no-fund
 echo "Interface : http://localhost:5173 (le serveur du scénario met environ 20 s à charger les modèles)"
-echo "Clic sur le logo HOVIS = lancer / relancer la simulation ; Ctrl+M = vue superviseur."
+echo "Clic sur le logo HOVIS = lancer / relancer la simulation ; Ctrl+M = vue superviseur ; Ctrl+P = poste suivant."
 VITE_USE_MOCK=false npx vite --port 5173 --host 127.0.0.1

@@ -1,4 +1,4 @@
-import { useEffect, type ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { USE_MOCK } from './api/client';
 import type { Role, User } from './api/types';
@@ -39,20 +39,44 @@ const DEMO_USERS: { role: Role; label: string; user: User }[] = [
   { role: 'TEAM_LEADER', label: 'Team leader', user: { id: 'demo-tl', name: 'Team leader démo', role: 'TEAM_LEADER', cellId: 'C3' } },
 ];
 
+/** Les 6 postes de la cellule de démo (C3·P06 = poste du scénario, les autres simulés). */
+const DEMO_STATIONS = ['C3·P01', 'C3·P02', 'C3·P03', 'C3·P04', 'C3·P05', 'C3·P06'];
+
 /**
- * DÉMO : Ctrl+M passe de la vue opérateur à la vue team leader (superviseur), et retour.
- * Aucun signe à l'écran ; actif aussi en mode live, pour le pitch.
+ * DÉMO, raccourcis sans aucun signe à l'écran (actifs aussi en mode live, pour le pitch) :
+ * - Ctrl+M : vue opérateur <-> vue team leader (superviseur) ;
+ * - Ctrl+P : écran opérateur du poste suivant de la cellule (P06 -> P01 -> … -> P06).
+ *   Ctrl+P remplace ici l'impression du navigateur.
  */
 function DemoShortcut() {
   const { user, setUser } = useAuth();
   const nav = useNavigate();
+  const lastStation = useRef('C3·P06'); // poste rouvert par Ctrl+M depuis la vue team leader
   useEffect(() => {
+    if (user?.role === 'OPERATEUR' && user.stationId) lastStation.current = user.stationId;
+  }, [user]);
+  useEffect(() => {
+    const operatorOf = (stationId: string): User => ({ ...DEMO_USERS[0].user, stationId });
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey && (e.key === 'm' || e.key === 'M'))) return;
-      e.preventDefault();
-      const next = user?.role === 'TEAM_LEADER' ? DEMO_USERS[0] : DEMO_USERS[1];
-      setUser(next.user);
-      nav(homeFor[next.role]);
+      if (!e.ctrlKey || e.altKey || e.metaKey) return;
+      const key = e.key.toLowerCase();
+      if (key === 'm') {
+        e.preventDefault();
+        if (user?.role === 'TEAM_LEADER') {
+          setUser(operatorOf(lastStation.current));
+          nav(homeFor.OPERATEUR);
+        } else {
+          setUser(DEMO_USERS[1].user);
+          nav(homeFor.TEAM_LEADER);
+        }
+      } else if (key === 'p') {
+        e.preventDefault(); // pas de fenêtre d'impression
+        const current = user?.role === 'OPERATEUR' ? user.stationId ?? lastStation.current : lastStation.current;
+        const i = DEMO_STATIONS.indexOf(current);
+        const next = DEMO_STATIONS[(i + 1) % DEMO_STATIONS.length];
+        setUser(operatorOf(next));
+        nav(homeFor.OPERATEUR);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

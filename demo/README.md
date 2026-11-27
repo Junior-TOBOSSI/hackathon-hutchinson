@@ -54,6 +54,7 @@ La vérification du poste n'est faite **qu'une fois** : une fois le poste valid�
 ## Vue superviseur (team leader)
 
 - **Ctrl+M** : passe de l'écran opérateur à la vue team leader, et retour. Aucun signe à l'écran.
+- **Ctrl+P** : écran opérateur du poste suivant de la cellule (C3·P06 → P01 → … → P06). Seul P06 déroule le scénario ; les autres postes sont simulés (écran « tout va bien »). Ctrl+P remplace ici l'impression du navigateur. Depuis la vue team leader, Ctrl+M rouvre le dernier poste affiché.
 - Ou se connecter avec `c.diaz@hutchinson.com` (ou un identifiant contenant « leader », « manager » ou « chef »).
 - Cellule 3 : **6 postes** (C3·P01 à C3·P06). C3·P06 est le poste du scénario : vrais verdicts, vraies alertes (prise de poste non conforme, pièce KO en attente, pièce laissée passer à confirmer). Les 5 autres sont simulés par le code d'EPI. Les écrans viennent du patch d'EPI (`usecases/safety/integration/argos-ui-operateur.patch`) : cartes de postes, « Prendre en charge ».
 
