@@ -280,14 +280,14 @@ function Artifacts({ run }: { run: MlRun }) {
   return <div className="col" style={{ gap: 12 }}>
     <div className="between" style={{ gap: 10, flexWrap: 'wrap' }}>
       <span className="muted">{list.data.length} fichier(s) · {size(total)}</span>
-      <a className="btn btn-primary" href={artifactsExportUrl(run.run_id)} download>Exporter tous les artefacts (.zip)</a>
+      <a className="btn btn-primary" href={artifactsExportUrl(run.run_id)} download={`run-${run.run_id.slice(0, 8)}-artifacts.zip`}>Exporter tous les artefacts (.zip)</a>
     </div>
     <table className="tf-table"><thead><tr><th>Artefact</th><th>Taille</th><th /></tr></thead><tbody>{list.data.map((a) => {
       const viewable = VIEWABLE.test(a.path);
       return <tr key={a.path} style={{ cursor: 'default' }}><td>{a.path}</td><td>{a.size != null ? size(a.size) : '—'}</td>
         <td className="row" style={{ gap: 12 }}>{DOWNLOADABLE.test(a.path) ? <>
           {viewable && <a href={artifactUrl(run.run_id, a.path)} target="_blank" rel="noreferrer">Ouvrir</a>}
-          <a href={artifactDownloadUrl(run.run_id, a.path)} download>Télécharger</a></>
+          <a href={artifactDownloadUrl(run.run_id, a.path)} download={a.path.split('/').pop()}>Télécharger</a></>
           : <span className="muted">consultation dans MLflow</span>}</td></tr>;
     })}</tbody></table>
   </div>;
