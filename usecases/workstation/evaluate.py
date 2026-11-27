@@ -62,11 +62,9 @@ def build_analyzer(
     params |= {"align": True, "persistence_frames": 1}
     params |= {k: v for k, v in overrides.items() if v is not None}
     if detector is not None:
-        params["detector"] = "none"
+        params["detector_object"] = detector
     analyzer = ZoneWorkstationAnalyzer()
     analyzer.load(params)
-    if detector is not None:
-        analyzer.detector = detector
     return analyzer, config.thresholds
 
 

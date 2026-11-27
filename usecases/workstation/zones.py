@@ -135,14 +135,24 @@ def change_mask(
     return cleaned.astype(bool)
 
 
-def blobs_in(changed: np.ndarray, min_area: int) -> list[Blob]:
-    """Connected regions of a boolean change mask larger than ``min_area`` pixels."""
-    n, _, stats, _ = cv2.connectedComponentsWithStats(changed.astype(np.uint8), connectivity=8)
+def blobs_in(changed: np.ndarray, min_area: int, group_px: int = 0) -> list[Blob]:
+    """Connected regions of a boolean change mask larger than ``min_area`` pixels.
+
+    ``group_px`` > 0 merges pieces closer than that many pixels into one region: the
+    edges of an object (a bin, a crate) often split its change in two, and the box must
+    cover the whole object. The area counts only the changed pixels."""
+    mask = changed.astype(np.uint8)
+    groups = mask
+    if group_px > 0:
+        size = 2 * group_px + 1
+        groups = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size)))
+    n, labels = cv2.connectedComponents(groups, connectivity=8)
     blobs = []
     for i in range(1, n):  # label 0 is the background
-        x, y, bw, bh, area = (int(v) for v in stats[i])
-        if area >= min_area:
-            blobs.append(Blob(box=(x, y, x + bw, y + bh), area=area))
+        ys, xs = np.nonzero((labels == i) & changed)
+        if len(xs) >= min_area:
+            box = (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+            blobs.append(Blob(box=box, area=len(xs)))
     return blobs
 
 

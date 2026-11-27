@@ -38,7 +38,7 @@ Classe `usecases.workstation.model:ZoneWorkstationAnalyzer`. [config.yaml](confi
 ```bash
 streamlit run usecases/workstation/demo_app.py --server.port 8502 --server.address localhost --browser.gatherUsageStats false
 ```
-En haut, un bouton par **section**. Dans le panneau latéral, la **photo** à évaluer (liste, précédente / suivante, lecture automatique). L'image affiche le verdict (**OK / CHECK / NOK**) et les boîtes :
+En haut, un bouton par **section**. Dans le panneau latéral, la **photo** à évaluer (liste, précédente / suivante, lecture automatique). L'image affiche le verdict (**OK / CHECK / NOK**) et les boîtes (rectangles pour les éléments et les objets, vraie forme pour les zones) :
 - **vert** : élément à sa place, zone libre ;
 - **rouge** : élément absent ou déplacé, zone occupée ;
 - **orange** : objet inconnu ;

@@ -96,7 +96,8 @@ class ZoneWorkstationAnalyzer(Analyzer):
                 config["station"], root if root.is_absolute() else REPO_ROOT / root
             )
             config = {**analyzer_params(station), **config}
-        self.detector = build_detector(config)
+        # An already loaded detector can be passed (shared between analyzers).
+        self.detector = config.get("detector_object") or build_detector(config)
         self.expected: list[str] = list(config.get("expected_objects") or [])
         # Labels never judged in zones. Empty by default: a person IS a violation.
         self.ignore_labels: set[str] = set(config.get("ignore_labels") or [])
@@ -110,6 +111,8 @@ class ZoneWorkstationAnalyzer(Analyzer):
         # ...but never more than this many pixels: in a LARGE zone, 1 % can be bigger
         # than a small tool lying on the floor.
         self.min_blob_pixels = int(config.get("min_blob_pixels", 150))
+        # Pieces of change closer than this are one object (its edges split it).
+        self.group_px = int(config.get("group_px", 10))
         # Allowed / ignored persons: their box is grown by this share of its size, so that
         # what they touch (the stool they sit on, their shadow) is ignored with them.
         self.ignore_box_margin = float(config.get("ignore_box_margin", 0.15))
@@ -240,10 +243,15 @@ class ZoneWorkstationAnalyzer(Analyzer):
         else:
             base, spread = view.image, None
         changed = change_mask(image, base, self.diff_threshold, valid, spread, self.normal_k)
+        # Loose mask (plain colour difference with normal, no spread): it DECIDES nothing,
+        # it only gives the full extent of an object already found (hysteresis).
+        loose = change_mask(image, base, self.diff_threshold, valid)
         masks = self._region_masks(view, (h, w))
         ignored = [d for d in detections if d.label in self.ignore_labels]
         if ignored:
-            changed &= ~boxes_mask([self._grow(d.box) for d in ignored], (h, w))
+            hidden = boxes_mask([self._grow(d.box) for d in ignored], (h, w))
+            changed &= ~hidden
+            loose &= ~hidden
         objects = [d for d in detections if d.label not in self.ignore_labels]
         usable = valid if valid is not None else np.ones((h, w), dtype=bool)
 
@@ -253,7 +261,7 @@ class ZoneWorkstationAnalyzer(Analyzer):
             )
         for zone in view.zones:
             candidates.update(
-                self._zone_problems(zone, masks[f"zone:{zone}"], changed, objects, w, h)
+                self._zone_problems(zone, masks[f"zone:{zone}"], changed, objects, w, h, loose)
             )
 
         confirmed = self._confirm(candidates)
@@ -318,6 +326,7 @@ class ZoneWorkstationAnalyzer(Analyzer):
         objects: list[Detection],
         w: int,
         h: int,
+        loose: np.ndarray | None = None,
     ) -> Problems:
         problems: Problems = {}
         zone_area = max(int(mask.sum()), 1)
@@ -328,7 +337,7 @@ class ZoneWorkstationAnalyzer(Analyzer):
             if here:
                 changed = changed & ~boxes_mask([self._grow(d.box) for d in here], changed.shape)
         min_area = max(1, min(int(self.min_blob_area * zone_area), self.min_blob_pixels))
-        blobs = blobs_in(changed & mask, min_area)
+        blobs = blobs_in(changed & mask, min_area, self.group_px)
 
         def change_score(area: int) -> float:
             # Client rule "no element in the zone": any change above the noise floor is
@@ -361,7 +370,10 @@ class ZoneWorkstationAnalyzer(Analyzer):
         if unknown:
             biggest = max(unknown, key=lambda b: b.area)
             confidence = change_score(biggest.area)
-            obj = _to_contract(UNKNOWN, confidence, biggest.box, w, h)
+            # The box may go beyond the zone: it shows the WHOLE object (a bin half on
+            # the mat), while the decision was taken inside the zone only.
+            box = biggest.box if loose is None else _extent(biggest.box, loose)
+            obj = _to_contract(UNKNOWN, confidence, box, w, h)
             problems[f"{UNKNOWN}@{zone}"] = (confidence, obj)
         return problems
 
@@ -378,6 +390,31 @@ class ZoneWorkstationAnalyzer(Analyzer):
 
 def _polygons(raw: object) -> dict[str, Polygon]:
     return {name: validate_polygon(name, pts) for name, pts in (raw or {}).items()}  # type: ignore[union-attr]
+
+
+def _extent(box: Box, loose: np.ndarray, max_growth: float = 1.0) -> Box:
+    """Grow a found object's box to the loose-mask region touching it (hysteresis), so
+    that the rectangle covers the whole object. Growth is limited to ``max_growth`` times
+    the box size on each side, so that it can never run over the whole zone."""
+    x1, y1, x2, y2 = box
+    bw, bh = x2 - x1, y2 - y1
+    h, w = loose.shape
+    gx1, gy1 = max(0, int(x1 - max_growth * bw)), max(0, int(y1 - max_growth * bh))
+    gx2, gy2 = min(w, int(x2 + max_growth * bw)), min(h, int(y2 + max_growth * bh))
+    window = loose[gy1:gy2, gx1:gx2].astype(np.uint8)
+    seed = np.zeros_like(window)
+    seed[y1 - gy1 : y2 - gy1, x1 - gx1 : x2 - gx1] = 1
+    n, labels = cv2.connectedComponents(window, connectivity=8)
+    touching = set(np.unique(labels[(seed > 0) & (window > 0)])) - {0}
+    if not touching:
+        return box
+    ys, xs = np.nonzero(np.isin(labels, list(touching)))
+    return (
+        min(x1, gx1 + int(xs.min())),
+        min(y1, gy1 + int(ys.min())),
+        max(x2, gx1 + int(xs.max()) + 1),
+        max(y2, gy1 + int(ys.max()) + 1),
+    )
 
 
 def _box_fill(box: Box, changed: np.ndarray) -> float:

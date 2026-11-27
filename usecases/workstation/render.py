@@ -6,8 +6,10 @@ inverse of the alignment homography (align.py).
 
 Drawn:
 - zones (``empty_zones``): green outline if empty, RED if something is in it;
-- element slots (``element_slots``): green box if the element is in its place, RED if not;
-- found objects: ORANGE box for an unknown object, MAGENTA for a person, with its label;
+- element slots (``element_slots``): green RECTANGLE if the element is in its place, RED
+  if not;
+- found objects: ORANGE rectangle for an unknown object, MAGENTA for a person, with its
+  label;
 - a banner with the verdict only (OK / CHECK / NOK), no score.
 """
 
@@ -53,7 +55,7 @@ def render(
         for name, polygon in view.slots.items():
             missing = name in result.details.missing or name in result.details.misplaced
             label = f"{name}: missing / moved" if missing else name
-            _outline(out, to_photo(polygon), RED if missing else GREEN, 2, label)
+            _outline(out, to_photo(polygon), RED if missing else GREEN, 2, label, rect=True)
         # Only what matters is drawn: unknown objects, persons, and detections that are
         # part of a problem. Other detections (e.g. the press seen as a "tv") decide
         # nothing and would only confuse the operator.
@@ -65,11 +67,20 @@ def render(
             quad = to_photo([(b.x1, b.y1), (b.x2, b.y1), (b.x2, b.y2), (b.x1, b.y2)])
             colour = MAGENTA if obj.label == "person" else ORANGE
             name = "unknown object" if obj.label == "unknown_object" else obj.label
-            _outline(out, quad, colour, 3, f"{name} {obj.confidence:.2f}")
+            _outline(out, quad, colour, 3, f"{name} {obj.confidence:.2f}", rect=True)
     return _banner(out, result, decision)
 
 
-def _outline(img: np.ndarray, points: np.ndarray, colour, thickness: int, label: str) -> None:
+def _outline(
+    img: np.ndarray, points: np.ndarray, colour, thickness: int, label: str, rect: bool = False
+) -> None:
+    """Outline + label. ``rect``: an upright rectangle around the points (bounding box),
+    instead of the exact shape tilted by the camera perspective."""
+    if rect:
+        h, w = img.shape[:2]
+        x1, y1 = np.clip(points.min(axis=0), 0, [w - 1, h - 1])
+        x2, y2 = np.clip(points.max(axis=0), 0, [w - 1, h - 1])
+        points = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], np.int32)
     cv2.polylines(img, [points], True, colour, thickness, cv2.LINE_AA)
     x, y = int(points[:, 0].min()), int(points[:, 1].min())
     (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)

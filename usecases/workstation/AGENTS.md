@@ -25,6 +25,8 @@ Vérifier que le poste est configuré comme la référence : objets attendus pr�
 - 2026-11-27 — Personnes autorisées : `zone_allowed_labels` (une zone) ou `ignore_labels` (partout) ; boîte agrandie de 15 % (le tabouret sous l'opérateur assis était signalé).
 - 2026-11-27 — Taille minimale d'un changement plafonnée à 150 pixels : un petit outil au sol passait sous le seuil de 1 % d'une grande zone.
 - 2026-11-27 — Le zone « floor » du poste électrique exclut l'emplacement du tabouret, qui bouge quand l'opérateur s'assoit.
+- 2026-11-27 — Boîtes des éléments et des objets en **rectangles droits** ; les zones gardent leur vraie forme (un rectangle déborderait sur la presse, etc.).
+- 2026-11-27 — Seuil à **hystérésis** pour la boîte d'un objet trouvé : le seuil strict décide, un seuil lâche (écart de couleur à la normale) donne l'étendue complète de l'objet (un bac coupé en deux par ses bords). Masquer les opérateurs pendant l'apprentissage donnait aussi des boîtes complètes, mais ajoutait une fausse alerte : abandonné.
 - 2026-11-27 — Seules les détections utiles sont dessinées (objets inconnus, personnes, objets en cause) : YOLO voyait la presse comme une « tv ».
 - 2026-11-26 — **Normalité apprise** (moyenne + dispersion par pixel) sur les photos conformes et la référence ; mesure en **validation croisée** (une photo conforme mise de côté à chaque fois).
 - 2026-11-26 — Le détecteur ne fait que **nommer** un changement, il ne déclenche jamais d'alerte seul.

@@ -45,6 +45,7 @@ params:
   min_box_fill: 0.05        # a detection names a change only if the change fills 5 % of its box
   min_blob_area: 0.01       # smallest changed region, as a share of the zone area
   min_blob_pixels: 150      # ...capped at this many pixels (small tool in a large zone)
+  group_px: 10              # pieces of change closer than this form one object
   ignore_box_margin: 0.15   # allowed persons: box grown by 15 % (stool, shadow)
   full_blob_area: 0.05      # changed region giving a confidence of 1 (share of the zone)
   unknown_min_score: 0.45   # any change in a zone is at least worth a check (> low)
