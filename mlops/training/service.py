@@ -18,6 +18,7 @@ import json
 import os
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
@@ -476,17 +477,26 @@ class TrainingService:
                 aliases = dict(self.c.mlflow.get_registered_model(name).aliases or {})
             except Exception:  # noqa: BLE001 - model not created yet
                 return []
-            out = []
-            for v in self._versions(spec):
-                full = self.c.mlflow.get_model_version(name, str(v.version))
-                out.append(
-                    {
-                        "version": str(v.version),
-                        "approved": (full.tags or {}).get("argos_approval") == "approved",
-                        "aliases": [a for a, ver in aliases.items() if str(ver) == str(v.version)],
-                    }
+            versions = self._versions(spec)
+            # INT-GLOBAL-01: N+1 reads in parallel (bounded) instead of one after the other.
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                fulls = list(
+                    pool.map(
+                        lambda v: self.c._call(
+                            lambda: self.c.mlflow.get_model_version(name, str(v.version)),
+                            f"version {v.version}",
+                        ),
+                        versions,
+                    )
                 )
-            return out
+            return [
+                {
+                    "version": str(v.version),
+                    "approved": (full.tags or {}).get("argos_approval") == "approved",
+                    "aliases": [a for a, ver in aliases.items() if str(ver) == str(v.version)],
+                }
+                for v, full in zip(versions, fulls, strict=True)
+            ]
 
         return self.c._cached(f"training:vstates:{spec.id}", load)
 

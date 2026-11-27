@@ -24,7 +24,7 @@ from fastapi import APIRouter, FastAPI
 from mlops.api.deployment_routes import create_deployment_router
 from mlops.api.routes import build_overview, create_mlops_router, default_connector
 from mlops.databricks.datasets import dataset_store
-from mlops.databricks.read_cache import read_scope
+from mlops.databricks.read_cache import allow_stale_reads, read_scope
 from visionhub.core.app import create_app
 
 PREFIX = "/api"
@@ -46,6 +46,16 @@ def route_collisions(core: FastAPI, router: APIRouter, prefix: str) -> list[str]
 
 def create_platform_app() -> FastAPI:
     application = create_app()
+
+    @application.middleware("http")
+    async def _read_only_requests_may_use_stale(request, call_next):  # noqa: ANN001
+        # INT-GLOBAL-01: stale-while-revalidate ONLY for read-only requests; every mutation
+        # (POST / PUT / DELETE) keeps blocking, fully fresh reads.
+        if request.method in ("GET", "HEAD"):
+            with allow_stale_reads():
+                return await call_next(request)
+        return await call_next(request)
+
     router = create_mlops_router()
     collisions = route_collisions(application, router, PREFIX)
     if collisions:
@@ -75,6 +85,12 @@ def warm_up() -> None:
             for managed in connector.settings.models:
                 if managed.dataset_root:
                     dataset_store(connector).index(managed.id)
+            # INT-GLOBAL-01: the two slowest first visits measured (Datasets catalogue,
+            # Training Factory summary / runs). Reads only.
+            dataset_store(connector).catalog()
+            from mlops.api.training_routes import service_for
+
+            service_for(connector).kpis()
         log.warning("MLOps warm-up done in %.1f s", time.perf_counter() - started)
     except Exception as exc:  # noqa: BLE001 - warm-up is best effort only
         log.warning("MLOps warm-up skipped: %s", type(exc).__name__)
@@ -86,6 +102,45 @@ def start_warm_up() -> threading.Thread:
     return thread
 
 
+from mlops import perf  # noqa: E402
+
+perf.install()  # HOVIS_PERF_COUNTERS=1 only (read-only diagnostics)
 app = create_platform_app()
+
+
+if perf.install():
+    import json as _json
+    from pathlib import Path as _Path
+
+    _TIMINGS = _Path(os.environ.get("HOVIS_PERF_LOG", "var/unified/logs/requests.jsonl"))
+    _TIMINGS.parent.mkdir(parents=True, exist_ok=True)
+    _TLOCK = threading.Lock()
+
+    @app.middleware("http")
+    async def _timing(request, call_next):  # noqa: ANN001 - diagnostics only
+        start = time.perf_counter()
+        response = await call_next(request)
+        line = _json.dumps(
+            {
+                "t": round(time.time(), 3),
+                "m": request.method,
+                "p": request.url.path,
+                "q": request.url.query,
+                "s": response.status_code,
+                "ms": round((time.perf_counter() - start) * 1000, 1),
+                "cache": response.headers.get("X-HOVIS-Cache"),
+            }
+        )
+        with _TLOCK, _TIMINGS.open("a", encoding="utf-8") as f:
+            f.write(line + chr(10))
+        return response
+
+
+@app.get("/api/mlops/_perf", include_in_schema=False)
+def perf_counters() -> dict:
+    """Remote HTTP / CLI counters of this process (diff two snapshots around an action)."""
+    return perf.snapshot()
+
+
 if os.environ.get("HOVIS_MLOPS_WARMUP") == "1":
     start_warm_up()

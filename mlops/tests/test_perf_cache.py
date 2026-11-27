@@ -358,3 +358,53 @@ def test_concurrent_first_requests_resolve_credentials_once():
     for t in threads:
         t.join(3)
     assert len(calls) == 1
+
+
+# ------------------------------------------------------------- INT-GLOBAL-01 stale-while-revalidate
+
+
+def _wait_refresh(cache, key):
+    for _ in range(200):
+        if key not in cache._flights:
+            return
+        time.sleep(0.01)
+
+
+def test_expired_entry_is_served_at_once_in_read_only_requests_then_refreshed_once():
+    from mlops.databricks.read_cache import allow_stale_reads
+
+    clock = Clock()
+    cache = ReadCache(clock=clock)
+    calls = []
+    loader = lambda: calls.append(1) or len(calls)  # noqa: E731
+    assert cache.get("k", loader, 60) == 1
+    clock.now += 61
+    with allow_stale_reads(), read_scope() as scope:
+        assert cache.get("k", loader, 60) == 1  # previous value, no waiting
+        assert cache.get("k", loader, 60) == 1  # no second background read
+    assert scope.headers()["X-HOVIS-Cache"] == "hit"  # real (old) read time in Fetched-At
+    _wait_refresh(cache, "k")
+    assert calls == [1, 1] and cache.get("k", loader, 60) == 2
+
+
+def test_mutations_and_invalidated_keys_never_get_stale_values():
+    from mlops.databricks.read_cache import allow_stale_reads
+
+    clock = Clock()
+    cache = ReadCache(clock=clock)
+    n = iter(range(1, 100))
+    loader = lambda: next(n)  # noqa: E731
+    cache.get("k", loader, 60)
+    clock.now += 61
+    assert cache.get("k", loader, 60) == 2  # no allow_stale_reads (POST): blocking fresh read
+    clock.now += 61
+    cache.invalidate("k")  # after a mutation
+    with allow_stale_reads():
+        assert cache.get("k", loader, 60) == 3  # entry removed: no stale value possible
+    clock.now += 61 + 15 * 60  # beyond the stale-while-revalidate window
+    with allow_stale_reads():
+        assert cache.get("k", loader, 60) == 4
+    with allow_stale_reads(), fresh_reads():
+        pass
+    with allow_stale_reads(), read_scope(fresh=True):
+        assert cache.get("k", loader, 60) == 5  # forced fresh read

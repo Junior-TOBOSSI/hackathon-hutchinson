@@ -6,7 +6,11 @@
   remote read started BEFORE a mutation can never write its result back into the cache;
 - a remote error never replaces the last valid value; when Databricks is unreachable the
   last valid value may be served, explicitly marked ``stale``;
-- ``fetched_at`` is the moment the REMOTE read completed, never the moment it was served.
+- ``fetched_at`` is the moment the REMOTE read completed, never the moment it was served;
+- stale-while-revalidate (INT-GLOBAL-01): ONLY inside a read-only request (GET / HEAD, see
+  ``allow_stale_reads``), an entry expired for less than ``SWR_SECONDS`` is served at once
+  with its real ``fetched_at`` while ONE background read refreshes it. Mutations, forced
+  ``fresh`` reads and invalidated keys never use it (an invalidation removes the entry).
 
 A ``read_scope`` (one per API request) carries the ``fresh`` flag, the request time budget
 and the list of reads, from which the freshness headers are computed.
@@ -24,6 +28,19 @@ from datetime import UTC, datetime
 from typing import Any
 
 STALE_MAX_SECONDS = 24 * 3600
+SWR_SECONDS = 15 * 60
+_SWR_ALLOWED: contextvars.ContextVar[bool] = contextvars.ContextVar("hovis_swr", default=False)
+_REFRESHERS = threading.BoundedSemaphore(4)  # at most 4 background refreshes at a time
+
+
+@contextmanager
+def allow_stale_reads() -> Iterator[None]:
+    """Mark the current (read-only) request: expired entries may be served while refreshed."""
+    token = _SWR_ALLOWED.set(True)
+    try:
+        yield
+    finally:
+        _SWR_ALLOWED.reset(token)
 
 
 class BudgetExceeded(Exception):
@@ -131,6 +148,23 @@ class ReadCache:
             if not fresh and entry and self._clock() - entry.stored < entry.ttl:
                 self._record(scope, entry.fetched_at, "hit")
                 return entry.value
+            if (
+                not fresh
+                and entry
+                and _SWR_ALLOWED.get()
+                and self._clock() - entry.stored < entry.ttl + SWR_SECONDS
+            ):
+                # Served now with its REAL read time; one background read refreshes it.
+                self._record(scope, entry.fetched_at, "hit")
+                if key not in self._flights:
+                    self._flights[key] = _Flight(generation=self._generations.get(key, 0))
+                    threading.Thread(
+                        target=self._refresh,
+                        args=(key, loader, ttl, self._flights[key]),
+                        name="hovis-swr",
+                        daemon=True,
+                    ).start()
+                return entry.value
             if fresh:
                 # A forced read must not join (nor be overwritten by) an older read.
                 self._bump(key)
@@ -167,6 +201,28 @@ class ReadCache:
         flight.done.set()
         self._record(scope, fetched_at, "miss")
         return value
+
+    def _refresh(self, key: str, loader: Callable[[], Any], ttl, flight: _Flight) -> None:
+        """Background refresh of an expired entry (no request scope, errors keep the entry)."""
+        with _REFRESHERS:
+            try:
+                value = loader()
+            except BaseException as exc:  # noqa: BLE001 - the served value stays the last valid one
+                with self._lock:
+                    if self._flights.get(key) is flight:
+                        del self._flights[key]
+                flight.error = exc
+                flight.done.set()
+                return
+            fetched_at = datetime.now(UTC)
+            with self._lock:
+                if self._generations.get(key, 0) == flight.generation:
+                    seconds = ttl(value) if callable(ttl) else ttl
+                    self._entries[key] = _Entry(value, fetched_at, self._clock(), seconds)
+                if self._flights.get(key) is flight:
+                    del self._flights[key]
+            flight.value, flight.fetched_at = value, fetched_at
+            flight.done.set()
 
     def _wait(self, flight: _Flight, scope: ReadScope | None) -> Any:
         left = scope.remaining() if scope else None
