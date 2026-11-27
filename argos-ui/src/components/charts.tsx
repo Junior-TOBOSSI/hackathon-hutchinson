@@ -23,47 +23,92 @@ export function ProgressRing({ value, target, expected, size = 220 }: { value: n
   );
 }
 
-/** Jauges heure par heure (opérateur). */
-export function HourlyGauges({ hours, perHour, currentHour, height = 56 }: { hours: { hour: number; good: number | null }[]; perHour: number; currentHour: number; height?: number }) {
+export interface ShiftGaugeInput {
+  startedAt: string;
+  plannedEndAt: string;
+  endedAt?: string | null;
+  status: 'OPEN' | 'CLOSED';
+  now: string;
+  target: number | null;
+  actualGood: number | null;
+}
+
+/** One time axis and one cumulative target axis for a complete shift. */
+export function shiftGaugeState(input: ShiftGaugeInput) {
+  if (input.status === 'CLOSED' && !input.endedAt) return null;
+  const start = new Date(input.startedAt).getTime();
+  const end = new Date(input.plannedEndAt).getTime();
+  const now = new Date(input.status === 'CLOSED' && input.endedAt ? input.endedAt : input.now).getTime();
+  if (![start, end, now].every(Number.isFinite) || end <= start || input.target == null || input.target <= 0) return null;
+  const target = input.target;
+  const elapsed = Math.max(0, Math.min(end - start, now - start));
+  const timeRatio = elapsed / (end - start);
+  const before = now < start;
+  const finished = input.status === 'CLOSED';
+  const actual = input.actualGood;
+  const expected = finished ? target : target * timeRatio;
+  const actualRatio = before || actual == null ? 0 : Math.max(0, Math.min(1, actual / target));
+  const deficit = expected > 0 && actual != null ? (expected - actual) / expected : null;
+  const tone = before || deficit == null ? 'unknown' : deficit <= 0 ? 'green' : deficit <= 0.1 ? 'amber' : 'red';
+  const count = Math.ceil((end - start) / 3600000);
+  const ticks = Array.from({ length: count + 1 }, (_, index) => {
+    const at = Math.min(end, start + index * 3600000);
+    const date = new Date(at);
+    const minute = date.getMinutes();
+    return {
+      position: ((at - start) / (end - start)) * 100,
+      hour: `${date.getHours()}h${minute ? String(minute).padStart(2, '0') : ''}`,
+      target: Math.round(target * (at - start) / (end - start)),
+    };
+  });
+  return { ticks, timeRatio, actualRatio, actual, expected, target, tone, before, finished, hourlyTarget: target / ((end - start) / 3600000) };
+}
+
+/** Continuous operator gauge: fill = good parts, fine marker = target due now. */
+export function HourlyGauges({ timeline, height = 56 }: { timeline: ShiftGaugeInput | null; height?: number }) {
+  const state = timeline ? shiftGaugeState(timeline) : null;
   return (
     <div className="col" style={{ gap: 8, borderTop: '1px solid var(--line-soft)', paddingTop: 12 }}>
-      <div className="between">
+      <div className="between" style={{ flexWrap: 'wrap', gap: 8 }}>
         <span className="label-caps">Heure par heure</span>
-        <span className="muted" style={{ fontSize: 14 }}>objectif {perHour} pièces / h · heure en cours en vert clair</span>
+        <span className="muted" style={{ fontSize: 14 }}>{state ? `objectif ${state.hourlyTarget.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} pièces bonnes / h` : 'Objectif ou durée du shift indisponible'}</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${hours.length}, minmax(0, 1fr))`, gap: 8 }}>
-        {hours.map((h) => {
-          const cur = h.hour === currentHour;
-          const ok = h.good !== null && h.good >= perHour;
-          const color = cur ? 'var(--green-light)' : ok ? 'var(--green)' : 'var(--amber)';
-          return (
-            <div key={h.hour} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, height: 18, color: ok || cur ? 'var(--green-text)' : 'var(--amber-text)' }}>{h.good ?? ''}</span>
-              <div style={{ position: 'relative', width: '100%', height, borderRadius: 8, background: 'var(--track)', overflow: 'hidden' }}>
-                {h.good === null
-                  ? <div style={{ position: 'absolute', inset: 0, border: '2px dashed var(--line-strong)', borderRadius: 8 }} />
-                  : <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.min(100, (h.good / perHour) * 100)}%`, background: color }} />}
-              </div>
-              <span style={{ fontSize: 12, fontWeight: cur ? 700 : 400 }} className={cur ? '' : 'muted'}>{h.hour} h</span>
+      {!state ? <div className="muted" style={{ minHeight: height, display: 'grid', placeItems: 'center', borderRadius: 12, background: 'var(--surface-soft)' }}>Jauge indisponible : aucun shift avec objectif exploitable.</div> : (
+        <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+          <div style={{ minWidth: Math.max(480, (state.ticks.length - 1) * 64), padding: '0 2px' }}>
+            <div style={{ height: 25, position: 'relative', fontSize: 12, fontWeight: 700 }}>
+              {state.ticks.map((tick, index) => <span key={`${tick.position}-top`} style={{ position: 'absolute', left: `${tick.position}%`, transform: index === 0 ? 'none' : index === state.ticks.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)', color: state.timeRatio * 100 >= tick.position ? 'var(--ink)' : 'var(--muted)' }}>{tick.hour}</span>)}
             </div>
-          );
-        })}
-      </div>
+            <div role="img" aria-label={`${state.actual ?? 'inconnu'} pièces bonnes sur ${state.target}, ${Math.round(state.timeRatio * 100)} % du temps du shift écoulé`} style={{ position: 'relative', height }}>
+              <div style={{ position: 'absolute', inset: 0, borderRadius: 12, background: 'var(--track)', overflow: 'hidden' }}>
+                <div style={{ width: `${state.actualRatio * 100}%`, height: '100%', background: state.tone === 'green' ? 'var(--green)' : state.tone === 'amber' ? 'var(--amber)' : state.tone === 'red' ? 'var(--red)' : 'var(--line-strong)', transition: 'width .5s ease' }} />
+                {state.ticks.slice(1, -1).map((tick) => <span key={`${tick.position}-mark`} style={{ position: 'absolute', left: `${tick.position}%`, top: 0, bottom: 0, width: 1, background: 'rgba(11,31,63,.25)' }} />)}
+              </div>
+              <span title={`Objectif théorique actuel : ${Math.round(state.expected).toLocaleString('fr-FR')} pièces bonnes`} style={{ position: 'absolute', left: `${state.timeRatio * 100}%`, top: -5, bottom: -5, width: 3, background: 'var(--navy)', transform: 'translateX(-50%)', borderRadius: 2 }} />
+            </div>
+            <div style={{ height: 28, position: 'relative', fontSize: 12, fontWeight: 700 }}>
+              {state.ticks.map((tick, index) => <span key={`${tick.position}-bottom`} style={{ position: 'absolute', left: `${tick.position}%`, transform: index === 0 ? 'none' : index === state.ticks.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)' }}>{tick.target.toLocaleString('fr-FR')}</span>)}
+            </div>
+          </div>
+        </div>
+      )}
+      {state && <span className="muted" style={{ fontSize: 13 }}>{state.before ? 'Shift non commencé · jauge vide' : state.finished ? 'Shift terminé · résultat final figé' : 'Production en cours'} · {state.actual == null ? 'production indisponible' : `${state.actual.toLocaleString('fr-FR')} / ${state.target.toLocaleString('fr-FR')} pièces bonnes`} · objectif actuel {Math.round(state.expected).toLocaleString('fr-FR')} · {state.actual == null || state.before ? 'écart indisponible' : `écart ${state.actual - Math.round(state.expected) >= 0 ? '+' : '−'}${Math.abs(state.actual - Math.round(state.expected)).toLocaleString('fr-FR')}`}</span>}
     </div>
   );
 }
 
 /** Barres par heure avec ligne d'objectif (superviseur). */
-export function HourlyBars({ hours, perHour, currentHour, barMax = 120 }: { hours: { hour: number; good: number | null; ko: number }[]; perHour: number; currentHour: number; barMax?: number }) {
+export function HourlyBars({ hours, perHour, currentHour, barMax = 120 }: { hours: { hour: number; good: number | null; ko: number }[]; perHour: number | null; currentHour: number; barMax?: number }) {
+  const scale = perHour && perHour > 0 ? perHour : Math.max(1, ...hours.map((item) => item.good ?? 0));
   return (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 14, paddingTop: 20 }}>
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 40 + barMax, height: 2, background: 'var(--navy)' }} />
+      {perHour != null && <div style={{ position: 'absolute', left: 0, right: 0, bottom: 40 + barMax, height: 2, background: 'var(--navy)' }} />}
       {hours.map((h) => (
         <div key={h.hour} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
           <span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>{h.good ?? ''}</span>
           {h.good === null
             ? <div style={{ width: '100%', height: barMax, border: '2px dashed var(--line-strong)', borderRadius: '8px 8px 3px 3px' }} />
-            : <div style={{ width: '100%', height: Math.round((h.good / perHour) * barMax), borderRadius: '8px 8px 3px 3px', background: h.hour === currentHour ? 'var(--green-light)' : 'var(--green)' }} />}
+            : <div style={{ width: '100%', height: Math.round((h.good / scale) * barMax), borderRadius: '8px 8px 3px 3px', background: h.hour === currentHour ? 'var(--green-light)' : 'var(--green)' }} />}
           <span style={{ fontSize: 13, fontWeight: 700, height: 16, color: h.ko ? 'var(--red-text)' : 'transparent' }}>{h.ko ? `${h.ko} KO` : ''}</span>
           <span className="muted" style={{ fontSize: 13, height: 16 }}>{h.hour} h</span>
         </div>
@@ -117,7 +162,8 @@ export function Legend({ categories }: { categories: Category[] }) {
 
 /** Anneau de répartition. */
 export function Donut({ items, size = 190, centerLabel }: { items: { name: string; value: number; color: string }[]; size?: number; centerLabel: string }) {
-  const total = items.reduce((s, i) => s + i.value, 0) || 1;
+  const actualTotal = items.reduce((s, i) => s + i.value, 0);
+  const total = actualTotal || 1;
   const r = 78, c = 2 * Math.PI * r;
   let cum = 0;
   return (
@@ -133,7 +179,7 @@ export function Donut({ items, size = 190, centerLabel }: { items: { name: strin
           })}
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <span className="num" style={{ fontSize: 44 }}>{total}</span>
+          <span className="num" style={{ fontSize: 44 }}>{actualTotal}</span>
           <span className="muted" style={{ fontSize: 14 }}>{centerLabel}</span>
         </div>
       </div>
