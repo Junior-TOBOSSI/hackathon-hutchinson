@@ -105,7 +105,8 @@ def test_non_required_ppe_does_not_raise_the_score():
 def test_parts_go_to_the_right_person():
     left = Det("person", 0.9, (0.0, 0.0, 0.4, 0.99))
     right = Det("person", 0.9, (0.6, 0.0, 1.0, 0.99))
-    assessed, _ = assess_frame([left, right, Det("hands", 0.9, (0.7, 0.5, 0.75, 0.55))], [], P)
+    hand = Det("hands", 0.9, (0.7, 0.5, 0.75, 0.55))
+    assessed, _ = assess_frame([left, right, hand], [], {**P, "operator_only": False})
     assert assessed[0].states["gloves"] == PPEState.UNCERTAIN
     assert assessed[1].states["gloves"] == PPEState.ABSENT
 
@@ -204,3 +205,19 @@ def test_a_person_box_without_head_or_face_is_ignored():
     ]
     assert [d.name for d in keep_real_persons(hand_on_lens)] == ["hands"]
     assert any(d.name == "person" for d in keep_real_persons(BARE_HAND))
+
+
+def test_only_the_station_operator_is_checked_not_people_behind():
+    """A person far behind (small) without glasses must not raise an alert for the operator."""
+    operator = Det("person", 0.9, (0.20, 0.05, 0.70, 0.99))
+    behind = Det("person", 0.8, (0.80, 0.30, 0.90, 0.60))
+    dets = [
+        operator,
+        Det("face", 0.9, (0.38, 0.12, 0.50, 0.25)),
+        Det("glasses", 0.6, (0.39, 0.15, 0.49, 0.19)),
+        behind, Det("face", 0.7, (0.83, 0.33, 0.87, 0.38)),  # no glasses, but not at the station
+    ]  # fmt: skip
+    assessed, _ = assess_frame(dets, [], {**P, "required": ["glasses"]})
+    assert len(assessed) == 1 and assessed[0].states["glasses"] == PPEState.PRESENT
+    everyone, score = assess_frame(dets, [], {**P, "required": ["glasses"], "operator_only": False})
+    assert len(everyone) == 2 and score > 0  # without the option, the person behind alerts

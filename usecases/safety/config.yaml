@@ -30,6 +30,7 @@ params:
   class_conf: {}             # per-class threshold, e.g. {gloves: 0.3, hands: 0.3}
   phone_conf: 0.30
   required: [helmet, glasses, gloves, shoes]   # mandatory PPE at this workstation
+  operator_only: true       # check only the station operator (largest person), not passers-by
   smoothing_frames: 3        # alert only if the problem lasts 3 frames (1.5 s at 2 FPS)
   shoes_absent_score: 0.5    # missing shoes inferred from a full body -> "a_verifier"
   full_body_bottom: 0.97     # person box ending above this height = feet in the image

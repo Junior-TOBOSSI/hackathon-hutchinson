@@ -117,6 +117,7 @@ Côté serveur, la démo `notebooks/hovis_demo.py` fournit ces routes, et aussi 
 - Un EPI est `absent` seulement si la partie du corps protégée est visible sans lui (main nue, tête, visage, corps entier sans chaussures). Sinon `uncertain`.
 - Score : `0,4 + 0,6 × confiance de la preuve` ; chaussures déduites du corps entier : 0,5 (« à vérifier »).
 - Lissage : le score retenu est la médiane des 3 dernières images : une image isolée ne déclenche rien, un problème vu sur 2 images sur 3 déclenche l'alerte (un téléphone en main est souvent manqué sur une image).
+- **Opérateur seul** (`operator_only: true`) : seule la personne la plus grande de l'image (l'opérateur, au plus près de la caméra) est contrôlée ; une personne au fond, de passage, une affiche ou un reflet ne déclenchent pas d'alerte au poste. Mettre `false` pour un poste à plusieurs opérateurs.
 - Le gilet n'est pas vérifié (`vest = uncertain`).
 - Les événements Safety sont continus (pas une pièce par cycle).
 

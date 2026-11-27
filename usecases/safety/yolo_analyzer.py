@@ -64,6 +64,7 @@ DEFAULTS: dict[str, Any] = {
     "phone_margin": 0.5,
     "privacy_conf": 0.10,  # faces, heads, persons kept from this confidence on, for hiding
     "require_head": True,  # a person counts only if a head or face is seen inside its box
+    "operator_only": True,  # check only the station operator (largest person), not passers-by
     "min_contrast": 12.0,  # below (grey-level std): camera covered or in the dark
     "min_sharpness": 10.0,  # below (Laplacian variance): lens covered (e.g. by a hand)
 }
@@ -194,6 +195,12 @@ def assess_frame(
     persons = [d for d in dets if d.name == "person"]
     parts = [d for d in dets if d.name != "person"]
     groups = assign_to_persons(persons, parts)
+    if p.get("operator_only") and persons:
+        # Only the operator of the station: the largest person, i.e. the closest to the camera.
+        # Passers-by, people in the background, posters or reflections raise nothing. Their
+        # heads, faces and hands stay with them (parts are assigned before the choice).
+        main = max(range(len(persons)), key=lambda i: persons[i].area)
+        persons, groups = [persons[main]], [groups[main]]
     assessed = [
         assess_person(person, g, phones, p) for person, g in zip(persons, groups, strict=True)
     ]

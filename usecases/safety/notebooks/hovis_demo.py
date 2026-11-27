@@ -101,6 +101,10 @@ def loop() -> None:
         with lock:
             record_episodes(issues, datetime.now().astimezone())
             ppe = station_ppe(analyzer.last_states, issues)
+            raw_names = [(d.name, round(d.conf, 2)) for d in analyzer.last_privacy]  # faces/heads/persons >= 0.10
+            dets_dbg = sorted(((d.name, round(d.conf, 2)) for d in analyzer.last_detections), key=lambda x: -x[1])
+            state.update(debug={"detections": dets_dbg, "low_conf_people": raw_names, "states": [
+                {k: v.value for k, v in st.items()} for st in analyzer.last_states]})
             state.update(issues=issues, ppe=ppe, jpeg=jpeg, n=n, error=None, blocked=analyzer.last_camera_blocked,
                          ms=round((time.perf_counter() - start) * 1000))
         time.sleep(max(0.0, PERIOD - (time.perf_counter() - start)))
@@ -501,4 +505,5 @@ def station_detail(station_id: str) -> dict:
 @app.get("/api/safety-demo/status")
 def status() -> dict:
     with lock:
-        return {"frames": state["n"], "ms_per_frame": state.get("ms"), "camera_blocked": state.get("blocked"), "issues": state["issues"], "error": state["error"]}
+        return {"frames": state["n"], "ms_per_frame": state.get("ms"), "camera_blocked": state.get("blocked"),
+                "issues": state["issues"], "error": state["error"], "debug": state.get("debug")}  # fmt: skip
