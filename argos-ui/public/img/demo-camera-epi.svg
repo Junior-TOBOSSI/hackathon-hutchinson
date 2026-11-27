@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400">
+<defs><linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#46505E"></stop><stop offset="1" stop-color="#2A313C"></stop></linearGradient>
+<filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"></feGaussianBlur></filter></defs>
+<rect width="640" height="400" fill="url(#wall)"></rect>
+<rect x="452" y="30" width="170" height="290" rx="6" fill="#5E6878"></rect><rect x="470" y="52" width="134" height="120" rx="4" fill="#3B4350"></rect>
+<rect x="470" y="186" width="134" height="16" fill="#F2C230"></rect><path d="M470 202 l12 -16 h8 l-12 16 z" fill="#1E232B"></path><path d="M490 202 l12 -16 h8 l-12 16 z" fill="#1E232B"></path><path d="M510 202 l12 -16 h8 l-12 16 z" fill="#1E232B"></path><path d="M530 202 l12 -16 h8 l-12 16 z" fill="#1E232B"></path><path d="M550 202 l12 -16 h8 l-12 16 z" fill="#1E232B"></path><path d="M570 202 l12 -16 h8 l-12 16 z" fill="#1E232B"></path><path d="M590 202 l12 -16 h8 l-12 16 z" fill="#1E232B"></path>
+<circle cx="590" cy="250" r="12" fill="#D61F2C"></circle><rect x="480" y="230" width="70" height="40" rx="4" fill="#2E3540"></rect>
+<rect x="0" y="300" width="640" height="100" fill="#7A8391"></rect><rect x="0" y="296" width="640" height="8" fill="#A3ABB7"></rect>
+<path d="M140 300 C150 215 190 196 250 192 C310 196 350 215 360 300 Z" fill="#244A7A"></path>
+<rect x="236" y="176" width="28" height="22" fill="#B8906E"></rect>
+<path d="M168 230 C150 260 160 285 178 300" stroke="#244A7A" stroke-width="34" fill="none" stroke-linecap="round"></path>
+<path d="M332 230 C350 260 340 285 322 300" stroke="#244A7A" stroke-width="34" fill="none" stroke-linecap="round"></path>
+<ellipse cx="180" cy="302" rx="22" ry="15" fill="#2B7BE4"></ellipse><ellipse cx="320" cy="302" rx="22" ry="15" fill="#2B7BE4"></ellipse>
+<g filter="url(#blur)"><ellipse cx="250" cy="140" rx="40" ry="46" fill="#C99C78"></ellipse><rect x="222" y="128" width="20" height="10" fill="#6B4C38"></rect><rect x="258" y="128" width="20" height="10" fill="#6B4C38"></rect><rect x="236" y="158" width="28" height="8" fill="#8C5D48"></rect></g>
+<path d="M206 124 C206 84 294 84 294 124 Z" fill="#F4F4F4"></path><rect x="198" y="120" width="104" height="9" rx="4" fill="#DADADA"></rect>
+<text x="250" y="198" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#E9EDF3" opacity="0.9">visage flouté</text>
+<rect x="212" y="128" width="76" height="26" rx="4" fill="none" stroke="#E5232F" stroke-width="4"></rect><rect x="300" y="140" width="236" height="28" rx="6" fill="#E5232F"></rect><text x="312" y="160" font-family="Arial, sans-serif" font-weight="700" font-size="17" fill="#FFFFFF">Lunettes absentes · 0,94</text>
+<line x1="288" y1="141" x2="300" y2="154" stroke="#E5232F" stroke-width="3"></line>
+<rect x="198" y="78" width="106" height="52" rx="4" fill="none" stroke="#16A34A" stroke-width="4"></rect><rect x="96" y="60" width="104" height="28" rx="6" fill="#16A34A"></rect><text x="108" y="80" font-family="Arial, sans-serif" font-weight="700" font-size="17" fill="#FFFFFF">Casque ✓</text>
+<rect x="152" y="284" width="56" height="38" rx="4" fill="none" stroke="#16A34A" stroke-width="4"></rect><rect x="60" y="340" width="92" height="28" rx="6" fill="#16A34A"></rect><text x="72" y="360" font-family="Arial, sans-serif" font-weight="700" font-size="17" fill="#FFFFFF">Gants ✓</text>
+<rect x="292" y="284" width="56" height="38" rx="4" fill="none" stroke="#16A34A" stroke-width="4"></rect>
+<rect x="0" y="0" width="640" height="30" fill="#000000" fill-opacity="0.45"></rect><circle cx="16" cy="15" r="6" fill="#E5232F"></circle><text x="30" y="21" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#FFFFFF">CAM FRONTALE · C3·P06 · 16:51:08</text>
+</svg>

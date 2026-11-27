@@ -1,0 +1,169 @@
+/*
+ * Charte HOVIS : Marine HOVIS #0B1F3F, Rouge Signal #C8102E, Blanc #FFFFFF.
+ * Le marine porte l'identité et les actions ; le rouge est réservé aux alertes.
+ * Le vert et l'ambre restent pour les états "conforme" / "à vérifier" (sens métier).
+ */
+:root {
+  /* Marques */
+  --navy: #0b1f3f;          /* Marine HOVIS */
+  --navy-2: #16305a;        /* surfaces sur fond marine */
+  --navy-line: #2a4068;     /* séparateurs sur fond marine */
+  --on-navy-muted: #a7b6cf; /* texte secondaire sur fond marine */
+  --primary: #0b1f3f;       /* actions, onglet actif */
+  --primary-soft: #eceff5;
+  --primary-light: #9aaed0;
+
+  /* États */
+  --green: #0e9f4f;
+  --green-text: #0a7a3c;
+  --green-soft: #e7f6ee;
+  --green-light: #8bd3ac;
+  --green-pale: #bfe6cf;
+  --red: #c8102e;           /* Rouge Signal */
+  --red-text: #a60d26;
+  --red-dark: #7e0a1d;
+  --red-soft: #fbe3e7;
+  --red-light: #f5c9d1;
+  --red-bg: #fff4f6;
+  --red-tint: #fbeef1;
+  --red-on-navy: #f0566b;   /* bordure d'alerte sur fond marine */
+  --red-deep: #3a0e1a;      /* tuile en alerte sur fond marine */
+  --amber: #e08a00;
+  --amber-text: #8a5300;
+  --amber-soft: #fdebd3;
+  --signal-yellow: #f2b705; /* action "signaler" : jaune sécurité industriel */
+
+  /* Neutres */
+  --ink: #0b1f3f;
+  --muted: #4a5d7e;
+  --line: #d6dde8;
+  --line-soft: #edf0f5;
+  --line-strong: #c5cfdf;
+  --track: #e6eaf1;
+  --surface-soft: #f7f9fc;
+  --app-bg: #eef1f6;
+  --op-bg: #f6f8fb;
+
+  /* Catégories de graphiques : dégradé de marine, rouge pour la sécurité */
+  --cat-securite: #c8102e;
+  --cat-poste: #0b1f3f;
+  --cat-qualite: #3d5a8a;
+  --cat-rythme: #7f96bf;
+  --cat-equipement: #c3cfe3;
+
+  /* Courbes (validées daltonisme et contraste) : réel en bleu, objectif en gris tireté */
+  --chart-real: #1b64be;
+  --chart-target: #6b7a93;
+
+  /* Jost : géométrique proche du logotype, servie en local (aucun appel externe). */
+  --font: 'Jost Variable', system-ui, sans-serif;
+  --font-cond: 'Jost Variable', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; min-height: 100%; }
+body { font-family: var(--font); color: var(--ink); background: var(--app-bg); }
+button { font-family: inherit; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+
+.cond { font-family: var(--font-cond); }
+.muted { color: var(--muted); }
+.num { font-family: var(--font-cond); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.label-caps { font-family: var(--font-cond); font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); font-size: 16px; }
+.h2 { font-family: var(--font-cond); font-weight: 700; font-size: 24px; margin: 0; }
+
+.card {
+  background: #fff;
+  border-radius: 22px;
+  box-shadow: 0 0 0 1px var(--line), 0 2px 6px rgba(11, 31, 63, 0.06);
+  padding: 18px 22px;
+}
+.card-op { background: #fff; border-radius: 28px; padding: 22px; }
+
+.row { display: flex; align-items: center; gap: 12px; }
+.col { display: flex; flex-direction: column; gap: 12px; }
+.between { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.grow { flex: 1; min-width: 0; }
+
+.btn { height: 44px; padding: 0 18px; border-radius: 12px; border: none; font-size: 15px; font-weight: 700; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-dark { background: var(--navy); color: #fff; }
+.btn-ghost { background: #fff; color: var(--ink); border: 2px solid var(--line-strong); }
+.btn-soft { background: var(--primary-soft); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; }
+.btn-green { background: var(--green); color: #fff; }
+
+.pill { padding: 4px 10px; border-radius: 10px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.pill-red { background: var(--red-soft); color: var(--red-dark); }
+.pill-green { background: var(--green-soft); color: var(--green-text); }
+.pill-amber { background: var(--amber-soft); color: var(--amber-text); }
+.pill-blue { background: var(--primary-soft); color: var(--ink); }
+.pill-solid-red { background: var(--red); color: #fff; }
+
+.badge { min-width: 24px; height: 24px; padding: 0 7px; border-radius: 12px; color: #fff; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+
+.track { position: relative; height: 14px; border-radius: 7px; background: var(--track); overflow: hidden; }
+.track > .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; }
+
+.topbar { height: 68px; background: var(--navy); color: #fff; display: flex; align-items: center; gap: 20px; padding: 0 24px; box-shadow: 0 2px 10px rgba(11, 31, 63, 0.25); position: relative; z-index: 5; }
+.topbar .sep { width: 1px; height: 32px; background: var(--navy-line); }
+.topbar-heading { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.topbar-title { font-weight: 600; font-size: 21px; letter-spacing: 0.04em; line-height: 1.1; }
+.topbar .sub { color: var(--on-navy-muted); font-size: 13px; letter-spacing: 0.02em; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.topbar .chip { color: var(--on-navy-muted); font-size: 14px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--navy-line); white-space: nowrap; }
+.topbar .clock { background: var(--navy-2); padding: 4px 14px; border-radius: 10px; font-size: 22px !important; }
+.topbar-icon { width: 40px; height: 40px; flex-shrink: 0; border-radius: 10px; border: 1px solid var(--navy-line); background: transparent; color: var(--on-navy-muted); display: inline-flex; align-items: center; justify-content: center; }
+.topbar-icon:hover { background: var(--navy-2); color: #fff; }
+
+/* Bouton "Signaler un problème" : jaune sécurité, texte marine (contraste suffisant). */
+.btn-report { background: var(--signal-yellow); color: var(--navy); box-shadow: 0 6px 16px rgba(242, 183, 5, 0.35); transition: filter 0.15s; }
+.btn-report:hover { filter: brightness(0.95); }
+.btn-report:active { filter: brightness(0.9); }
+.btn-report[data-done='true'] { background: var(--navy); color: #fff; box-shadow: none; }
+
+.alert-red { border: 2px solid var(--red) !important; }
+.screen { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ---------- Team leader : onglets ---------- */
+.tabs { background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: flex-end; gap: 4px; padding: 0 24px; overflow-x: auto; }
+.tab { height: 58px; padding: 0 18px; border: none; background: none; display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.tab[aria-selected='true'] { font-weight: 700; color: var(--primary); box-shadow: inset 0 -4px 0 var(--primary); }
+
+.grid-5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.grid-6 { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+
+/* Téléphone : une colonne, onglets en bas. */
+@media (max-width: 760px) {
+  .grid-5, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .grid-4, .grid-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hide-mobile { display: none !important; }
+  .stack-mobile { flex-direction: column !important; align-items: stretch !important; }
+  .tabs { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; padding: 0; justify-content: space-around; border-top: 1px solid var(--line); }
+  .tab { flex-direction: column; gap: 2px; font-size: 12px; height: 64px; padding: 0 6px; }
+  .tab[aria-selected='true'] { box-shadow: none; }
+  .page-sup { padding-bottom: 84px !important; }
+  .topbar .sub { display: none; }
+  .topbar { gap: 10px; padding: 0 10px; }
+  .topbar-title { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar .clock { font-size: 18px !important; padding: 2px 8px; }
+}
+
+/* Connexion : le logo réduit sur téléphone pour tenir dans la largeur. */
+@media (max-width: 760px) {
+  .login-logo { zoom: 0.6; }
+}
+
+/* ---------- Team leader : tableau des postes ---------- */
+.station-table tbody tr { border-top: 1px solid var(--line-soft); cursor: pointer; }
+.station-table tbody tr:hover { background: var(--surface-soft); }
+.station-table tbody tr:focus-visible { outline: 3px solid var(--chart-real); outline-offset: -3px; }
+.station-table td { padding: 0 10px; vertical-align: middle; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); vertical-align: middle; }
+.icon-btn:hover { background: var(--primary-soft); color: var(--ink); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.page-btn { min-width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); font-weight: 600; font-size: 15px; }
+.page-btn[aria-current='page'] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.page-btn:disabled { opacity: 0.35; cursor: default; }

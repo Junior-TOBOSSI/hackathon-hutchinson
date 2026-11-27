@@ -1,0 +1,26 @@
+{
+  "name": "hovis-pitch-video",
+  "private": true,
+  "version": "0.1.0",
+  "description": "HOVIS pitch video (5 min, silent, played behind a live speaker), built with Remotion.",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render HovisPitch out/hovis-pitch.mp4",
+    "still": "remotion still HovisPitch out/still.png",
+    "typecheck": "tsc --noEmit",
+    "capture": "npm --prefix ../argos-ui run build && node capture/record.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/jost": "^5.3.0",
+    "@remotion/cli": "^4.0.547",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.547"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.32",
+    "@types/react-dom": "^18.3.7",
+    "playwright-core": "^1.65.1",
+    "typescript": "^5.9.3"
+  }
+}

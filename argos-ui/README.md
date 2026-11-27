@@ -1,0 +1,127 @@
+# HOVIS : interface utilisateur
+
+Front-end de la solution HOVIS (anciennement ARGOS) (hackathon Hutchinson × ESIGELEC, sujet 3 « AI & Industrial Vision »).
+React 18 + TypeScript + Vite, sans librairie de composants ni de graphiques : tout est dans `src/`.
+
+## Lancer
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # version de production dans dist/
+```
+
+Par défaut l'interface tourne sur des **données de démonstration** (`src/api/mock.ts`).
+Pour la brancher sur le backend :
+
+```bash
+VITE_USE_MOCK=false VITE_API_URL=http://localhost:8000/api npm run dev
+```
+
+En dev, `/api` est aussi redirigé vers `http://localhost:8000` (voir `vite.config.ts`).
+
+## Organisation de l'usine
+
+L'usine est découpée en **UAP**, chaque UAP en **cellules**, chaque cellule en **postes** (12 en général).
+L'interface reste au niveau de la cellule : un **team leader** voit les postes de **sa** cellule, jamais les autres cellules ni l'UAP entière (l'UAP n'apparaît qu'en en-tête, pour information).
+
+Trois écrans montrent une cellule ou un poste, chacun pour un public différent :
+
+| Écran | Où | Pour qui | Ce qu'il montre |
+|---|---|---|---|
+| Écran du poste (`/operateur`) | tablette au poste | l'opérateur | sa pièce, son objectif, ses problèmes en cours, le bouton Signaler |
+| 4 voyants (`/poste/:stationId/voyants`) | au poste, devant l'opérateur | l'opérateur | sécurité et poste de travail, lisibles d'un coup d'œil |
+| TV de la cellule (`/tv/:cellId`) | TV au bord de la ligne | toute l'équipe | **performance seule** des 12 postes : avancement, avance ou retard, KO. Ni alerte sécurité, ni image, ni nom |
+
+## Comptes de démonstration
+
+Le rôle vient des droits du compte. Sans rôle attribué, c'est **opérateur**.
+
+| Identifiant | Rôle | Page d'arrivée |
+|---|---|---|
+| `m.rojas@hutchinson.com` | Opérateur | `/operateur` |
+| `c.diaz@hutchinson.com` | Team leader (cellule 3) | `/team-leader` |
+| `a.noui@hutchinson.com` | AI Leader | `/ai-leader` |
+| `admin@hutchinson.com` | Admin | `/admin` |
+
+N'importe quel autre identifiant ouvre l'écran opérateur. Le mot de passe n'est pas vérifié en démo.
+
+## Écrans et routes
+
+| Route | Persona | Contenu |
+|---|---|---|
+| `/` | tous | Connexion (identifiant / mot de passe, ou badge au poste) |
+| `/operateur` | Opérateur | Écran du poste. Un seul écran qui s'adapte : tout va bien, pièce KO, EPI ou poste en défaut, plusieurs problèmes. En démo : `?scenario=ok\|ko\|epi\|multi` ou le sélecteur en bas de l'écran |
+| `/poste/:stationId/voyants` | écran au poste | 4 voyants (sécurité, poste de travail), sans connexion |
+| `/tv/:cellId` | TV de la cellule | Performance des postes de la cellule, sans connexion. Démo : `/tv/C3` |
+| `/team-leader` | Team leader | Onglet **Postes** : indicateurs de la cellule et une carte par poste (état, avance ou retard, KO, alerte). Onglet **Alertes** : alertes de la cellule, « Je m'en occupe », valider ou rejeter, maintenance |
+| `/team-leader/poste/:id` | Team leader | **Écran du poste en consultation** : exactement la vue de l'opérateur, en lecture seule, avec les alertes du poste à acquitter |
+| `/team-leader/poste/:id/historique` | Team leader | Historique du shift du poste (bande du shift, EPI, événements) |
+| `/ai-leader` | AI Leader | Santé des modèles, dérives, réentraînement manuel ou auto, versions, entraînement en cours |
+| `/admin` | Admin | Utilisateurs (rôle, périmètre, activation), matrice des droits, journal |
+
+Les routes sont protégées par rôle dans `src/App.tsx` (`Guard`).
+
+## Règles à respecter côté backend
+
+1. **Aucune image de personne** n'est envoyée aux écrans team leader (hors consultation d'un poste), TV et AI Leader. Les alertes sont du texte : poste, catégorie, description, shift, heure.
+2. L'image de la caméra frontale (`frontSnapshotUrl`, visage flouté) ne sert qu'à l'écran du poste (opérateur, ou team leader qui le consulte) et ne doit pas être conservée.
+3. **Une alerte = un épisode par poste**, jamais en double (le backend regroupe).
+4. Les alertes **EPI et poste** sont informatives : `action: 'NONE'`, sans validation. Qualité et rythme : `VALIDATE`. Équipement et signalements : `MAINTENANCE`.
+5. Les indicateurs portent sur le **poste**, jamais sur la personne (aucun nom, aucun classement d'opérateurs).
+6. La règle de priorité affichée à l'opérateur quand plusieurs problèmes arrivent en même temps est dans `src/components/priority.ts` : sécurité, puis pièce KO, puis poste de travail.
+
+## Contrat d'API
+
+Tous les types sont dans `src/api/types.ts`. Tous les appels passent par `src/api/client.ts`, qui documente chaque endpoint.
+
+| Méthode | Endpoint | Réponse |
+|---|---|---|
+| POST | `/api/auth/login` `{login, password}` ou `{badge}` | `User` |
+| GET | `/api/stations/{id}/live` | `StationLive` |
+| POST | `/api/stations/{id}/report` | 204 (bouton Signaler) |
+| GET | `/api/cells/{cellId}/overview` | `CellOverview` (UAP, cellule, postes, production par heure) |
+| GET | `/api/cells/{cellId}/alerts?status=open` | `Alert[]` |
+| POST | `/api/alerts/{id}/acknowledge` | 204 (« Je m'en occupe ») |
+| POST | `/api/alerts/{id}/decision` `{decision: 'VALIDER'\|'REJETER'}` | 204 |
+| POST | `/api/alerts/{id}/maintenance` | 204 |
+| GET | `/api/stations/{id}/detail` | `StationDetail` |
+| GET | `/api/models/overview` | `AiOverview` |
+| POST | `/api/models/{id}/retrain` | 202 |
+| PUT | `/api/models/retrain-mode` `{mode}` | 204 |
+| POST | `/api/models/{id}/promote` `{version}` | 204 |
+| GET | `/api/admin/users` | `AppUser[]` |
+| POST | `/api/admin/users` | `AppUser` |
+| PATCH | `/api/admin/users/{id}` `{role?, scope?, active?}` | `AppUser` |
+| GET | `/api/admin/roles` | `RoleDefinition[]` |
+| GET | `/api/admin/audit` | `AuditEntry[]` |
+
+**Temps réel :** l'interface interroge le backend à intervalle régulier (`useApi`, 2 s au poste, 5 s pour les alertes).
+Si vous exposez des WebSockets (`/api/ws/stations/{id}`, `/api/ws/alerts`) qui poussent les mêmes objets, il suffit de remplacer le polling dans `src/hooks/useApi.ts`.
+
+**Authentification :** les requêtes partent avec `credentials: 'include'` (cookie de session). Pour un jeton, ajoutez l'en-tête `Authorization` dans `http()` de `client.ts`.
+
+## Structure
+
+```
+src/
+  api/        types.ts (contrat), client.ts (appels), mock.ts (démo)
+  components/ brand.tsx (logo HOVIS en SVG), ui.tsx (bandeau, badges, icônes), charts.tsx (anneau, jauges, histogramme, camembert, courbes), priority.ts
+  pages/      Login, Operateur (aussi en consultation), PosteVoyants, CelluleTV, TeamLeader, PosteDetail, AiLeader, Admin
+  theme.css   charte HOVIS : couleurs et styles communs (marine, blanc ; rouge pour les alertes)
+public/img/   icône HOVIS (favicon) et images de démonstration
+```
+
+## Charte graphique HOVIS
+
+- **Marine HOVIS** `#0B1F3F` : identité, bandeaux, actions. **Rouge Signal** `#C8102E` : alertes uniquement. **Blanc** `#FFFFFF`.
+- Vert et ambre conservés pour les états « conforme » / « à vérifier » : ce sont des codes métier, pas de la décoration.
+- Police **Jost** (géométrique proche du logotype), servie en local par `@fontsource-variable/jost` : aucun appel à Google Fonts.
+- Le logo est dessiné en SVG dans `src/components/brand.tsx` d'après la fiche de construction (grille 120 × 120).
+- Toutes les couleurs passent par les variables de `src/theme.css` : changer de charte ne touche qu'un fichier.
+
+## Images de démonstration
+
+`public/img/demo-piece-*.svg` et `demo-camera-*.svg` sont des **dessins**, pas des photos réelles :
+les images du jeu qualité 702 ne doivent pas sortir des postes de l'équipe sans accord.
+En production, le backend fournit `part.imageUrl` (photo de la pièce avec la zone en défaut dessinée) et `frontSnapshotUrl`.
