@@ -128,16 +128,18 @@ index c1b98d8..d0fc825 100644
  
  /* ------------------------------------------------------------------ */
 diff --git a/argos-ui/src/components/charts.tsx b/argos-ui/src/components/charts.tsx
-index cfed526..bfbaee4 100644
+index cfed526..f70a5b2 100644
 --- a/argos-ui/src/components/charts.tsx
 +++ b/argos-ui/src/components/charts.tsx
-@@ -1,5 +1,5 @@
+@@ -1,6 +1,6 @@
  // Graphiques dessinés à la main (SVG / div) : aucune librairie à installer.
 -import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+-import { deltaText, fmt } from './ui';
 +import { useEffect, useRef, useState, type PointerEvent } from 'react';
- import { deltaText, fmt } from './ui';
++import { CountUp, deltaText, fmt } from './ui';
  
  /* ------------------------------------------------------------------ */
+ /* Production cumulée de la cellule : réel contre objectif             */
 @@ -44,10 +44,12 @@ export function CumulativeChart({ hourly, target, expectedNow, shiftStart, shift
    // Points du réel : 0 au début du shift, puis le cumul à chaque heure pleine, puis maintenant.
    const points: { x: number; y: number }[] = [{ x: shiftStart, y: 0 }];
@@ -170,6 +172,15 @@ index cfed526..bfbaee4 100644
          ))}
          {/* Réel */}
          <path d={area} fill="var(--chart-real)" opacity="0.1" />
+@@ -145,7 +147,7 @@ export function ProgressRing({ value, target, expected, size = 220 }: { value: n
+         <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--navy)" strokeWidth="5" strokeLinecap="round" />
+       </svg>
+       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+-        <span className="num" style={{ fontSize: size * 0.27, color: 'var(--green-text)' }}>{value}</span>
++        <span className="num" style={{ fontSize: size * 0.27, color: 'var(--green-text)' }}><CountUp value={value} /></span>
+         <span className="muted" style={{ fontSize: 17, fontWeight: 600 }}>sur {fmt(target)}</span>
+       </div>
+     </div>
 @@ -161,71 +163,36 @@ export function ProgressRing({ value, target, expected, size = 220 }: { value: n
   *  - tronçon entamé de l'heure en cours ou à venir : vert clair (en cours).
   */
@@ -278,6 +289,42 @@ index 099578c..99d8863 100644
    }
    return list.sort((a, b) => a.rank - b.rank);
  }
+diff --git a/argos-ui/src/components/ui.tsx b/argos-ui/src/components/ui.tsx
+index 9000982..f68027f 100644
+--- a/argos-ui/src/components/ui.tsx
++++ b/argos-ui/src/components/ui.tsx
+@@ -1,8 +1,30 @@
+-import type { CSSProperties, ReactNode } from 'react';
++import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+ import { useNavigate } from 'react-router-dom';
+ import { useAuth } from '../auth';
+ import { HovisLogo } from './brand';
+ 
++/** L'utilisateur a demandé moins d'animations (réglage système) : on les coupe. */
++export const REDUCED_MOTION = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
++
++/** Nombre qui défile jusqu'à sa nouvelle valeur (0,4 s) : on voit que les chiffres sont en direct. */
++export function CountUp({ value, format = fmt }: { value: number; format?: (n: number) => string }) {
++  const [shown, setShown] = useState(value);
++  const from = useRef(value);
++  useEffect(() => {
++    if (REDUCED_MOTION || from.current === value) { from.current = value; setShown(value); return; }
++    const start = performance.now(), a = from.current, b = value;
++    let raf = 0;
++    const step = (t: number) => {
++      const k = Math.min(1, (t - start) / 400);
++      setShown(Math.round(a + (b - a) * (1 - (1 - k) ** 3)));
++      if (k < 1) raf = requestAnimationFrame(step); else from.current = b;
++    };
++    raf = requestAnimationFrame(step);
++    return () => { cancelAnimationFrame(raf); from.current = b; };
++  }, [value]);
++  return <>{format(shown)}</>;
++}
++
+ /* Icônes au trait (24×24). */
+ export const ICONS = {
+   shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z',
 diff --git a/argos-ui/src/pages/AiLeader.tsx b/argos-ui/src/pages/AiLeader.tsx
 index aad30a9..e30d345 100644
 --- a/argos-ui/src/pages/AiLeader.tsx
@@ -323,9 +370,18 @@ index 0129f23..d1f9a41 100644
    );
  }
 diff --git a/argos-ui/src/pages/Operateur.tsx b/argos-ui/src/pages/Operateur.tsx
-index 6f36356..a2ee2dd 100644
+index 6f36356..b43e593 100644
 --- a/argos-ui/src/pages/Operateur.tsx
 +++ b/argos-ui/src/pages/Operateur.tsx
+@@ -6,7 +6,7 @@ import type { Alert, StationLive } from '../api/types';
+ import { useAuth } from '../auth';
+ import { HourlyGauges, ProgressRing } from '../components/charts';
+ import { operatorActions, type OperatorAction } from '../components/priority';
+-import { Clock, deltaText, fmt, Icon, ICONS, Loading, TopBar } from '../components/ui';
++import { Clock, CountUp, deltaText, fmt, Icon, ICONS, Loading, TopBar } from '../components/ui';
+ import { useApi } from '../hooks/useApi';
+ 
+ /**
 @@ -16,7 +16,7 @@ import { useApi } from '../hooks/useApi';
   *
   * Le même écran sert au team leader qui CONSULTE un poste depuis son PC (`consultStationId`) :
@@ -365,7 +421,15 @@ index 6f36356..a2ee2dd 100644
    const shiftChip = <span className="chip hide-mobile">Shift {live.shift.code} · {live.shift.start.slice(0, 2)} h – {live.shift.end.slice(0, 2)} h</span>;
  
    return (
-@@ -60,7 +66,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
+@@ -53,14 +59,14 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
+ 
+       {consult && <ConsultBar stationId={live.stationId} alerts={stationAlerts} onAcknowledge={acknowledge} />}
+ 
+-      {envIssues.length > 0 && <ProblemBanner actions={actions} />}
++      {envIssues.length > 0 && <ProblemBanner key={actions.map((a) => a.key).join('|')} actions={actions} />}
+ 
+       <main className="row stack-mobile" style={{ flex: 1, alignItems: 'stretch', gap: 24, padding: '20px 28px 0' }}>
+         {/* Colonne gauche : la pièce, ou l'image caméra si seul l'environnement est en défaut */}
          <section className="card-op col" style={{ width: 440, maxWidth: '100%', gap: 14 }}>
            {!ko && envIssues.length > 0 && live.frontSnapshotUrl
              ? <SnapshotPanel live={live} instruction={envIssues[0].instruction} />
@@ -374,7 +438,13 @@ index 6f36356..a2ee2dd 100644
          </section>
  
          <section className="col grow" style={{ gap: 18 }}>
-@@ -81,7 +87,7 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
+@@ -76,12 +82,12 @@ export default function Operateur({ consultStationId }: { consultStationId?: str
+                 <div className="col grow" style={{ gap: 16 }}>
+                   <span className="label-caps" style={{ fontSize: 18 }}>Objectif du shift</span>
+                   <div>
+-                    <div className="num" style={{ fontSize: 64 }}>{fmt(live.objective.shiftTarget - live.counters.good)}</div>
++                    <div className="num" style={{ fontSize: 64 }}><CountUp value={live.objective.shiftTarget - live.counters.good} /></div>
+                     <div className="muted" style={{ fontSize: 18, fontWeight: 600 }}>pièces à faire</div>
                    </div>
                    <div className="row">
                      <MiniStat value={deltaText(live.counters.good - live.objective.expectedNow, true)} tone={live.counters.good >= live.objective.expectedNow ? 'green' : 'red'} />
@@ -412,6 +482,15 @@ index 6f36356..a2ee2dd 100644
          </span>
        ))}
        <Link to={`/team-leader/poste/${encodeURIComponent(stationId)}/historique`} className="chip" style={{ color: '#fff', fontWeight: 600 }}>Historique du shift</Link>
+@@ -138,7 +144,7 @@ function ConsultBar({ stationId, alerts, onAcknowledge }: { stationId: string; a
+ 
+ function ProblemBanner({ actions }: { actions: OperatorAction[] }) {
+   return (
+-    <div className="row" style={{ background: 'var(--red)', color: '#fff', padding: '12px 28px', flexWrap: 'wrap', gap: 14 }}>
++    <div className="row banner-in" style={{ background: 'var(--red)', color: '#fff', padding: '12px 28px', flexWrap: 'wrap', gap: 14 }}>
+       <Icon d={ICONS.warn} size={32} color="#fff" stroke={2.2} />
+       {actions.length > 1 ? (
+         <>
 @@ -159,9 +165,10 @@ function ProblemBanner({ actions }: { actions: OperatorAction[] }) {
    );
  }
@@ -582,9 +661,22 @@ index 89edae1..09c58d6 100644
        </main>
      </div>
 diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
-index 1642809..70df117 100644
+index 1642809..caa51c4 100644
 --- a/argos-ui/src/pages/TeamLeader.tsx
 +++ b/argos-ui/src/pages/TeamLeader.tsx
+@@ -1,10 +1,10 @@
+-import { useMemo, useState, type ReactNode } from 'react';
++import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+ import { Link, useNavigate } from 'react-router-dom';
+ import { api, USE_MOCK } from '../api/client';
+ import type { Alert, AlertCategory, CellOverview, StationStatus, StationSummary } from '../api/types';
+ import { useAuth } from '../auth';
+ import { CumulativeChart, type Category } from '../components/charts';
+-import { Clock, CountBadge, deltaText, fmt, Icon, ICONS, Kpi, Loading, TopBar } from '../components/ui';
++import { Clock, CountBadge, CountUp, deltaText, fmt, Icon, ICONS, Kpi, Loading, REDUCED_MOTION, TopBar } from '../components/ui';
+ import { useApi } from '../hooks/useApi';
+ 
+ /**
 @@ -23,7 +23,7 @@ export const CATEGORIES: (Category & { key: AlertCategory })[] = [
  ];
  
@@ -623,7 +715,7 @@ index 1642809..70df117 100644
          </div>
          <StationTable stations={cell.stations} alerts={alerts} />
        </div>
-@@ -119,128 +119,137 @@ const DOT: Record<StationStatus, string> = {
+@@ -119,128 +119,150 @@ const DOT: Record<StationStatus, string> = {
    OK: 'var(--green)', SECURITE: 'var(--red)', QUALITE: 'var(--red)', RYTHME: 'var(--amber)', CAMERA: 'var(--amber)', OBJET: 'var(--amber)',
  };
  
@@ -632,8 +724,6 @@ index 1642809..70df117 100644
 +const TINT: Record<StationStatus, string> = {
 +  OK: '#d5eedf', SECURITE: '#f8d3da', QUALITE: '#f8d3da', RYTHME: '#fbe3c0', CAMERA: '#fbe3c0', OBJET: '#fbe3c0',
 +};
-+/** Réglage système « réduire les animations » : la carte en alerte reste alors fixe. */
-+const REDUCED_MOTION = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 +/** Contour de la carte : la même couleur que le fond, un ton plus soutenu. */
 +const EDGE: Record<StationStatus, string> = {
 +  OK: '#9fd6b6', SECURITE: '#eb99a7', QUALITE: '#eb99a7', RYTHME: '#efbf78', CAMERA: '#efbf78', OBJET: '#efbf78',
@@ -652,6 +742,18 @@ index 1642809..70df117 100644
    const [query, setQuery] = useState('');
 -  const [page, setPage] = useState(0);
 +  const [selected, setSelected] = useState<string | null>(null);
++  // Retour au vert : un poste qui redevient conforme l'affiche quelques secondes (« ✓ Revenu conforme »).
++  const previous = useRef<Record<string, StationStatus>>({});
++  const [fixed, setFixed] = useState<Record<string, number>>({});
++  useEffect(() => {
++    const now = Date.now();
++    const back = stations.filter((s) => s.status === 'OK' && previous.current[s.id] && previous.current[s.id] !== 'OK');
++    previous.current = Object.fromEntries(stations.map((s) => [s.id, s.status]));
++    if (!back.length) return;
++    setFixed((f) => ({ ...f, ...Object.fromEntries(back.map((s) => [s.id, now])) }));
++    const t = setTimeout(() => setFixed((f) => Object.fromEntries(Object.entries(f).filter(([, at]) => at !== now))), 6000);
++    return () => clearTimeout(t);
++  }, [stations]);
  
    const q = query.trim().toUpperCase().replace(/^P0?/, '');
    const filtered = stations.filter((s) =>
@@ -779,14 +881,17 @@ index 1642809..70df117 100644
 +              aria-label={`Poste ${shortId(s.id)} : sécurité ${safe ? 'OK' : 'NOK'}, ${deltaText(delta, true)}, ${s.good} pièces OK, ${s.ko} pièces NOK. Voir le détail`}
 +              className="col"
 +              style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 7, padding: '14px 16px', borderRadius: 16, background: TINT[s.status],
-+                border: isSel ? '2px solid var(--navy)' : `2px solid ${EDGE[s.status]}`,
++                border: isSel ? '2px solid var(--navy)' : `2px solid ${EDGE[s.status]}`, transition: 'background-color 0.8s, border-color 0.8s',
 +                animation: (s.status === 'SECURITE' || s.status === 'QUALITE') && !REDUCED_MOTION ? 'station-alert 0.8s ease-in-out infinite' : undefined }}
 +            >
-+              <span className="cond" style={{ fontWeight: 700, fontSize: 26, lineHeight: 1 }}>{shortId(s.id)}</span>
++              <span className="between" style={{ alignItems: 'center' }}>
++                <span className="cond" style={{ fontWeight: 700, fontSize: 26, lineHeight: 1 }}>{shortId(s.id)}</span>
++                {fixed[s.id] && <span className="pill pill-green fixed-in" style={{ fontSize: 12 }}>✓ Revenu conforme</span>}
++              </span>
 +              <CardLine label="Sécurité" value={safe ? 'OK' : 'NOK'} tone={safe ? 'ok' : 'bad'} />
 +              <CardLine label="Rythme" value={deltaText(delta, true)} tone={delta < 0 ? 'bad' : 'ok'} />
-+              <CardLine label="Pièces OK" value={fmt(s.good)} />
-+              <CardLine label="Pièces NOK" value={fmt(s.ko)} />
++              <CardLine label="Pièces OK" value={<CountUp value={s.good} />} />
++              <CardLine label="Pièces NOK" value={<CountUp value={s.ko} />} />
 +            </button>
 +          );
 +        })}
@@ -799,7 +904,7 @@ index 1642809..70df117 100644
 +}
 +
 +/** Une ligne de carte : libellé à gauche, valeur à droite (verte si OK, rouge sinon). */
-+function CardLine({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'bad' }) {
++function CardLine({ label, value, tone }: { label: string; value: ReactNode; tone?: 'ok' | 'bad' }) {
 +  return (
 +    <span className="between" style={{ alignItems: 'baseline', fontSize: 15 }}>
 +      <span style={{ color: 'var(--muted)' }}>{label}</span>
@@ -853,7 +958,7 @@ index 1642809..70df117 100644
        </div>
      </div>
    );
-@@ -255,6 +264,8 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
+@@ -255,6 +277,8 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
  }
  
  /* ---------------- Alertes de la cellule : texte seul ---------------- */
@@ -862,7 +967,7 @@ index 1642809..70df117 100644
  function Alerts({ cell, alerts, onDone, onAcknowledge }: { cell: CellOverview; alerts: Alert[]; onDone: (id: string) => void; onAcknowledge: (id: string) => void }) {
    const [cat, setCat] = useState<AlertCategory | 'ALL'>('ALL');
    const list = useMemo(() => [...alerts].filter((a) => cat === 'ALL' || a.category === cat).sort((a, b) => Number(b.priority) - Number(a.priority)), [alerts, cat]);
-@@ -285,7 +296,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
+@@ -285,7 +309,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
        <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
          <span className="cond" style={{ fontWeight: 700, fontSize: 26 }}>{a.stationId}</span>
          <span className={`pill ${a.category === 'SECURITE_EPI' ? 'pill-red' : 'pill-blue'}`}>{cat.name}</span>
@@ -871,7 +976,7 @@ index 1642809..70df117 100644
          <span style={{ flex: 1 }} />
          <span className="muted" style={{ fontSize: 13 }}>{a.reportedByOperator ? 'signalé par l’opérateur' : ''}</span>
        </div>
-@@ -294,7 +305,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
+@@ -294,7 +318,7 @@ export function AlertCard({ a, status, onDone, onAcknowledge }: { a: Alert; stat
        <span style={{ fontSize: 14, fontWeight: 600 }}>Shift {a.shift} · {a.when}</span>
        {a.action === 'NONE' && <span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>Pour information : aucune validation demandée</span>}
        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -881,16 +986,23 @@ index 1642809..70df117 100644
            <>
              <button className="btn btn-dark grow" onClick={() => api.decideAlert(a.id, 'VALIDER').then(onDone)}>Valider</button>
 diff --git a/argos-ui/src/theme.css b/argos-ui/src/theme.css
-index b7b068e..8619a53 100644
+index b7b068e..b4fb435 100644
 --- a/argos-ui/src/theme.css
 +++ b/argos-ui/src/theme.css
-@@ -167,3 +167,6 @@ a { color: inherit; text-decoration: none; }
+@@ -167,3 +167,13 @@ a { color: inherit; text-decoration: none; }
  .page-btn { min-width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); font-weight: 600; font-size: 15px; }
  .page-btn[aria-current='page'] { background: var(--navy); color: #fff; border-color: var(--navy); }
  .page-btn:disabled { opacity: 0.35; cursor: default; }
 +
 +/* Team leader : une carte de poste en alerte (sécurité ou qualité NOK) pulse doucement. */
 +@keyframes station-alert { 0%, 100% { background-color: #f8d3da; } 50% { background-color: #e8798c; } }
++
++/* Animations courtes et utiles (désactivées si l'utilisateur réduit les animations). */
++@keyframes banner-in { from { transform: translateY(-100%); opacity: 0; } to { transform: none; opacity: 1; } }
++.banner-in { animation: banner-in 0.35s ease-out; }
++@keyframes fixed-in { 0% { opacity: 0; transform: scale(0.6); } 60% { opacity: 1; transform: scale(1.08); } 100% { transform: scale(1); } }
++.fixed-in { animation: fixed-in 0.4s ease-out; }
++@media (prefers-reduced-motion: reduce) { .banner-in, .fixed-in { animation: none; } }
 diff --git a/argos-ui/src/vite-env.d.ts b/argos-ui/src/vite-env.d.ts
 index 73d2b55..f3b517c 100644
 --- a/argos-ui/src/vite-env.d.ts
