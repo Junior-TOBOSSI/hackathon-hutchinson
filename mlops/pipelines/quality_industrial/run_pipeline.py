@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -193,20 +194,106 @@ def ensure_opencv(runner, log) -> None:
         log(f"OpenCV import failed ({exc}): installing opencv-python-headless")
         runner([sys.executable, "-m", "pip", "uninstall", "-y", "opencv-python"], check=False)
         runner(
-            [sys.executable, "-m", "pip", "install", "--quiet", "opencv-python-headless"],
+            [sys.executable, "-m", "pip", "install", "--quiet", OPENCV_HEADLESS],
             check=True,
         )
 
 
 def verify_onnx(model_dir: Path) -> bool:
-    """True only if modele.onnx exists, is non-empty and passes onnx.checker."""
+    """True only if modele.onnx exists, passes onnx.checker AND runs in ONNX Runtime with
+    one output per class. (The group's export_onnx.py also compares .pt and .onnx answers
+    in rapport_export.md.) Not a validation for Edge deployment."""
     path = model_dir / "modele.onnx"
     if not path.is_file() or path.stat().st_size == 0:
         return False
+    import numpy as np
     import onnx
+    import onnxruntime as ort
 
     onnx.checker.check_model(str(path))
-    return True
+    session = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+    inp = session.get_inputs()[0]
+    shape = [d if isinstance(d, int) else 1 for d in inp.shape]
+    out = session.run(None, {inp.name: np.zeros(shape, dtype=np.float32)})[0]
+    return out.shape[-1] == 3
+
+
+# Databricks serverless environment 3 core packages that must stay unchanged (DBX-05D-FIX).
+CORE_VERSIONS = {"numpy": "1.26.4", "protobuf": "5.29.4", "pyarrow": "15.0.2"}
+TORCH_PAIR = ("2.5.", "0.20.")  # pinned torch / torchvision series
+OPENCV_HEADLESS = "opencv-python-headless==4.11.0.86"  # same version as the pinned opencv-python
+
+
+def environment_check(request: dict[str, Any], weights: Path | None) -> dict[str, Any]:
+    """Explicit checks BEFORE any training; raises SystemExit (clean stop) on failure."""
+    import hashlib
+    from importlib.metadata import PackageNotFoundError, version
+
+    report: dict[str, Any] = {
+        "python": platform.python_version(),
+        "machine": platform.machine(),
+        "cpus": os.cpu_count(),
+        "versions": {},
+        "errors": [],
+    }
+    for pkg in [
+        "numpy",
+        "protobuf",
+        "pyarrow",
+        "pandas",
+        "torch",
+        "torchvision",
+        "ultralytics",
+        "opencv-python",
+        "opencv-python-headless",
+        "onnx",
+        "onnxruntime",
+        "onnxslim",
+        "mlflow",
+        "databricks-sdk",
+    ]:
+        try:
+            report["versions"][pkg] = version(pkg)
+        except PackageNotFoundError:
+            report["versions"][pkg] = None
+    for pkg, expected in CORE_VERSIONS.items():
+        if report["versions"].get(pkg) != expected:
+            report["errors"].append(
+                f"core package {pkg} {report['versions'].get(pkg)} != {expected}"
+            )
+    try:
+        import torch
+        import torchvision
+
+        report["torch_cuda"] = bool(torch.cuda.is_available())
+        if not (
+            torch.__version__.startswith(TORCH_PAIR[0])
+            and torchvision.__version__.startswith(TORCH_PAIR[1])
+        ):
+            report["errors"].append(
+                f"torch {torch.__version__} / torchvision {torchvision.__version__}"
+                " not the pinned pair"
+            )
+        torchvision.ops.nms(torch.zeros((1, 4)), torch.zeros(1), 0.5)  # compiled ops really usable
+        import cv2
+        import onnx  # noqa: F401
+        import onnxruntime  # noqa: F401
+        import ultralytics  # noqa: F401
+        from ultralytics import YOLO
+
+        report["cv2"] = cv2.__version__
+        if weights is not None:
+            YOLO(str(weights))  # the public pre-trained weights load
+            report["weights_sha256"] = hashlib.sha256(weights.read_bytes()).hexdigest()
+    except Exception as exc:  # noqa: BLE001 - reported, then clean stop
+        report["errors"].append(f"{type(exc).__name__}: {str(exc)[:300]}")
+    raw = Path(request["manifest_path"]).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != request["manifest_sha256"]:
+        report["errors"].append("manifest SHA-256 differs from the request")
+    print("HOVIS_ENV_CHECK=" + json.dumps(report), flush=True)
+    if report["errors"]:
+        raise SystemExit("environment check failed: " + "; ".join(report["errors"]))
+    return report
 
 
 def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) -> dict[str, Any]:
@@ -253,6 +340,17 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
     data_dir = work / "dataset"
     manifest = json.loads(Path(request["manifest_path"]).read_text(encoding="utf-8"))
     t0 = time.time()
+    timings: dict[str, float] = {}
+    os.environ["YOLO_AUTOINSTALL"] = "false"  # Ultralytics must never pip-install at run time
+    work.mkdir(parents=True, exist_ok=True)
+    base_weights = None
+    if request.get("base_weights"):  # public pre-trained weights stored in the Volume
+        base_weights = work / hyperparameters(request["parameters"])["modele_base"]
+        shutil.copy2(request["base_weights"], base_weights)
+    ensure_opencv(runner, log)
+    env_report = environment_check(request, base_weights)
+    timings["duration_env_check_s"] = time.time() - t0
+    t = time.time()
     counts = materialize(
         manifest,
         Path(request["dataset_dir"]),
@@ -263,13 +361,11 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
         group_required=True,
     )
     log(f"materialised: {counts}")
+    timings["duration_materialize_s"] = time.time() - t
     hp = hyperparameters(request["parameters"])
-    if request.get("base_weights"):  # public pre-trained weights stored in the Volume
-        shutil.copy2(request["base_weights"], work / hp["modele_base"])
     hp_file = work / "hyperparametres.yaml"
     hp_file.write_text(yaml.safe_dump(hp, sort_keys=False), encoding="utf-8")
     model_dir = out_root / "modele"
-    ensure_opencv(runner, log)
     disable_ultralytics_mlflow()
     tags = {
         "hovis.request_id": rid,
@@ -289,7 +385,11 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
         mlflow.log_params({**hp, "device": device, "fusionner_test": False})
         cmd = train_command(python, data_dir, model_dir, rid[:12], hp_file, device)
         log(f"step train: {' '.join(cmd)}")
+        mlflow.log_dict(env_report, "hovis/environment_check.json")
+        t = time.time()
         runner(cmd, check=True, cwd=str(work))
+        timings["duration_train_s"] = time.time() - t
+        t = time.time()
         cfg_path = model_dir / "config_qualite702.yaml"
         cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
         runner(
@@ -297,6 +397,7 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
             check=True,
             cwd=str(work),
         )
+        timings["duration_evaluate_s"] = time.time() - t
         history = read_results(model_dir / "entrainement" / "results.csv")
         for row in history:
             mlflow.log_metrics(
@@ -309,6 +410,7 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
                 **summary,
                 **evaluation_metrics(metrics),
                 "train_duration_s": time.time() - t0,
+                **timings,
                 "val_seuil_nok": float(cfg["seuil_nok"]),
             }
         )
@@ -317,12 +419,14 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
             | {"python": platform.python_version()}
         )
         onnx_ok, onnx_error = False, ""
+        t = time.time()
         try:
             runner(export_command(python, cfg_path, data_dir / "val"), check=True, cwd=str(work))
             onnx_ok = verify_onnx(model_dir)
         except Exception as exc:  # noqa: BLE001 - optional step, reported as such
             onnx_error = f"{type(exc).__name__}: {str(exc)[:200]}"
             log(f"ONNX export failed: {onnx_error}")
+        mlflow.log_metric("duration_export_s", time.time() - t)
         mlflow.set_tags(
             {"hovis.onnx_exported": str(onnx_ok).lower(), "hovis.onnx_error": onnx_error}
         )

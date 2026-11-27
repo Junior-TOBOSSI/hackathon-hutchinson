@@ -8,6 +8,8 @@ import { Chip, classColor, Donut, fr, SelectField, SPLIT_BLUES, StackedBar } fro
 import { useCompatible, usePipelines, usePreview, useTfParams } from './shared';
 
 const STEPS = ['Configuration', 'Validation', 'Exécution'];
+// Use cases of the platform: a pipeline appears under its own; none is invented for the others.
+const USE_CASES: [string, string][] = [['quality', 'Qualité'], ['safety', 'EPI (sécurité)'], ['workstation', 'Gestion de poste (5S)']];
 
 /* Assistant « Nouvel entraînement » : les paramètres viennent de la déclaration du
    pipeline ; les contrôles affichés sont ceux calculés par le backend. */
@@ -16,6 +18,7 @@ export default function NewTraining() {
   const store = useStore();
   const pipelines = usePipelines();
   const [step, setStep] = useState(0);
+  const [useCase, setUseCase] = useState('');
   const [pipelineId, setPipelineId] = useState(nav.pipeline ?? '');
   const [datasetId, setDatasetId] = useState(nav.dataset ?? '');
   const [version, setVersion] = useState(nav.dsversion ?? '');
@@ -29,9 +32,13 @@ export default function NewTraining() {
   const view = pipelines.data?.find((p) => p.spec.id === pipelineId) ?? null;
   const spec = view?.spec ?? null;
 
-  useEffect(() => { // default pipeline: the one compatible with the dataset coming from Datasets
-    if (!pipelineId && pipelines.data?.length) setPipelineId(pipelines.data.find((p) => !nav.dataset || p.spec.dataset.families.includes(nav.dataset))?.spec.id ?? pipelines.data[0].spec.id);
-  }, [pipelines.data, pipelineId, nav.dataset]);
+  useEffect(() => { // default: the use case / pipeline compatible with the dataset coming from Datasets
+    if (useCase || !pipelines.data?.length) return;
+    const first = pipelines.data.find((p) => (nav.pipeline ? p.spec.id === nav.pipeline : !nav.dataset || p.spec.dataset.families.includes(nav.dataset))) ?? pipelines.data[0];
+    setUseCase(first.spec.use_case);
+    if (!pipelineId) setPipelineId(first.spec.id);
+  }, [pipelines.data, pipelineId, useCase, nav.dataset, nav.pipeline]);
+  const ofUseCase = (pipelines.data ?? []).filter((p) => p.spec.use_case === useCase);
   useEffect(() => { // latest version by default
     const versions = family.data?.versions ?? [];
     if (datasetId && !version && versions.length) setVersion(versions[versions.length - 1].version);
@@ -72,8 +79,13 @@ export default function NewTraining() {
 
       {step === 0 && pipelines.data && <div className="tf-config">
         <div className="col" style={{ gap: 12, minWidth: 0 }}>
-          <SelectField label="Pipeline / modèle" icon="none" value={pipelineId} onChange={(v) => { setPipelineId(v); setValues({}); }}
-            options={pipelines.data.map((p) => [p.spec.id, `${p.spec.name}${p.executable ? '' : ' — non exécutable'}`])} />
+          <SelectField label="Cas d'usage" icon="none" value={useCase}
+            onChange={(v) => { setUseCase(v); setPipelineId(pipelines.data?.find((p) => p.spec.use_case === v)?.spec.id ?? ''); setDatasetId(''); setVersion(''); setValues({}); }}
+            options={USE_CASES.map(([id, label]) => [id, `${label} — ${(pipelines.data ?? []).filter((p) => p.spec.use_case === id).length} modèle(s)`])} />
+          {useCase && ofUseCase.length === 0 && <Unavailable tone="grey">Aucun modèle livré pour ce cas d'usage : le pipeline du groupe apparaîtra ici dès sa livraison (aucun pipeline fictif).</Unavailable>}
+          {ofUseCase.length > 0 && <SelectField label="Modèle (pipeline)" icon="none" value={pipelineId} onChange={(v) => { setPipelineId(v); setDatasetId(''); setVersion(''); setValues({}); }}
+            options={ofUseCase.map((p) => [p.spec.id, `${p.spec.name}${p.executable ? '' : ' — non exécutable'}`])} />}
+          {spec && <span className="muted" style={{ fontSize: 13 }}>Version du code : {spec.code.version ?? spec.code.commit ?? '—'} · architecture {spec.architecture} · classes {spec.classes.join(', ')}</span>}
           {view && !view.executable && <Unavailable>Pipeline non exécutable : {view.requirements.filter((r) => !r.ok).map((r) => `${r.label} (${r.detail ?? 'non satisfait'})`).join(' ; ')}</Unavailable>}
           <SelectField label="Dataset" icon="none" allLabel="Choisir un dataset compatible" value={datasetId} onChange={(v) => { setDatasetId(v); setVersion(''); }}
             options={(compat.data ?? []).map((d) => [d.family.dataset_id, `${d.family.name} (${d.family.dataset_id})${d.family.version_count ? '' : ' — aucune version'}`])} />
