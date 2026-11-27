@@ -5,7 +5,7 @@ show the boxes on the photo as it was taken, every point is sent back through th
 inverse of the alignment homography (align.py).
 
 Drawn:
-- zones (``empty_zones``): green outline if empty, RED if something is in it;
+- zones (``empty_zones``): green RECTANGLE if clear, RED if something is in it;
 - element slots (``element_slots``): green RECTANGLE if the element is in its place, RED
   if not;
 - found objects: ORANGE rectangle for an unknown object, MAGENTA for a person, with its
@@ -51,7 +51,7 @@ def render(
         busy = {f.split("@", 1)[1] for f in result.details.misplaced if "@" in f}
         for name, polygon in view.zones.items():
             colour = RED if name in busy else GREEN
-            _outline(out, to_photo(polygon), colour, 3 if name in busy else 2, name)
+            _outline(out, to_photo(polygon), colour, 3 if name in busy else 2, name, rect=True)
         for name, polygon in view.slots.items():
             missing = name in result.details.missing or name in result.details.misplaced
             label = f"{name}: missing / moved" if missing else name

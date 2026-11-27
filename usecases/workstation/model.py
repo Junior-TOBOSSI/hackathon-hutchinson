@@ -118,6 +118,11 @@ class ZoneWorkstationAnalyzer(Analyzer):
         self.ignore_box_margin = float(config.get("ignore_box_margin", 0.15))
         self.full_blob_area = float(config.get("full_blob_area", 0.05))
         self.unknown_min_score = float(config.get("unknown_min_score", 0.45))
+        # Stricter zones: any change there is at least this score (e.g. a forbidden zone
+        # in front of a machine: anything in it is NOK at once, not "to check").
+        self.zone_min_score: dict[str, float] = {
+            z: float(v) for z, v in (config.get("zone_min_score") or {}).items()
+        }
         self.slot_min_change = float(config.get("slot_min_change", 0.25))
         self.slot_full_change = float(config.get("slot_full_change", 0.6))
         self.persistence_frames = max(1, int(config.get("persistence_frames", 1)))
@@ -343,7 +348,8 @@ class ZoneWorkstationAnalyzer(Analyzer):
             # Client rule "no element in the zone": any change above the noise floor is
             # worth at least a check (unknown_min_score), up to 1 at full_blob_area.
             growth = min(1.0, area / (self.full_blob_area * zone_area))
-            return self.unknown_min_score + (1.0 - self.unknown_min_score) * growth
+            floor = self.zone_min_score.get(zone, self.unknown_min_score)
+            return floor + (1.0 - floor) * growth
 
         # 1. Detected objects or persons whose box overlaps the zone AND covers a change:
         #    the detector only NAMES what changed, it never raises an alert on its own

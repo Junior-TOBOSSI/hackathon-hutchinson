@@ -25,7 +25,8 @@ Vérifier que le poste est configuré comme la référence : objets attendus pr�
 - 2026-11-27 — Personnes autorisées : `zone_allowed_labels` (une zone) ou `ignore_labels` (partout) ; boîte agrandie de 15 % (le tabouret sous l'opérateur assis était signalé).
 - 2026-11-27 — Taille minimale d'un changement plafonnée à 150 pixels : un petit outil au sol passait sous le seuil de 1 % d'une grande zone.
 - 2026-11-27 — La zone « floor » du poste électrique est un simple rectangle, arrêté juste à gauche du tabouret (qui bouge quand l'opérateur s'assoit).
-- 2026-11-27 — Boîtes des éléments et des objets en **rectangles droits** ; les zones gardent leur vraie forme (un rectangle déborderait sur la presse, etc.).
+- 2026-11-27 — **Toutes les boîtes sont des rectangles** (zones, éléments, objets), à la demande de l'équipe. Conséquence : le `workbench` du poste électrique commence à x = 355 pour éviter le tabouret, donc la partie gauche de l'établi n'est plus surveillée (la feuille de `good_03` n'y est plus signalée).
+- 2026-11-27 — Machine cell : `operator_mat` renommé `person_spot` (personne autorisée) ; le walkway devient un rectangle `forbidden_zone`, plus strict (`zone_min_score` 0,9 : tout ce qui y entre est NOK).
 - 2026-11-27 — Seuil à **hystérésis** pour la boîte d'un objet trouvé : le seuil strict décide, un seuil lâche (écart de couleur à la normale) donne l'étendue complète de l'objet (un bac coupé en deux par ses bords). Masquer les opérateurs pendant l'apprentissage donnait aussi des boîtes complètes, mais ajoutait une fausse alerte : abandonné.
 - 2026-11-27 — Seules les détections utiles sont dessinées (objets inconnus, personnes, objets en cause) : YOLO voyait la presse comme une « tv ».
 - 2026-11-26 — **Normalité apprise** (moyenne + dispersion par pixel) sur les photos conformes et la référence ; mesure en **validation croisée** (une photo conforme mise de côté à chaque fois).
@@ -44,6 +45,6 @@ Vérifier que le poste est configuré comme la référence : objets attendus pr�
 
 ## Résultats
 Jeux `poste_*_5s_11`, validation croisée, YOLO26 COCO, seuils 0,4 / 0,7, CPU :
-- press_cell 5/5 anomalies, 0/5 fausse alerte ; machine_cell 4/5, 0/5 ; machine_cell_variant 5/5, 0/5 ; electrical_bench 5/5, 1/5 ;
-- total : 19/20 anomalies, 1/20 fausse alerte ; alignement : 0 échec ; ≈ 0,3 s par photo.
+- press_cell 5/5 anomalies, 0/5 fausse alerte ; machine_cell 4/5, 0/5 ; machine_cell_variant 5/5, 0/5 ; electrical_bench 5/5, 0/5 ;
+- total : 19/20 anomalies, 0/20 fausse alerte (zones rectangulaires) ; alignement : 0 échec ; ≈ 0,3 s par photo.
 - Ce n'est **pas** un chiffre de performance : 10 photos synthétiques par section.

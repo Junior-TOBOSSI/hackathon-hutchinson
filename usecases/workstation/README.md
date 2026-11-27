@@ -6,7 +6,7 @@ Contrôle **5S** au début de la prise de poste : une **photo** du poste est com
 | Section | Fichier | Jeu (`<data-root>/raw/workstation/`) | Zones | Éléments | Personne |
 |---|---|---|---|---|---|
 | Press cell | [press_cell.yaml](stations/press_cell.yaml) | `poste_5s_11` | `blue_mat`, `workbench` | `tool_tray`, `blue_bin`, `shelf_blue_bin`, `yellow_bin` | interdite sur le tapis |
-| Machine cell (top view) | [machine_cell.yaml](stations/machine_cell.yaml) | `poste_bleu_5s_11` | `walkway`, `operator_mat` | `rack_bin`, `orange_crate` | autorisée sur `operator_mat`, interdite sur `walkway` |
+| Machine cell (top view) | [machine_cell.yaml](stations/machine_cell.yaml) | `poste_bleu_5s_11` | `forbidden_zone` (tout y est NOK), `person_spot` | `rack_bin`, `orange_crate` | autorisée sur `person_spot`, interdite dans `forbidden_zone` |
 | Machine cell variant | [machine_cell_variant.yaml](stations/machine_cell_variant.yaml) | `poste_variante_5s_11` | `passage`, `workbench` | `bench_blue_bin`, `rack_blue_bin`, `rack_yellow_bin` | interdite dans le passage |
 | Electrical bench | [electrical_bench.yaml](stations/electrical_bench.yaml) | `poste_electrique_5s_11` | `floor`, `workbench` | `tool_tray`, `screwdrivers`, `blue_bins`, `cable_coil` | autorisée partout (opérateur au travail) |
 
@@ -38,7 +38,7 @@ Classe `usecases.workstation.model:ZoneWorkstationAnalyzer`. [config.yaml](confi
 ```bash
 streamlit run usecases/workstation/demo_app.py --server.port 8502 --server.address localhost --browser.gatherUsageStats false
 ```
-En haut, un bouton par **section**. Dans le panneau latéral, la **photo** à évaluer (liste, précédente / suivante, lecture automatique). L'image affiche le verdict (**OK / CHECK / NOK**) et les boîtes (rectangles pour les éléments et les objets, vraie forme pour les zones) :
+En haut, un bouton par **section**. Dans le panneau latéral, la **photo** à évaluer (liste, précédente / suivante, lecture automatique). L'image affiche le verdict (**OK / CHECK / NOK**) et les boîtes, **toutes rectangulaires** (zones, éléments, objets) :
 - **vert** : élément à sa place, zone libre ;
 - **rouge** : élément absent ou déplacé, zone occupée ;
 - **orange** : objet inconnu ;
@@ -57,12 +57,12 @@ python -m usecases.workstation.evaluate --station electrical_bench --data-root ~
 | Press cell | 5/5 | 0/5 |
 | Machine cell | 4/5 | 0/5 |
 | Machine cell variant | 5/5 | 0/5 |
-| Electrical bench | 5/5 | 1/5 |
-| **Total** | **19/20** | **1/20** |
+| Electrical bench | 5/5 | 0/5 |
+| **Total** | **19/20** | **0/20** |
 
-Les deux erreurs viennent des données :
+Les deux points à connaître :
 - **Machine cell `anomaly_01`** (« objet manquant ») : l'objet qui diffère de la référence (le bac bleu à ouverture noire de la machine) manque aussi sur les 5 photos conformes, donc l'anomalie est indiscernable d'une photo conforme.
-- **Electrical bench `good_03`** (« conforme_document ») : une feuille posée sur l'établi donne CHECK. C'est un vrai changement en 5S ; il faut que le client dise si un document y est autorisé.
+- **Electrical bench `good_03`** (« conforme_document ») : la feuille est posée sur la partie gauche de l'établi, hors du rectangle `workbench` (qui évite le tabouret). Elle n'est donc plus signalée, mais un objet laissé à cet endroit ne le serait pas non plus.
 
 **Ce n'est pas un chiffre de performance** : 10 photos synthétiques par section, à présenter image par image.
 
