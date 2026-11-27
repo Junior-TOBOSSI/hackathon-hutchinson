@@ -542,7 +542,7 @@ index 89edae1..09c58d6 100644
        </main>
      </div>
 diff --git a/argos-ui/src/pages/TeamLeader.tsx b/argos-ui/src/pages/TeamLeader.tsx
-index 1642809..292e38f 100644
+index 1642809..d2cc3a3 100644
 --- a/argos-ui/src/pages/TeamLeader.tsx
 +++ b/argos-ui/src/pages/TeamLeader.tsx
 @@ -88,7 +88,7 @@ function Stations({ cell, alerts, openAlerts }: { cell: CellOverview; alerts: Al
@@ -722,7 +722,7 @@ index 1642809..292e38f 100644
 +              className="col"
 +              style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 7, padding: '14px 16px', borderRadius: 16, background: TINT[s.status],
 +                border: isSel ? '2px solid var(--navy)' : `2px solid ${EDGE[s.status]}`,
-+                animation: (s.status === 'SECURITE' || s.status === 'QUALITE') && !REDUCED_MOTION ? 'station-alert 1.6s ease-in-out infinite' : undefined }}
++                animation: (s.status === 'SECURITE' || s.status === 'QUALITE') && !REDUCED_MOTION ? 'station-alert 0.8s ease-in-out infinite' : undefined }}
 +            >
 +              <span className="cond" style={{ fontWeight: 700, fontSize: 26, lineHeight: 1 }}>{shortId(s.id)}</span>
 +              <CardLine label="Sécurité" value={safe ? 'OK' : 'NOK'} tone={safe ? 'ok' : 'bad'} />
@@ -796,7 +796,7 @@ index 1642809..292e38f 100644
      </div>
    );
 diff --git a/argos-ui/src/theme.css b/argos-ui/src/theme.css
-index b7b068e..08f85b0 100644
+index b7b068e..8619a53 100644
 --- a/argos-ui/src/theme.css
 +++ b/argos-ui/src/theme.css
 @@ -167,3 +167,6 @@ a { color: inherit; text-decoration: none; }
@@ -805,7 +805,7 @@ index b7b068e..08f85b0 100644
  .page-btn:disabled { opacity: 0.35; cursor: default; }
 +
 +/* Team leader : une carte de poste en alerte (sécurité ou qualité NOK) pulse doucement. */
-+@keyframes station-alert { 0%, 100% { background-color: #f8d3da; } 50% { background-color: #ef9fae; } }
++@keyframes station-alert { 0%, 100% { background-color: #f8d3da; } 50% { background-color: #e8798c; } }
 diff --git a/argos-ui/src/vite-env.d.ts b/argos-ui/src/vite-env.d.ts
 index 73d2b55..f3b517c 100644
 --- a/argos-ui/src/vite-env.d.ts
