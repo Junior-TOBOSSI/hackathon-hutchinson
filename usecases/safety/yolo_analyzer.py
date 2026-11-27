@@ -109,6 +109,14 @@ def touches(a: tuple[float, ...], b: tuple[float, ...], margin: float) -> bool:
     return a[0] - dx < b[2] and b[0] < a[2] + dx and a[1] - dy < b[3] and b[1] < a[3] + dy
 
 
+def overlap(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+    """Share of box a covered by box b (0 to 1)."""
+    w = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    h = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    area = (a[2] - a[0]) * (a[3] - a[1])
+    return w * h / area if area > 0 else 0.0
+
+
 def risk(conf: float) -> float:
     """Evidence confidence -> score: 0.4 (weak, a_verifier) to 1.0 (certain, anomalie)."""
     return min(1.0, 0.4 + 0.6 * conf)
@@ -131,6 +139,18 @@ def assess_person(person: Det, parts: list[Det], phones: list[Det], p: dict) -> 
         by_name.setdefault(d.name, []).append(d)
     best = {name: max(d.conf for d in dets) for name, dets in by_name.items()}
     out = PersonAssessment(box=person.box)
+    # A "hands" box on a "gloves" box is the same gloved hand, seen twice by the model:
+    # only a hand touching no glove is a BARE hand.
+    glove_boxes = [d.box for d in parts if d.name == "gloves"]
+    bare = [
+        d
+        for d in by_name.get("hands", [])
+        if not any(overlap(d.box, g) >= 0.3 for g in glove_boxes)
+    ]
+    if bare:
+        best["hands"] = max(d.conf for d in bare)
+    else:
+        best.pop("hands", None)
 
     def decide(item: str, worn: str, evidence: str) -> None:
         if evidence in best and item == "gloves":  # one bare hand is enough to break the rule
