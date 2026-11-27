@@ -58,14 +58,14 @@ def synthetic_frame(index: int, seed: int = 0, size: tuple[int, int] = (480, 640
     cv2.putText(img, f"SYNTHETIC #{index}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,) * 3, 1)
     return img
 
-
+    #Dessine de fausses images avec OpenCV
 def synthetic_source(seed: int = 0) -> Iterator[np.ndarray]:
     index = 0
     while True:
         yield synthetic_frame(index, seed)
         index += 1
 
-
+    #	Lit toutes les images d'un dossier dans l'ordre alphabétique, en boucle.
 def folder_source(path: str) -> Iterator[np.ndarray]:
     files = sorted(p for p in Path(path).iterdir() if p.suffix.lower() in IMAGE_EXTENSIONS)
     if not files:
@@ -78,7 +78,7 @@ def folder_source(path: str) -> Iterator[np.ndarray]:
                 continue
             yield image
 
-
+    #Lit une vidéo image par image, en boucle.
 def video_source(path: str) -> Iterator[np.ndarray]:
     if not Path(path).is_file():
         raise FileNotFoundError(f"Video file not found: {path!r}")
@@ -94,7 +94,7 @@ def video_source(path: str) -> Iterator[np.ndarray]:
         finally:
             capture.release()
 
-
+    #Lit la webcam image par image, sans fin.
 def webcam_source(index: int = 0) -> Iterator[np.ndarray]:
     capture = cv2.VideoCapture(index)
     if not capture.isOpened():
@@ -108,7 +108,7 @@ def webcam_source(index: int = 0) -> Iterator[np.ndarray]:
     finally:
         capture.release()
 
-
+    # choisit la bonne source selon la valeur de SOURCE dans .env
 def open_source(settings: Settings) -> Iterator[np.ndarray]:
     if settings.source == "synthetic":
         return synthetic_source(settings.synthetic_seed)
