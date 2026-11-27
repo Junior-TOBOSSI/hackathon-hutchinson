@@ -91,6 +91,8 @@ class DatabricksSettings:
     snapshot_dir: str = field(default_factory=lambda: str(_mlops_home() / "dbx_cache"))
     inference_timeout_s: int = 30
     models: tuple[ManagedModel, ...] = field(default_factory=lambda: tuple(DEFAULT_MODELS))
+    # Independent families live below the existing UC Volume, apart from legacy versions.
+    dataset_catalog_root: str | None = None
     # Jobs that may be triggered through the API besides the models' training jobs.
     extra_triggerable_jobs: tuple[str, ...] = ("argos-poc-drift-monitor",)
 
@@ -123,6 +125,7 @@ class DatabricksSettings:
             snapshot_dir=env.get("ARGOS_DBX_SNAPSHOT_DIR", str(_mlops_home() / "dbx_cache")),
             inference_timeout_s=int(env.get("ARGOS_DBX_INFERENCE_TIMEOUT", 30)),
             models=tuple(models),
+            dataset_catalog_root=env.get("ARGOS_DBX_DATASET_CATALOG_ROOT") or None,
             extra_triggerable_jobs=tuple(
                 j.strip()
                 for j in env.get("ARGOS_DBX_TRIGGERABLE_JOBS", "argos-poc-drift-monitor").split(",")

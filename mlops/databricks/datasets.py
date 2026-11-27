@@ -34,12 +34,14 @@ import contextvars
 import hashlib
 import io
 import json
+import logging
 import re
 import threading
 import uuid
 from collections import OrderedDict
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any, Literal
@@ -61,7 +63,7 @@ if TYPE_CHECKING:
 SPLITS = ("train", "validation", "test")
 EVALUATION_SPLITS = {"validation", "test"}
 VERSION_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,40}$")
-RESERVED = {"code", "runs", "_drafts", "_locks"}
+RESERVED = {"code", "runs", "_drafts", "_locks", "_families"}
 DRAFT_ID_RE = re.compile(r"^[0-9a-f]{12}$")
 FILE_RE = re.compile(r"^[A-Za-z0-9_.\-/]{1,200}$")
 
@@ -250,9 +252,14 @@ def build_manifest(
         "use_case": parent.get("use_case") or use_case,
         "annotation_format": fmt,
         "classes": classes,
-        "split_strategy": parent.get("split_strategy") or "random",
-        "split_note": "Splits inherited from the parent version; imported items: split chosen "
-        "explicitly by the AI Leader.",
+        "split_strategy": parent.get("split_strategy")
+        or ("random" if parent_version else "manual"),
+        "split_note": (
+            "Splits inherited from the parent version; imported items: split chosen explicitly "
+            "by the AI Leader."
+            if parent_version
+            else "Initial version: split chosen explicitly by the AI Leader for each image."
+        ),
         "synthetic": bool(parent.get("synthetic", False)),
         "counts": counts(items, classes),
         "changes": stats,
@@ -273,6 +280,7 @@ def manifest_bytes(manifest: dict) -> bytes:
 
 
 class UsedBy(BaseModel):
+    model_id: str | None = None
     model_version: str
     run_id: str | None = None
 
@@ -328,6 +336,34 @@ class DatasetIndex(BaseModel):
     versions: list[DatasetVersionSummary]
     incomplete: list[Incomplete]
     drafts: list[DraftSummary]
+
+
+class DatasetFamilySummary(BaseModel):
+    dataset_id: str
+    name: str
+    use_case: str
+    annotation_format: str
+    classes: list[str]
+    root: str
+    synthetic: bool
+    linked_models: list[str]
+    version_count: int
+    latest_version: str | None
+    latest_images: int | None
+    latest_splits: dict[str, int] | None
+    last_published_at: str | None
+    draft_count: int
+
+
+@dataclass(frozen=True)
+class DatasetScope:
+    id: str
+    dataset_root: str
+    dataset_name: str
+    argos_use_case: str
+    dataset_tables: tuple[str, ...] = ()
+    training_job: str | None = None
+    synthetic: bool = True
 
 
 class ItemPage(BaseModel):
@@ -395,6 +431,8 @@ class DatasetStore:
         self._draft_locks: dict[str, threading.Lock] = {}
         self._jobs: dict[str, PublishJob] = {}
         self._jobs_lock = threading.Lock()
+        self._family_records: dict[str, dict] = {}
+        self._family_lock = threading.Lock()
 
     # ------------------------------------------------------------------ Files API helpers
 
@@ -402,7 +440,228 @@ class DatasetStore:
     def w(self):
         return self.c.w
 
-    def _managed(self, model_id: str) -> ManagedModel:
+    @property
+    def catalog_root(self) -> str:
+        configured = self.c.settings.dataset_catalog_root
+        if configured:
+            return configured.rstrip("/")
+        legacy = next((m.dataset_root for m in self.c.settings.models if m.dataset_root), None)
+        if not legacy:
+            raise InvalidDatasetRequest("ARGOS_DBX_DATASET_CATALOG_ROOT is required")
+        return f"{legacy.rstrip('/')}/_families"
+
+    def _family(self, dataset_id: str) -> dict:
+        check_version_name(dataset_id)
+        with self._family_lock:
+            record = self._family_records.get(dataset_id)
+        if record is None:
+            raw = self._download(f"{self.catalog_root}/{dataset_id}/family.json")
+            record = json.loads(raw)
+            if record.get("dataset_id") != dataset_id:
+                raise DatabricksConnectorError("family metadata names another dataset")
+            with self._family_lock:
+                self._family_records[dataset_id] = record
+        return record
+
+    def _legacy(self) -> dict[str, list[ManagedModel]]:
+        families: dict[str, list[ManagedModel]] = {}
+        root_ids: dict[str, str] = {}
+        for model in self.c.settings.models:
+            root = model.dataset_root
+            if not root or root.rstrip("/").startswith(self.catalog_root + "/"):
+                continue
+            dataset_id = root_ids.setdefault(root, model.dataset_name or model.id)
+            families.setdefault(dataset_id, []).append(model)
+        return families
+
+    def create_family(
+        self,
+        dataset_id: str,
+        name: str,
+        use_case: str,
+        classes: list[str],
+        synthetic: bool,
+        description: str | None = None,
+    ) -> dict:
+        """Register a family in the existing Volume without creating a model or a version."""
+        check_version_name(dataset_id)
+        name = name.strip()
+        if not name or len(name) > 100:
+            raise InvalidDatasetRequest("dataset name must contain 1 to 100 characters")
+        if use_case not in ("quality", "workstation", "safety"):
+            raise InvalidDatasetRequest("use_case must be quality, workstation or safety")
+        if not classes or len(classes) > 50 or len(classes) != len(set(classes)):
+            raise InvalidDatasetRequest("classes must be unique and contain 1 to 50 labels")
+        if any(not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", label) for label in classes):
+            raise InvalidDatasetRequest("class labels must be simple path-safe names")
+        if dataset_id in self._legacy():
+            raise ConflictError("dataset id already belongs to a configured legacy family")
+        root = f"{self.catalog_root}/{dataset_id}"
+        if self._exists(f"{root}/family.json") or self._list(root):
+            raise ConflictError("dataset family folder already contains data")
+        record = {
+            "dataset_id": dataset_id,
+            "name": name,
+            "use_case": use_case,
+            "annotation_format": "classification",
+            "classes": classes,
+            "synthetic": synthetic,
+            "description": description,
+            "created_at": now(),
+            "version_count": 0,
+            "latest_version": None,
+            "latest_images": None,
+            "latest_splits": None,
+            "last_published_at": None,
+        }
+        self.c._call(lambda: self.w.files.create_directory(root), root)
+        self._upload(f"{root}/family.json", manifest_bytes(record))
+        with self._family_lock:
+            self._family_records[dataset_id] = record
+        self.c.reads.invalidate("dataset_catalog")
+        return record
+
+    def family_index(self, dataset_id: str) -> DatasetIndex:
+        return self.index(self.scope_id(dataset_id))
+
+    def _invalidate(self, model_id: str) -> None:
+        self.c.reads.invalidate(f"datasets:{model_id}")
+        self.c.reads.invalidate("dataset_catalog")
+
+    def catalog(self) -> list[DatasetFamilySummary]:
+        return self.c._cached("dataset_catalog", self._catalog)
+
+    def _catalog(self) -> list[DatasetFamilySummary]:
+        legacy = self._legacy()
+        ids = list(legacy)
+        for entry in self._list(self.catalog_root):
+            dataset_id = PurePosixPath(entry.path.rstrip("/")).name
+            if entry.is_directory and VERSION_RE.match(dataset_id):
+                if dataset_id in legacy:
+                    raise ConflictError(f"dataset id {dataset_id} conflicts with a legacy family")
+                ids.append(dataset_id)
+        # Bounded parallel reads keep tens of independent families within the existing
+        # request budget. The request context (fresh/cache) must reach each worker.
+        with ThreadPoolExecutor(max_workers=min(4, max(len(ids), 1))) as pool:
+            jobs = [
+                pool.submit(
+                    contextvars.copy_context().run,
+                    self._catalog_one,
+                    dataset_id,
+                    legacy.get(dataset_id, []),
+                )
+                for dataset_id in ids
+            ]
+            out = [job.result() for job in jobs]
+        return sorted(out, key=lambda item: item.name.casefold())
+
+    def _catalog_one(self, dataset_id: str, models: list[ManagedModel]) -> DatasetFamilySummary:
+        record = None if models else self._family(dataset_id)
+        root = models[0].dataset_root if models else f"{self.catalog_root}/{dataset_id}"
+        linked = [m.id for m in self.c.settings.models if m.dataset_root == root]
+        # New families keep a small catalogue projection. A missing/stale projection
+        # falls back to the immutable manifests, which remain the source of truth.
+        entries = self._list(root) if record else []
+        folders = [
+            e
+            for e in entries
+            if e.is_directory and VERSION_RE.match(PurePosixPath(e.path.rstrip("/")).name)
+        ]
+        summary_ok = record is not None and record.get("version_count") == len(folders)
+        index = None if summary_ok else self.family_index(dataset_id)
+        latest = index.versions[-1] if index and index.versions else None
+        drafts = self._drafts(self._managed(f"family:{dataset_id}")) if summary_ok else None
+        return DatasetFamilySummary(
+            dataset_id=dataset_id,
+            name=record["name"] if record else models[0].dataset_name or dataset_id,
+            use_case=record["use_case"] if record else models[0].argos_use_case,
+            annotation_format=latest.annotation_format
+            if latest
+            else record["annotation_format"]
+            if record
+            else "unknown",
+            classes=latest.classes if latest else record["classes"] if record else [],
+            root=root,
+            synthetic=latest.synthetic
+            if latest
+            else record["synthetic"]
+            if record
+            else models[0].synthetic,
+            linked_models=linked,
+            version_count=record["version_count"] if summary_ok else len(index.versions),
+            latest_version=record["latest_version"]
+            if summary_ok
+            else latest.version
+            if latest
+            else None,
+            latest_images=record["latest_images"]
+            if summary_ok
+            else latest.ref.num_samples
+            if latest
+            else None,
+            latest_splits=record["latest_splits"]
+            if summary_ok
+            else latest.ref.splits
+            if latest
+            else None,
+            last_published_at=record["last_published_at"]
+            if summary_ok
+            else latest.created_at
+            if latest
+            else None,
+            draft_count=sum(
+                d.status != "published" for d in (drafts if summary_ok else index.drafts)
+            ),
+        )
+
+    def _refresh_family_summary(self, model_id: str) -> None:
+        """Best-effort catalogue projection after a committed independent version."""
+        if not model_id.startswith("family:"):
+            return
+        dataset_id = model_id.removeprefix("family:")
+        try:
+            self._invalidate(model_id)
+            index = self.index(model_id)
+            latest = index.versions[-1]
+            record = {
+                **self._family(dataset_id),
+                "version_count": len(index.versions),
+                "latest_version": latest.version,
+                "latest_images": latest.ref.num_samples,
+                "latest_splits": latest.ref.splits,
+                "last_published_at": latest.created_at,
+            }
+            self._upload(
+                f"{self.catalog_root}/{dataset_id}/family.json",
+                manifest_bytes(record),
+                overwrite=True,
+            )
+            with self._family_lock:
+                self._family_records[dataset_id] = record
+        except Exception:  # noqa: BLE001 - published manifest stays valid; catalogue falls back
+            logging.getLogger(__name__).warning(
+                "dataset family catalogue projection could not be updated", exc_info=True
+            )
+
+    def scope_id(self, dataset_id: str) -> str:
+        check_version_name(dataset_id)
+        legacy = self._legacy().get(dataset_id)
+        if legacy:
+            return legacy[0].id
+        self._family(dataset_id)
+        return f"family:{dataset_id}"
+
+    def _managed(self, model_id: str) -> ManagedModel | DatasetScope:
+        if model_id.startswith("family:"):
+            dataset_id = model_id.removeprefix("family:")
+            record = self._family(dataset_id)
+            return DatasetScope(
+                id=model_id,
+                dataset_root=f"{self.catalog_root}/{dataset_id}",
+                dataset_name=record["name"],
+                argos_use_case=record["use_case"],
+                synthetic=record["synthetic"],
+            )
         managed = self.c.managed(model_id)
         if not managed.dataset_root:
             raise ResourceNotFoundError(f"no dataset configured for {model_id}")
@@ -454,15 +713,19 @@ class DatasetStore:
     def _used_by(self, model_id: str) -> dict[str, list[UsedBy]]:
         """manifest sha256 -> model versions trained on it (MLflow run tags, cached)."""
         out: dict[str, list[UsedBy]] = {}
-        for vs in self.c.model_status(model_id).versions:
-            run_id = vs.version.run_id
-            if not run_id:
+        root = self._managed(model_id).dataset_root
+        for model in self.c.settings.models:
+            if model.dataset_root != root:
                 continue
-            tag = self.c.get_run(run_id).tags.get("argos.manifest_sha256")
-            if tag:
-                out.setdefault(tag, []).append(
-                    UsedBy(model_version=vs.version.version, run_id=run_id)
-                )
+            for vs in self.c.model_status(model.id).versions:
+                run_id = vs.version.run_id
+                if not run_id:
+                    continue
+                tag = self.c.get_run(run_id).tags.get("argos.manifest_sha256")
+                if tag:
+                    out.setdefault(tag, []).append(
+                        UsedBy(model_id=model.id, model_version=vs.version.version, run_id=run_id)
+                    )
         return out
 
     def _summary(
@@ -760,15 +1023,31 @@ class DatasetStore:
     def get_draft(self, model_id: str, draft_id: str) -> dict:
         return self._read_draft(self._managed(model_id), draft_id)
 
-    def create_draft(self, model_id: str, parent_version: str) -> dict:
+    def _parent(self, model_id: str, parent_version: str) -> tuple[str | None, dict]:
+        if parent_version:
+            return self.manifest(model_id, parent_version)
+        if not model_id.startswith("family:") or self.index(model_id).versions:
+            raise InvalidDatasetRequest("a published parent version is required")
+        record = self._family(model_id.removeprefix("family:"))
+        return None, {
+            "dataset_version": None,
+            "items": [],
+            "classes": record["classes"],
+            "synthetic": record["synthetic"],
+            "annotation_format": record["annotation_format"],
+            "use_case": record["use_case"],
+            "description": record.get("description"),
+        }
+
+    def create_draft(self, model_id: str, parent_version: str | None) -> dict:
         managed = self._managed(model_id)
-        parent_sha, _ = self.manifest(model_id, parent_version)
+        parent_sha, _ = self._parent(model_id, parent_version or "")
         draft = {
             "schema_version": 1,
             "draft_id": uuid.uuid4().hex[:12],
             "model_id": model_id,
-            "parent_version": parent_version,
-            "parent_manifest_sha256": parent_sha,
+            "parent_version": parent_version or "",
+            "parent_manifest_sha256": parent_sha or "",
             "status": "open",
             "created_at": now(),
             "created_by": "ai_leader",
@@ -776,7 +1055,7 @@ class DatasetStore:
             "imports": [],
         }
         self._write_draft(managed, draft, create=True)
-        self.c.reads.invalidate(f"datasets:{model_id}")
+        self._invalidate(model_id)
         return draft
 
     def _open_draft(self, managed: ManagedModel, draft_id: str) -> dict:
@@ -789,7 +1068,7 @@ class DatasetStore:
         managed = self._managed(model_id)
         with self._lock_for(draft_id):
             draft = self._open_draft(managed, draft_id)
-            _, parent = self.manifest(model_id, draft["parent_version"])
+            _, parent = self._parent(model_id, draft["parent_version"])
             by_file = {i["file"]: i for i in parent["items"]}
             fmt = annotation_format(parent)
             classes = set(parent.get("classes") or [])
@@ -823,7 +1102,7 @@ class DatasetStore:
                         "action must be validate, relabel, exclude or reset"
                     )
             self._write_draft(managed, draft)
-        self.c.reads.invalidate(f"datasets:{model_id}")
+        self._invalidate(model_id)
         return draft
 
     def import_files(
@@ -847,7 +1126,7 @@ class DatasetStore:
         results: list[ImportResult] = []
         with self._lock_for(draft_id):
             draft = self._open_draft(managed, draft_id)
-            _, parent = self.manifest(model_id, draft["parent_version"])
+            _, parent = self._parent(model_id, draft["parent_version"])
             if annotation_format(parent) != "classification":
                 raise InvalidDatasetRequest("import is only supported for classification datasets")
             if label not in set(parent.get("classes") or []):
@@ -931,7 +1210,7 @@ class DatasetStore:
                 results.append(ImportResult(name=name, accepted=True, sha256=digest))
             if any(r.accepted for r in results):
                 self._write_draft(managed, draft)
-        self.c.reads.invalidate(f"datasets:{model_id}")
+        self._invalidate(model_id)
         return results
 
     def remove_import(self, model_id: str, draft_id: str, digest: str) -> dict:
@@ -940,7 +1219,7 @@ class DatasetStore:
             draft = self._open_draft(managed, draft_id)
             draft["imports"] = [i for i in draft["imports"] if i["sha256"] != digest]
             self._write_draft(managed, draft)
-        self.c.reads.invalidate(f"datasets:{model_id}")
+        self._invalidate(model_id)
         return draft
 
     def draft_image(self, model_id: str, draft_id: str, digest: str) -> tuple[bytes, str]:
@@ -975,7 +1254,7 @@ class DatasetStore:
                     self.c._call(lambda f=folder: self.w.files.delete_directory(f), "draft folder")
                 except (ResourceNotFoundError, DatabricksConnectorError):
                     pass  # absent or not empty: never forced
-        self.c.reads.invalidate(f"datasets:{model_id}")
+        self._invalidate(model_id)
 
     # ------------------------------------------------------------------ publication
 
@@ -1050,15 +1329,15 @@ class DatasetStore:
             locked = True
             with self._lock_for(job.draft_id):
                 draft = self._read_draft(managed, job.draft_id)
-                parent_sha, parent = self.manifest(job.model_id, draft["parent_version"])
-                if parent_sha != draft["parent_manifest_sha256"]:
+                parent_sha, parent = self._parent(job.model_id, draft["parent_version"])
+                if (parent_sha or "") != draft["parent_manifest_sha256"]:
                     raise ConflictError("parent manifest changed since the draft was created")
                 if draft.get("status") != "publishing":
                     draft.update(
                         status="publishing", target_version=version, publish_started_at=now()
                     )
                     self._write_draft(managed, draft)
-            self.c.reads.invalidate(f"datasets:{job.model_id}")
+            self._invalidate(job.model_id)
             manifest, plan = build_manifest(
                 parent,
                 parent_sha,
@@ -1093,6 +1372,7 @@ class DatasetStore:
                     published_at=now(),
                 )
                 self._write_draft(managed, draft)
+            self._refresh_family_summary(job.model_id)
             self._set(
                 job,
                 state="succeeded",
@@ -1111,7 +1391,7 @@ class DatasetStore:
                     self.c._call(lambda: self.w.files.delete(lock_path), "lock")
                 except DatabricksConnectorError:
                     pass
-            self.c.reads.invalidate(f"datasets:{job.model_id}")
+            self._invalidate(job.model_id)
 
     def _acquire_lock(self, path: str, token: str, draft_id: str) -> None:
         body = manifest_bytes({"token": token, "draft_id": draft_id, "acquired_at": now()})

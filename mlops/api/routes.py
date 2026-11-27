@@ -36,6 +36,7 @@ from mlops.databricks.connector import (
     VersionStatus,
 )
 from mlops.databricks.datasets import (
+    DatasetFamilySummary,
     DatasetIndex,
     DatasetVersionSummary,
     ImportResult,
@@ -67,6 +68,19 @@ class RetrainModeBody(BaseModel):
 
 class DraftBody(BaseModel):
     parent_version: str
+
+
+class FamilyBody(BaseModel):
+    dataset_id: str
+    name: str
+    use_case: str
+    classes: list[str]
+    synthetic: bool = True
+    description: str | None = None
+
+
+class FamilyDraftBody(BaseModel):
+    parent_version: str | None = None
 
 
 class ItemChange(BaseModel):
@@ -301,6 +315,148 @@ def create_mlops_router(
     @translate
     def endpoint(name: str, c: Connector, response: Response, fresh: Fresh = False) -> EndpointInfo:
         return served(c, response, fresh, lambda: c.get_endpoint(name))
+
+    # ---------------------------------------------------- independent dataset families
+    # These aliases delegate to the SAME DatasetStore and connector as DBX-04. Legacy
+    # model-scoped routes below remain available for Training Factory and older clients.
+
+    @router.get("/mlops/datasets")
+    @translate
+    def dataset_catalog(
+        c: Connector, response: Response, fresh: Fresh = False
+    ) -> list[DatasetFamilySummary]:
+        return served(c, response, fresh, lambda: dataset_store(c).catalog())
+
+    @router.post("/mlops/datasets", status_code=201)
+    @translate
+    def create_dataset_family(body: FamilyBody, c: Connector) -> dict[str, Any]:
+        return dataset_store(c).create_family(
+            body.dataset_id,
+            body.name,
+            body.use_case,
+            body.classes,
+            body.synthetic,
+            body.description,
+        )
+
+    @router.get("/mlops/datasets/{dataset_id}")
+    @translate
+    def dataset_family(
+        dataset_id: str, c: Connector, response: Response, fresh: Fresh = False
+    ) -> DatasetIndex:
+        return served(c, response, fresh, lambda: dataset_store(c).family_index(dataset_id))
+
+    @router.get("/mlops/datasets/{dataset_id}/versions")
+    @translate
+    def family_versions(
+        dataset_id: str, c: Connector, response: Response, fresh: Fresh = False
+    ) -> list[DatasetVersionSummary]:
+        return served(
+            c, response, fresh, lambda: dataset_store(c).family_index(dataset_id).versions
+        )
+
+    @router.get("/mlops/datasets/{dataset_id}/versions/{version}")
+    @translate
+    def family_version(
+        dataset_id: str, version: str, c: Connector, response: Response, fresh: Fresh = False
+    ) -> DatasetVersionSummary:
+        store = dataset_store(c)
+        return served(
+            c, response, fresh, lambda: store.version(store.scope_id(dataset_id), version)
+        )
+
+    @router.get("/mlops/datasets/{dataset_id}/versions/{version}/items")
+    @translate
+    def family_items(
+        dataset_id: str,
+        version: str,
+        c: Connector,
+        split: str | None = None,
+        label: str | None = None,
+        review: str | None = None,
+        q: str | None = Query(None, max_length=100),
+        offset: int = Query(0, ge=0),
+        limit: int = Query(24, ge=1, le=48),
+    ) -> ItemPage:
+        store = dataset_store(c)
+        return store.items(
+            store.scope_id(dataset_id), version, split, label, review, q, offset, limit
+        )
+
+    @router.get("/mlops/datasets/{dataset_id}/versions/{version}/images/{file:path}")
+    @translate
+    def family_image(dataset_id: str, version: str, file: str, c: Connector) -> Response:
+        store = dataset_store(c)
+        data, media = store.image(store.scope_id(dataset_id), version, file)
+        return Response(data, media_type=media, headers=IMMUTABLE_IMAGE)
+
+    @router.post("/mlops/datasets/{dataset_id}/drafts", status_code=201)
+    @translate
+    def create_family_draft(dataset_id: str, body: FamilyDraftBody, c: Connector) -> dict[str, Any]:
+        store = dataset_store(c)
+        return store.create_draft(store.scope_id(dataset_id), body.parent_version)
+
+    @router.get("/mlops/datasets/{dataset_id}/drafts/{draft_id}")
+    @translate
+    def family_draft(dataset_id: str, draft_id: str, c: Connector) -> dict[str, Any]:
+        store = dataset_store(c)
+        return store.get_draft(store.scope_id(dataset_id), draft_id)
+
+    @router.delete("/mlops/datasets/{dataset_id}/drafts/{draft_id}", status_code=204)
+    @translate
+    def delete_family_draft(dataset_id: str, draft_id: str, c: Connector) -> None:
+        store = dataset_store(c)
+        store.delete_draft(store.scope_id(dataset_id), draft_id)
+
+    @router.patch("/mlops/datasets/{dataset_id}/drafts/{draft_id}/items")
+    @translate
+    def change_family_items(
+        dataset_id: str, draft_id: str, body: ItemChanges, c: Connector
+    ) -> dict[str, Any]:
+        store = dataset_store(c)
+        return store.update_items(
+            store.scope_id(dataset_id), draft_id, [change.model_dump() for change in body.changes]
+        )
+
+    @router.post("/mlops/datasets/{dataset_id}/drafts/{draft_id}/import")
+    @translate
+    def import_family_items(
+        dataset_id: str,
+        draft_id: str,
+        c: Connector,
+        files: Annotated[list[UploadFile], File()],
+        label: Annotated[str, Form()],
+        split: Annotated[str, Form()],
+        synthetic_attested: Annotated[bool, Form()] = False,
+    ) -> list[ImportResult]:
+        store = dataset_store(c)
+        stream = ((f.filename or "image", f.file) for f in files)
+        return store.import_files(
+            store.scope_id(dataset_id), draft_id, stream, label, split, synthetic_attested
+        )
+
+    @router.delete("/mlops/datasets/{dataset_id}/drafts/{draft_id}/imports/{sha}")
+    @translate
+    def remove_family_import(
+        dataset_id: str, draft_id: str, sha: str, c: Connector
+    ) -> dict[str, Any]:
+        store = dataset_store(c)
+        return store.remove_import(store.scope_id(dataset_id), draft_id, sha)
+
+    @router.get("/mlops/datasets/{dataset_id}/drafts/{draft_id}/images/{sha}")
+    @translate
+    def family_draft_image(dataset_id: str, draft_id: str, sha: str, c: Connector) -> Response:
+        store = dataset_store(c)
+        data, media = store.draft_image(store.scope_id(dataset_id), draft_id, sha)
+        return Response(data, media_type=media, headers=IMMUTABLE_IMAGE)
+
+    @router.post("/mlops/datasets/{dataset_id}/drafts/{draft_id}/publish", status_code=202)
+    @translate
+    def publish_family_draft(
+        dataset_id: str, draft_id: str, body: PublishBody, c: Connector
+    ) -> PublishJob:
+        store = dataset_store(c)
+        return store.start_publish(store.scope_id(dataset_id), draft_id, body.version).model_copy()
 
     # ------------------------------------------------------------------ datasets (DBX-04)
     # Files API + Unity Catalog metadata only (no SQL warehouse). Published versions are

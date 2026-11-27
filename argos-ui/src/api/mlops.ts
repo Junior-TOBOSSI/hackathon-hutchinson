@@ -166,6 +166,35 @@ export const mlops = {
   setRetrainMode: (mode: 'MANUEL' | 'AUTO') => call<void>('/models/retrain-mode', { method: 'PUT', body: JSON.stringify({ mode }) }),
 
   // ---------------------------------------------------------------- datasets (DBX-04)
+  datasetCatalog: (o?: ReadOpts) => call<DatasetFamilySummary[]>('/mlops/datasets', undefined, o),
+  datasetFamily: (id: string, o?: ReadOpts) => call<DatasetIndex>(`/mlops/datasets/${q(id)}`, undefined, o),
+  createDatasetFamily: (body: DatasetFamilyCreate) =>
+    call<DatasetFamilyCreate & { created_at: string }>('/mlops/datasets', { method: 'POST', body: JSON.stringify(body) }),
+  familyItems: (id: string, version: string, f: ItemFilters, o?: ReadOpts) => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) if (v !== undefined && v !== null && v !== '') p.set(k, String(v));
+    return call<ItemPage>(`/mlops/datasets/${q(id)}/versions/${q(version)}/items?${p}`, undefined, o);
+  },
+  createFamilyDraft: (id: string, parentVersion: string | null) =>
+    call<Draft>(`/mlops/datasets/${q(id)}/drafts`, { method: 'POST', body: JSON.stringify({ parent_version: parentVersion }) }),
+  familyDraft: (id: string, draftId: string, o?: ReadOpts) =>
+    call<Draft>(`/mlops/datasets/${q(id)}/drafts/${q(draftId)}`, undefined, o),
+  deleteFamilyDraft: (id: string, draftId: string) =>
+    call<void>(`/mlops/datasets/${q(id)}/drafts/${q(draftId)}`, { method: 'DELETE' }),
+  updateFamilyDraftItems: (id: string, draftId: string, changes: DraftChange[]) =>
+    call<Draft>(`/mlops/datasets/${q(id)}/drafts/${q(draftId)}/items`, { method: 'PATCH', body: JSON.stringify({ changes }) }),
+  importFamilyFiles: (id: string, draftId: string, files: File[], label: string, split: string, attested: boolean) => {
+    const form = new FormData();
+    files.forEach((f) => form.append('files', f, f.name));
+    form.append('label', label);
+    form.append('split', split);
+    form.append('synthetic_attested', String(attested));
+    return call<ImportResult[]>(`/mlops/datasets/${q(id)}/drafts/${q(draftId)}/import`, { method: 'POST', body: form, headers: {} }, { timeoutMs: 120_000 });
+  },
+  removeFamilyImport: (id: string, draftId: string, sha: string) =>
+    call<Draft>(`/mlops/datasets/${q(id)}/drafts/${q(draftId)}/imports/${q(sha)}`, { method: 'DELETE' }),
+  publishFamilyDraft: (id: string, draftId: string, version: string) =>
+    call<PublishJob>(`/mlops/datasets/${q(id)}/drafts/${q(draftId)}/publish`, { method: 'POST', body: JSON.stringify({ version }) }),
   datasets: (id: string, o?: ReadOpts) => call<DatasetIndex>(`/mlops/models/${q(id)}/datasets`, undefined, o),
   datasetItems: (id: string, version: string, f: ItemFilters, o?: ReadOpts) => {
     const p = new URLSearchParams();
@@ -201,8 +230,23 @@ export const datasetImageUrl = (id: string, version: string, file: string) =>
   `${BASE}/mlops/models/${q(id)}/datasets/${q(version)}/images/${file.split('/').map(q).join('/')}`;
 export const draftImageUrl = (id: string, draftId: string, sha: string) =>
   `${BASE}/mlops/models/${q(id)}/dataset-drafts/${q(draftId)}/images/${q(sha)}`;
+export const familyImageUrl = (id: string, version: string, file: string) =>
+  `${BASE}/mlops/datasets/${q(id)}/versions/${q(version)}/images/${file.split('/').map(q).join('/')}`;
+export const familyDraftImageUrl = (id: string, draftId: string, sha: string) =>
+  `${BASE}/mlops/datasets/${q(id)}/drafts/${q(draftId)}/images/${q(sha)}`;
 
 /* ------------------------------------------------------------------ datasets (types) */
+
+export interface DatasetFamilySummary {
+  dataset_id: string; name: string; use_case: string; annotation_format: string; classes: string[];
+  root: string; synthetic: boolean; linked_models: string[]; version_count: number;
+  latest_version: string | null; latest_images: number | null; latest_splits: Record<string, number> | null;
+  last_published_at: string | null; draft_count: number;
+}
+export interface DatasetFamilyCreate {
+  dataset_id: string; name: string; use_case: 'quality' | 'workstation' | 'safety';
+  classes: string[]; synthetic: boolean; description?: string | null;
+}
 
 export interface DatasetRef {
   name: string; version: string; uri: string; manifest_sha256: string | null; num_samples: number;
@@ -215,7 +259,7 @@ export interface DatasetVersion {
   split_strategy: string; split_fingerprints: Record<string, string>; synthetic: boolean; description: string | null;
   provenance: Record<string, unknown>; changes: Record<string, number> | null; evaluation_reference_changed: boolean | null;
   evaluation_changes: { file: string; split: string; change: string }[]; excluded_items: { file: string; sha256: string; label: string; split: string }[];
-  used_by: { model_version: string; run_id: string | null }[]; locked: boolean;
+  used_by: { model_id?: string | null; model_version: string; run_id: string | null }[]; locked: boolean;
 }
 export interface DraftSummary {
   draft_id: string; parent_version: string; status: string; created_at: string; updated_at: string;

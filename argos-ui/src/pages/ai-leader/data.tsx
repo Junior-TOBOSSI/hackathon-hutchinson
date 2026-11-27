@@ -132,6 +132,18 @@ export function useFreshness() {
 
 /* ------------------------------------------------------------------ datasets (DBX-04) */
 
+export const useDatasetCatalog = () => useResource('dataset-catalog', read(mlops.datasetCatalog));
+export const useDatasetFamily = (datasetId: string | null) =>
+  useResource(datasetId ? `family:${datasetId}` : null, read((o) => mlops.datasetFamily(datasetId as string, o)));
+export const useFamilyItems = (datasetId: string | null, version: string | null, f: ItemFilters) =>
+  useResource(
+    datasetId && version ? `family-items:${datasetId}:${version}:${JSON.stringify(f)}` : null,
+    read((o) => mlops.familyItems(datasetId as string, version as string, f, o)),
+  );
+export const useFamilyDraft = (datasetId: string | null, draftId: string | null) =>
+  useResource(datasetId && draftId ? `family-draft:${datasetId}:${draftId}` : null,
+    read((o) => mlops.familyDraft(datasetId as string, draftId as string, o)));
+
 export const useDatasets = (modelId: string | null) =>
   useResource(modelId ? `datasets:${modelId}` : null, read((o) => mlops.datasets(modelId as string, o)));
 export const useDatasetItems = (modelId: string | null, version: string | null, f: ItemFilters) =>

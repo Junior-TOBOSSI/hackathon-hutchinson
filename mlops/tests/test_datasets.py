@@ -53,6 +53,9 @@ class FakeFiles:
         self.data[path] = stream.read()
         self.writes.append(path)
 
+    def create_directory(self, path):
+        pass  # directories are implied by file paths in this fake
+
     def download(self, path):
         if path not in self.data:
             raise NotFound(f"{path} does not exist")
@@ -482,6 +485,87 @@ def test_api_end_to_end(api, env):
     assert state["state"] == "succeeded" and state["done"] == state["total"]
     versions = api.get("/api/mlops/models/q/datasets").json()["versions"]
     assert [v["version"] for v in versions] == ["synthetic-v1", "synthetic-v2"]  # cache invalidated
+
+
+def test_independent_family_first_and_second_versions(api, env):
+    legacy_before = snapshot_v1(env.files)
+    family = api.post(
+        "/api/mlops/datasets",
+        json={
+            "dataset_id": "presse-5s",
+            "name": "Presse 5S",
+            "use_case": "workstation",
+            "classes": ["good", "disorder", "zone_object", "zone_person"],
+            "synthetic": True,
+        },
+    )
+    assert family.status_code == 201
+    catalog = api.get("/api/mlops/datasets").json()
+    assert [item["dataset_id"] for item in catalog] == ["presse-5s", "quality-synthetic"]
+    assert catalog[0]["linked_models"] == [] and catalog[0]["version_count"] == 0
+    assert catalog[0]["latest_images"] is None
+    assert api.post("/api/mlops/datasets", json=family.json()).status_code != 201
+
+    draft = api.post("/api/mlops/datasets/presse-5s/drafts", json={}).json()
+    assert draft["parent_version"] == ""
+    base = f"/api/mlops/datasets/presse-5s/drafts/{draft['draft_id']}"
+    for label, seed, split in (("good", 200, "train"), ("disorder", 201, "validation")):
+        imported = api.post(
+            f"{base}/import",
+            files=[("files", (f"{label}.png", png(seed), "image/png"))],
+            data={"label": label, "split": split, "synthetic_attested": "true"},
+        )
+        assert imported.status_code == 200 and imported.json()[0]["accepted"]
+    job = env.store.start_publish(
+        "family:presse-5s", draft["draft_id"], "presse-v1", background=False
+    )
+    assert job.state == "succeeded", job.error
+    detail = api.get("/api/mlops/datasets/presse-5s").json()
+    assert [version["version"] for version in detail["versions"]] == ["presse-v1"]
+    assert detail["versions"][0]["parent_version"] is None
+    assert detail["versions"][0]["ref"]["num_samples"] == 2
+    page = api.get("/api/mlops/datasets/presse-5s/versions/presse-v1/items?limit=1").json()
+    assert page["total"] == 2 and len(page["items"]) == 1
+    file = page["items"][0]["file"]
+    assert (
+        api.get(f"/api/mlops/datasets/presse-5s/versions/presse-v1/images/{file}").status_code
+        == 200
+    )
+
+    second = api.post(
+        "/api/mlops/datasets/presse-5s/drafts", json={"parent_version": "presse-v1"}
+    ).json()
+    assert (
+        api.patch(
+            f"/api/mlops/datasets/presse-5s/drafts/{second['draft_id']}/items",
+            json={"changes": [{"file": file, "action": "validate"}]},
+        ).status_code
+        == 200
+    )
+    job2 = env.store.start_publish(
+        "family:presse-5s", second["draft_id"], "presse-v2", background=False
+    )
+    assert job2.state == "succeeded", job2.error
+    catalog = api.get("/api/mlops/datasets").json()
+    assert catalog[0]["version_count"] == 2 and catalog[0]["latest_images"] == 2
+    assert snapshot_v1(env.files) == legacy_before
+
+    # A catalogue refresh reads the small family projection, not every published
+    # image manifest. The historical model-scoped family may still use its index.
+    projection = json.loads(env.files.data[f"{ROOT}/_families/presse-5s/family.json"])
+    assert projection["latest_version"] == "presse-v2"
+    env.store._manifests.clear()
+    env.c.reads.invalidate("dataset_catalog")
+    downloads = []
+    original_download = env.files.download
+
+    def tracked_download(path):
+        downloads.append(path)
+        return original_download(path)
+
+    env.files.download = tracked_download
+    assert env.store.catalog()[0].latest_version == "presse-v2"
+    assert not any("presse-v" in path and path.endswith("/manifest.json") for path in downloads)
 
 
 # ------------------------------------------------------------------ Delta option B

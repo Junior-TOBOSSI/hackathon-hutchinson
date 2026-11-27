@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { draftImageUrl, mlops, type DatasetIndex, type Draft, type ImportResult, type PublishJob } from '../../api/mlops';
+import { mlops, type DatasetFamilySummary, type DatasetIndex, type Draft, type ImportResult, type PublishJob } from '../../api/mlops';
 import { Badge, grid, KV, Loading, Panel, Technical, Unavailable } from './common';
 import DatasetExplorer, { isEvaluation, SPLIT_FR } from './DatasetExplorer';
-import { errText, useDraft, useStore } from './data';
+import { errText, useFamilyDraft, useStore } from './data';
 import { translate } from './messages';
 import { dateTime } from './metrics';
 
@@ -17,13 +17,14 @@ const PHASE_FR: Record<string, string> = {
 };
 const jobError = (e: string | null) => (e ? translate(e.replace(/^\w+: /, '')) : '');
 
-export default function DatasetDraft({ modelId, draftId, index, resumeVersion, onPublished, onClose }: {
-  modelId: string; draftId: string; index: DatasetIndex; resumeVersion?: string | null;
+export default function DatasetDraft({ modelId, draftId, index, family, resumeVersion, onPublished, onClose }: {
+  modelId: string; draftId: string; index: DatasetIndex; family: DatasetFamilySummary; resumeVersion?: string | null;
   onPublished: (version: string) => void; onClose: () => void;
 }) {
   const store = useStore();
-  const draft = useDraft(modelId, draftId);
+  const draft = useFamilyDraft(modelId, draftId);
   const [message, setMessage] = useState('');
+  const [showParent, setShowParent] = useState(false);
   const d = draft.data;
   const parent = index.versions.find((v) => v.version === d?.parent_version) ?? null;
 
@@ -36,12 +37,12 @@ export default function DatasetDraft({ modelId, draftId, index, resumeVersion, o
     ...changes.filter(([file]) => isEvaluation(file.split('/')[0])).map(([file, c]) => `${file} (${c.action})`),
     ...d.imports.filter((i) => isEvaluation(i.split)).map((i) => `${i.original_name} (import en ${SPLIT_FR[i.split]})`),
   ];
-  const refresh = () => store.invalidate(`draft:${modelId}:${draftId}`, `datasets:${modelId}`);
+  const refresh = () => store.invalidate(`family-draft:${modelId}:${draftId}`, `family:${modelId}`, 'dataset-catalog');
   const remove = async () => {
     if (!window.confirm('Supprimer ce brouillon ? Les versions publiées ne sont pas concernées.')) return;
     try {
-      await mlops.deleteDraft(modelId, draftId);
-      store.invalidate(`datasets:${modelId}`);
+      await mlops.deleteFamilyDraft(modelId, draftId);
+      store.invalidate(`family:${modelId}`, 'dataset-catalog');
       onClose();
     } catch (e) {
       setMessage(errText(e));
@@ -50,7 +51,7 @@ export default function DatasetDraft({ modelId, draftId, index, resumeVersion, o
 
   return (
     <>
-      <Panel title={`Brouillon à partir de ${d.parent_version}`}
+      <Panel title={d.parent_version ? `Brouillon à partir de ${d.parent_version}` : 'Brouillon de la première version'}
         sub={`Créé le ${dateTime(d.created_at)} · modifié le ${dateTime(d.updated_at)}`}
         right={<div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
           <Badge tone={d.status === 'open' ? 'blue' : d.status === 'published' ? 'green' : 'amber'}>{d.status === 'open' ? 'brouillon ouvert' : d.status === 'published' ? `publié : ${d.published_version}` : `publication en cours : ${d.target_version}`}</Badge>
@@ -63,32 +64,36 @@ export default function DatasetDraft({ modelId, draftId, index, resumeVersion, o
           <Fact label="Éléments exclus" value={count('exclude')} />
           <Fact label="Images importées" value={d.imports.length} />
         </div>
-        {evaluationTouched.length > 0
+        {!d.parent_version
+          ? <span className="muted" style={{ fontSize: 14 }}>Première version : les images importées reçoivent explicitement leur classe et leur split.</span>
+          : evaluationTouched.length > 0
           ? <Unavailable>Changement de la référence d'évaluation : {evaluationTouched.length} modification(s) touchent la validation ou le test ({evaluationTouched.slice(0, 3).join(', ')}{evaluationTouched.length > 3 ? '…' : ''}). Les évaluations de la nouvelle version ne seront pas comparables à celles de {d.parent_version} ; ce changement sera signalé dans le manifeste.</Unavailable>
           : <span className="muted" style={{ fontSize: 14 }}>Les jeux de validation et de test restent identiques à {d.parent_version} : les évaluations resteront comparables.</span>}
         {message && <Unavailable tone="red">{message}</Unavailable>}
         <Technical title="Identifiants du brouillon"><KV k="brouillon" v={d.draft_id} /><KV k="manifeste parent (SHA-256)" v={d.parent_manifest_sha256} /></Technical>
       </Panel>
 
-      {d.status === 'open' && parent && <ImportPanel modelId={modelId} draft={d} classes={parent.classes} onDone={refresh} />}
+      {d.status === 'open' && <ImportPanel modelId={modelId} draft={d} classes={parent?.classes ?? family.classes} onDone={refresh} />}
+      {parent && <div><button className="btn btn-ghost" onClick={() => setShowParent((value) => !value)}>
+        {showParent ? 'Masquer' : 'Annoter'} les images de la version parente
+      </button></div>}
+      {parent && showParent && <DatasetExplorer modelId={modelId} version={parent.version} classes={parent.classes} draft={d} />}
       {d.imports.length > 0 && (
         <Panel title="Images importées (en attente de publication)">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
             {d.imports.map((i) => (
               <div key={i.sha256} className="col" style={{ gap: 4, padding: 6, borderRadius: 12, border: '1px solid var(--line)' }}>
-                <img src={draftImageUrl(modelId, d.draft_id, i.sha256)} alt={i.original_name} loading="lazy" width={128} height={128} style={{ width: '100%', height: 'auto', aspectRatio: '1 / 1', objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--track)', borderRadius: 8 }} />
                 <span style={{ fontSize: 12, overflowWrap: 'anywhere' }}>{i.original_name}</span>
                 <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}><Badge tone={i.label === 'NOK' ? 'red' : 'green'}>{i.label}</Badge><Badge tone={isEvaluation(i.split) ? 'blue' : 'grey'}>{SPLIT_FR[i.split]}</Badge></div>
                 {d.status === 'open' && <button className="btn" style={{ background: 'none', color: 'var(--primary)', padding: 0, height: 'auto', fontSize: 13 }}
-                  onClick={() => mlops.removeImport(modelId, d.draft_id, i.sha256).then(refresh).catch((e) => setMessage(errText(e)))}>Retirer</button>}
+                  onClick={() => mlops.removeFamilyImport(modelId, d.draft_id, i.sha256).then(refresh).catch((e) => setMessage(errText(e)))}>Retirer</button>}
               </div>
             ))}
           </div>
         </Panel>
       )}
 
-      {d.status !== 'published' && <PublishPanel modelId={modelId} draft={d} index={index} resumeVersion={resumeVersion} onPublished={onPublished} />}
-      {parent && <DatasetExplorer modelId={modelId} version={parent.version} classes={parent.classes} draft={d} />}
+      {d.status !== 'published' && <PublishPanel modelId={modelId} draft={d} index={index} initialVersion={`${family.dataset_id.slice(0, 38)}-v1`} resumeVersion={resumeVersion} onPublished={onPublished} />}
     </>
   );
 }
@@ -110,7 +115,7 @@ function ImportPanel({ modelId, draft, classes, onDone }: { modelId: string; dra
     try {
       for (let i = 0; i < files.length; i += BATCH) {
         const batch = files.slice(i, i + BATCH);
-        all.push(...await mlops.importFiles(modelId, draft.draft_id, batch, label, split, attested));
+        all.push(...await mlops.importFamilyFiles(modelId, draft.draft_id, batch, label, split, attested));
         setProgress({ sent: Math.min(i + BATCH, files.length), total: files.length });
         setResults([...all]);
       }
@@ -155,10 +160,10 @@ function ImportPanel({ modelId, draft, classes, onDone }: { modelId: string; dra
   );
 }
 
-function PublishPanel({ modelId, draft, index, resumeVersion, onPublished }: { modelId: string; draft: Draft; index: DatasetIndex; resumeVersion?: string | null; onPublished: (v: string) => void }) {
+function PublishPanel({ modelId, draft, index, initialVersion, resumeVersion, onPublished }: { modelId: string; draft: Draft; index: DatasetIndex; initialVersion: string; resumeVersion?: string | null; onPublished: (v: string) => void }) {
   const store = useStore();
   const resuming = draft.status === 'publishing';
-  const [version, setVersion] = useState(resuming ? draft.target_version ?? '' : resumeVersion ?? suggest(draft.parent_version, index));
+  const [version, setVersion] = useState(resuming ? draft.target_version ?? '' : resumeVersion ?? (draft.parent_version ? suggest(draft.parent_version, index) : initialVersion));
   const [job, setJob] = useState<PublishJob | null>(null);
   const [error, setError] = useState('');
   const timer = useRef<number | null>(null);
@@ -175,7 +180,7 @@ function PublishPanel({ modelId, draft, index, resumeVersion, onPublished }: { m
         setJob(j);
         if (j.state !== 'running') {
           if (timer.current) window.clearInterval(timer.current);
-          store.invalidate(`datasets:${modelId}`, `draft:${modelId}:${draft.draft_id}`, `dstables:${modelId}`);
+          store.invalidate(`family:${modelId}`, `family-draft:${modelId}:${draft.draft_id}`, 'dataset-catalog');
           if (j.state === 'succeeded') onPublished(j.version);
         }
       } catch (e) {
@@ -189,7 +194,7 @@ function PublishPanel({ modelId, draft, index, resumeVersion, onPublished }: { m
     if (!window.confirm(`${what}\n\nLa version sera immuable (jamais réécrite par HOVIS) : copie des images, vérification de chaque empreinte SHA-256, puis écriture du manifeste en dernier.\nAucun entraînement ne sera lancé.`)) return;
     setError('');
     try {
-      follow(await mlops.publish(modelId, draft.draft_id, version));
+      follow(await mlops.publishFamilyDraft(modelId, draft.draft_id, version));
     } catch (e) {
       setError(errText(e));
     }

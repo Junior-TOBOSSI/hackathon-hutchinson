@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { datasetImageUrl, mlops, type DatasetItem, type Draft, type DraftChange } from '../../api/mlops';
+import { familyImageUrl, mlops, type DatasetItem, type Draft, type DraftChange } from '../../api/mlops';
 import { Badge, KV, Loading, Panel, Technical, Unavailable } from './common';
-import { errText, useDatasetItems, useStore } from './data';
+import { errText, useFamilyItems, useStore } from './data';
 
 /* Explorateur d'une version publiée : 24 images par page, chargées à la demande
    (loading="lazy"), servies par le backend depuis la liste blanche du manifeste.
@@ -20,7 +20,7 @@ export default function DatasetExplorer({ modelId, version, classes, draft }: { 
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<DatasetItem | null>(null);
   const [error, setError] = useState('');
-  const page = useDatasetItems(modelId, version, { ...filters, offset, limit: PAGE });
+  const page = useFamilyItems(modelId, version, { ...filters, offset, limit: PAGE });
   const editable = draft?.status === 'open';
 
   const setFilter = (k: keyof typeof filters, v: string) => { setFilters({ ...filters, [k]: v }); setOffset(0); };
@@ -28,8 +28,8 @@ export default function DatasetExplorer({ modelId, version, classes, draft }: { 
     if (!draft) return;
     setError('');
     try {
-      await mlops.updateDraftItems(modelId, draft.draft_id, [change]);
-      store.invalidate(`draft:${modelId}:${draft.draft_id}`, `datasets:${modelId}`);
+      await mlops.updateFamilyDraftItems(modelId, draft.draft_id, [change]);
+      store.invalidate(`family-draft:${modelId}:${draft.draft_id}`, `family:${modelId}`, 'dataset-catalog');
     } catch (e) {
       setError(errText(e));
     }
@@ -59,7 +59,7 @@ export default function DatasetExplorer({ modelId, version, classes, draft }: { 
             return (
               <button key={item.file} onClick={() => setSelected(active ? null : item)} title={item.file}
                 style={{ padding: 6, borderRadius: 12, cursor: 'pointer', textAlign: 'left', background: active ? 'var(--surface-soft)' : '#fff', border: `2px solid ${change ? 'var(--amber)' : active ? 'var(--primary)' : 'var(--line)'}`, opacity: change?.action === 'exclude' ? 0.45 : 1 }}>
-                <img src={datasetImageUrl(modelId, version, item.file)} alt={item.file} loading="lazy" decoding="async" width={104} height={104}
+                <img src={familyImageUrl(modelId, version, item.file)} alt={item.file} loading="lazy" decoding="async" width={104} height={104}
                   style={{ width: '100%', height: 'auto', aspectRatio: '1 / 1', objectFit: 'contain', imageRendering: 'pixelated', borderRadius: 8, background: 'var(--track)' }} />
                 <div className="row" style={{ gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
                   <Badge tone={item.label === 'NOK' ? 'red' : 'green'}>{change?.action === 'relabel' ? `${item.label}→${change.label}` : item.label}</Badge>
@@ -91,7 +91,7 @@ function ItemDetail({ modelId, version, item, classes, draft, onApply }: { model
   const evaluation = isEvaluation(item.split);
   return (
     <div className="row" style={{ gap: 18, alignItems: 'flex-start', flexWrap: 'wrap', padding: 14, borderRadius: 14, background: 'var(--surface-soft)' }}>
-      <img src={datasetImageUrl(modelId, version, item.file)} alt={item.file} width={192} height={192} style={{ imageRendering: 'pixelated', borderRadius: 10, background: 'var(--track)' }} />
+      <img src={familyImageUrl(modelId, version, item.file)} alt={item.file} width={192} height={192} style={{ imageRendering: 'pixelated', borderRadius: 10, background: 'var(--track)' }} />
       <div className="col" style={{ gap: 8, flex: 1, minWidth: 260 }}>
         <b style={{ overflowWrap: 'anywhere' }}>{item.file}</b>
         <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
