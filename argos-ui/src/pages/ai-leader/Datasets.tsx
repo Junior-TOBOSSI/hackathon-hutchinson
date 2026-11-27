@@ -10,6 +10,13 @@ import { fr, Kpi, SearchField, SelectField } from './ui';
 const useCases = ['quality', 'workstation', 'safety'] as const;
 const SPLIT_SHORT: Record<string, string> = { train: 'train', validation: 'val', test: 'test' };
 const useCaseName: Record<string, string> = { quality: fr('quality'), workstation: fr('workstation'), safety: fr('safety') };
+const expectedScientific = [
+  { id: 'quality-industrial-binary', name: 'Quality 702 — binaire industriel', useCase: 'quality', status: '5 plis préparés localement ; publication non effectuée' },
+  { id: 'poste-5s-11', name: 'Press cell', useCase: 'workstation', status: 'Livraison du jeu original attendue' },
+  { id: 'poste-bleu-5s-11', name: 'Machine cell', useCase: 'workstation', status: 'Livraison du jeu original attendue' },
+  { id: 'poste-variante-5s-11', name: 'Machine cell variant', useCase: 'workstation', status: 'Livraison du jeu original attendue' },
+  { id: 'poste-electrique-5s-11', name: 'Electrical bench', useCase: 'workstation', status: 'Livraison du jeu original attendue' },
+];
 
 export default function Datasets() {
   const catalog = useDatasetCatalog();
@@ -43,6 +50,8 @@ export default function Datasets() {
     ? null : families.reduce((sum, f) => sum + (f.latest_images ?? 0), 0);
   const versionCount = families.reduce((sum, f) => sum + f.version_count, 0);
   const totalDrafts = families.reduce((sum, f) => sum + f.draft_count, 0);
+  const expected = expectedScientific.filter((item) => !families.some((family) => family.dataset_id === item.id))
+    .filter((item) => (!filter || item.useCase === filter) && (!query || `${item.name} ${item.id}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
 
   return <div className="dataset-catalog col" style={{ gap: 14 }}>
     <header className="card dataset-hero">
@@ -93,6 +102,10 @@ export default function Datasets() {
             <td className="opt">{f.linked_models.length ? f.linked_models.join(', ') : '—'}</td><td className="opt">{f.last_published_at ? new Date(f.last_published_at).toLocaleDateString('fr-FR') : '—'}</td><td className="opt"><button className="btn btn-ghost" onClick={() => select(f.dataset_id)}>Ouvrir</button></td>
           </tr>)}</tbody></table></div>
           {!filtered.length && <Unavailable tone="grey">Aucun dataset pour ces critères.</Unavailable>}
+          {expected.length > 0 && <div className="card col" style={{ gap: 8, padding: 14 }}><b>Jeux scientifiques attendus — non publiés</b>
+            <span className="muted">Ces entrées ne sont pas des versions Databricks et ne comptent pas dans les indicateurs du catalogue.</span>
+            {expected.map((item) => <span key={item.id}><b>{item.name}</b> · {item.id} — {item.status}</span>)}
+          </div>}
           {filtered.length > 10 && <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
             <button className="btn btn-ghost" disabled={!page} onClick={() => setPage(page - 1)}>Précédent</button>
             <span>{page + 1} / {Math.ceil(filtered.length / 10)}</span>

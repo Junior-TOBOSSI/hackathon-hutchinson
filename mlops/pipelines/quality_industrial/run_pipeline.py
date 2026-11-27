@@ -199,7 +199,7 @@ def ensure_opencv(runner, log) -> None:
         )
 
 
-def verify_onnx(model_dir: Path) -> bool:
+def verify_onnx(model_dir: Path, expected_classes: int) -> bool:
     """True only if modele.onnx exists, passes onnx.checker AND runs in ONNX Runtime with
     one output per class. (The group's export_onnx.py also compares .pt and .onnx answers
     in rapport_export.md.) Not a validation for Edge deployment."""
@@ -215,7 +215,7 @@ def verify_onnx(model_dir: Path) -> bool:
     inp = session.get_inputs()[0]
     shape = [d if isinstance(d, int) else 1 for d in inp.shape]
     out = session.run(None, {inp.name: np.zeros(shape, dtype=np.float32)})[0]
-    return out.shape[-1] == 3
+    return out.shape[-1] == expected_classes
 
 
 # Databricks serverless environment 3 core packages that must stay unchanged (DBX-05D-FIX).
@@ -422,7 +422,7 @@ def run(request: dict[str, Any], runner=subprocess.run, mlflow=None, log=print) 
         t = time.time()
         try:
             runner(export_command(python, cfg_path, data_dir / "val"), check=True, cwd=str(work))
-            onnx_ok = verify_onnx(model_dir)
+            onnx_ok = verify_onnx(model_dir, len(cfg["classes"]))
         except Exception as exc:  # noqa: BLE001 - optional step, reported as such
             onnx_error = f"{type(exc).__name__}: {str(exc)[:200]}"
             log(f"ONNX export failed: {onnx_error}")

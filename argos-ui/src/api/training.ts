@@ -4,7 +4,7 @@ import { call, type DatasetFamilySummary, type ReadOpts } from './mlops';
 const q = encodeURIComponent;
 const T = '/mlops/training';
 
-export interface ParamSpec { name: string; type: 'int' | 'float' | 'bool' | 'str'; default: unknown; min: number | null; max: number | null; level: 'basic' | 'advanced' | 'imposed'; label: string; help: string | null }
+export interface ParamSpec { name: string; type: 'int' | 'float' | 'bool' | 'str'; default: unknown; min: number | null; max: number | null; level: 'basic' | 'advanced' | 'imposed'; label: string; help: string | null; choices: string[] }
 export interface PipelineSpec {
   id: string; name: string; use_case: string; task: string; architecture: string; description: string;
   code: Record<string, string>; classes: string[];
@@ -39,14 +39,15 @@ export interface MlRun { run_id: string; run_name: string | null; status: string
 export interface RunDetail { row: TrainingRow; pipeline: PipelineSpec; runs: MlRun[] }
 export interface Point { key: string; value: number; step: number; timestamp: string }
 export interface Evaluation {
-  available: boolean; reason?: string; split?: string; metrics?: Record<string, unknown>; truth_classes?: string[]; columns?: string[];
+  available: boolean; kind?: 'workstation'; reason?: string; split?: string; metrics?: Record<string, unknown>; truth_classes?: string[]; columns?: string[];
   matrix?: Record<string, Record<string, number>>; per_class?: Record<string, { support: number; precision: number | null; recall: number | null; f1: number | null }>; n?: number;
 }
 export interface Prediction {
   fichier: string; vraie_classe: string; verdict: string; type_defaut: string; decision: string; score_nok: number | null; latence_ms: number | null;
   correct: boolean; false_reject: boolean; missed_defect: boolean; type_confusion: boolean; to_check: boolean; manifest_file: string | null;
+  annotated_path?: string; right_reason?: boolean; alignment_failed?: boolean; found?: string; view?: string;
 }
-export interface PredictionPage { available: boolean; total: number; offset?: number; limit?: number; items: Prediction[]; dataset_id?: string | null; version?: string | null }
+export interface PredictionPage { available: boolean; kind?: 'workstation'; total: number; offset?: number; limit?: number; items: Prediction[]; dataset_id?: string | null; version?: string | null }
 
 export const training = {
   pipelines: (o?: ReadOpts) => call<PipelineView[]>(`${T}/pipelines`, undefined, o),
