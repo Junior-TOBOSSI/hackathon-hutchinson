@@ -87,7 +87,8 @@ def warm_up() -> None:
                     dataset_store(connector).index(managed.id)
             # INT-GLOBAL-01: the two slowest first visits measured (Datasets catalogue,
             # Training Factory summary / runs). Reads only.
-            dataset_store(connector).catalog()
+            for family in dataset_store(connector).catalog():
+                dataset_store(connector).family_index(family.dataset_id)  # dataset detail
             from mlops.api.training_routes import service_for
 
             service_for(connector).kpis()

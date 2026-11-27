@@ -118,7 +118,7 @@ indisponible n'est jamais satisfaite.
   - politique active et en mode `auto` ;
   - conditions satisfaites et garde-fous respectés ;
   - verrou `HOVIS_TRAINING_REMOTE=1`.
-  
+
   Une évaluation explicite ne lance jamais. Ce mode est testé avec un fournisseur de jobs
   simulé.
 - **Après l'entraînement**, le modèle reste candidat : aucun alias, aucune approbation, aucun
