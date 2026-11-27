@@ -28,6 +28,7 @@ argos-ui (5173) ──/api──> cellule C3 (8000) ──> poste C3·P06 (8001)
 .\demo\start.ps1 -Stations 3             # 3 postes actifs : C3·P06, C3·P01, C3·P02
 .\demo\start.ps1 -Stations 6 -NoSafety   # 6 postes, sans la webcam EPI
 .\demo\start.ps1 -Stations 3 -Mode auto  # mode NOK automatique (défaut : -Mode manuel)
+.\demo\start.ps1 -Stations 2 -Mode auto -Here   # tous les serveurs dans CE terminal (Ctrl+C arrête tout)
 .\demo\start.bat -Stations 3             # même chose par le .bat
 ```
 
