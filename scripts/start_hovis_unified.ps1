@@ -4,8 +4,14 @@
   Deployment), Edge (Production Engine) and the argos-ui frontend (AI Leader + industrial live).
 
 .DESCRIPTION
-  - Remote training launches stay DISABLED (HOVIS_TRAINING_REMOTE removed) and the retraining
-    scheduler stays DISABLED (HOVIS_RETRAIN_SCHEDULER removed): this script never enables them.
+  - By default remote training launches stay DISABLED (HOVIS_TRAINING_REMOTE removed) and the
+    retraining scheduler stays DISABLED (HOVIS_RETRAIN_SCHEDULER removed).
+  - -EnableRemoteTraining temporarily AUTHORIZES remote Databricks training launches for this
+    instance only, after an explicit confirmation (typed, or -ConfirmRemoteTraining AUTORISER).
+    HOVIS_TRAINING_REMOTE=1 is given to the gateway process only (the one hosting
+    TrainingService); Edge and UI never receive it. Nothing is launched automatically: a launch
+    still goes through TrainingService.launch (validations, idempotency token, audit). The
+    retraining scheduler stays DISABLED in every mode. Stopping the instance revokes it.
   - Only the processes it started (PIDs recorded in var/unified/pids.json) are stopped by
     -Stop, together with their child processes (uvicorn launched through a venv starts a child
     interpreter). No other Python / Node process of the machine is touched.
@@ -16,6 +22,7 @@
   powershell -ExecutionPolicy Bypass -File scripts\start_hovis_unified.ps1
   powershell -ExecutionPolicy Bypass -File scripts\start_hovis_unified.ps1 -Stop
   powershell -ExecutionPolicy Bypass -File scripts\start_hovis_unified.ps1 -Status
+  powershell -ExecutionPolicy Bypass -File scripts\start_hovis_unified.ps1 -EnableRemoteTraining
 #>
 [CmdletBinding()]
 param(
@@ -26,7 +33,9 @@ param(
     [int]$UiPort = 5180,
     [string]$Python = "",
     [string]$DataDir = "",
-    [switch]$NoWarmup
+    [switch]$NoWarmup,
+    [switch]$EnableRemoteTraining,
+    [string]$ConfirmRemoteTraining = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -69,7 +78,14 @@ function Wait-Http([string]$url, [int]$seconds) {
     throw "no answer from $url after $seconds s"
 }
 
-if ($Stop) { Stop-Recorded; return }
+if ($Stop) {
+    $remoteLog = Join-Path $LogDir 'remote-training.log'
+    if ((Test-Path $PidFile) -and (Get-Content $PidFile -Raw) -match '"remote_training":\s*true') {
+        "$((Get-Date).ToString('s')) instance stopped: REMOTE TRAINING AUTHORIZATION REVOKED" | Add-Content -Path $remoteLog -Encoding utf8
+        Write-Host '[hovis] Remote training authorization revoked.' -ForegroundColor Yellow
+    }
+    Stop-Recorded; return
+}
 
 if ($Status) {
     foreach ($p in @($GatewayPort, $EdgePort, $UiPort)) {
@@ -78,6 +94,28 @@ if ($Status) {
     }
     if (Test-Path $PidFile) { Get-Content $PidFile -Raw | Write-Host }
     return
+}
+
+# ------------------------------------------------------------------ remote training authorization
+$ConfirmWord = 'AUTORISER'
+if ($ConfirmRemoteTraining -and -not $EnableRemoteTraining) {
+    throw '-ConfirmRemoteTraining only makes sense with -EnableRemoteTraining'
+}
+if ($EnableRemoteTraining) {
+    Write-Host ''
+    Write-Host '[hovis] -EnableRemoteTraining: remote Databricks training launches will be AUTHORIZED' -ForegroundColor Yellow
+    Write-Host '[hovis]   for this instance (gateway process only), until it is stopped.' -ForegroundColor Yellow
+    Write-Host '[hovis]   Each launch still goes through TrainingService.launch (checks, idempotency, audit).' -ForegroundColor Yellow
+    Write-Host '[hovis]   Nothing is launched by this script; the retraining scheduler stays disabled.' -ForegroundColor Yellow
+    $answer = $ConfirmRemoteTraining
+    if (-not $answer) {
+        try { $answer = Read-Host "[hovis] Type $ConfirmWord to confirm" }
+        catch { $answer = '' }   # non-interactive session: no confirmation possible
+    }
+    if ($answer -cne $ConfirmWord) {
+        Write-Bad "Remote training NOT confirmed (expected '$ConfirmWord'): nothing started."
+        exit 2
+    }
 }
 
 # ------------------------------------------------------------------ checks
@@ -118,7 +156,8 @@ if (Test-Path $localEnv) {
     Write-Step "Local configuration loaded from hovis.local.env"
 }
 
-# Safety: remote training and the automatic scheduler are NEVER enabled by this script.
+# Safety: remote training is enabled only below, for the gateway, with -EnableRemoteTraining;
+# the automatic retraining scheduler is NEVER enabled by this script.
 foreach ($name in @('HOVIS_TRAINING_REMOTE', 'HOVIS_RETRAIN_SCHEDULER')) {
     if (Test-Path "Env:$name") { Remove-Item "Env:$name"; Write-Step "$name removed from the environment." }
 }
@@ -132,12 +171,16 @@ foreach ($db in @($coreDb, $edgeDb)) {
 }
 
 $started = @()
+$RemoteLog = Join-Path $LogDir 'remote-training.log'
+function Write-RemoteLog([string]$text) {
+    "$((Get-Date).ToString('s')) $text" | Add-Content -Path $RemoteLog -Encoding utf8
+}
 function Start-HovisProcess([string]$name, [string]$file, [string[]]$arguments, [string]$cwd) {
     $out = Join-Path $LogDir "$name.log"
     $err = Join-Path $LogDir "$name.err.log"
     $p = Start-Process -FilePath $file -ArgumentList $arguments -WorkingDirectory $cwd -WindowStyle Hidden `
         -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
-    $script:started += [pscustomobject]@{ name = $name; pid = $p.Id; log = $err }
+    $script:started += [pscustomobject]@{ name = $name; pid = $p.Id; log = $err; remote_training = ($name -eq 'gateway' -and [bool]$EnableRemoteTraining) }
     $script:started | ConvertTo-Json | Set-Content -Path $PidFile -Encoding utf8
     Write-Step "$name started (PID $($p.Id)), logs $err"
 }
@@ -149,7 +192,13 @@ try {
     $env:MLFLOW_DISABLE_AGENT_HINT = '1'
     $env:HOVIS_PERF_COUNTERS = '1'       # read-only remote-call counters (/api/mlops/_perf)
     if ($NoWarmup) { Remove-Item Env:HOVIS_MLOPS_WARMUP -ErrorAction SilentlyContinue } else { $env:HOVIS_MLOPS_WARMUP = '1' }
+    if ($EnableRemoteTraining) { $env:HOVIS_TRAINING_REMOTE = '1' }   # inherited by the gateway only
     Start-HovisProcess 'gateway' $Python @('-m', 'uvicorn', 'mlops.api.platform:app', '--host', '127.0.0.1', '--port', "$GatewayPort") $Root
+    Remove-Item Env:HOVIS_TRAINING_REMOTE -ErrorAction SilentlyContinue   # never passed to Edge / UI
+    if ($EnableRemoteTraining) {
+        Write-RemoteLog "REMOTE TRAINING AUTHORIZED by ${env:USERNAME}, gateway PID $($started[-1].pid), port $GatewayPort, commit $((& git -C $Root rev-parse --short HEAD).Trim())"
+        Write-Host "[hovis] REMOTE TRAINING AUTHORIZED (gateway only), logged in $RemoteLog" -ForegroundColor Yellow
+    }
     $null = Wait-Http "$gateway/health" 90
 
     # ------------------------------------------------------------------ Edge (Production Engine)
@@ -173,7 +222,9 @@ try {
 
     # ------------------------------------------------------------------ verifications
     $guard = Wait-Http "$gateway/api/mlops/training/launch-guard" 30
-    if ($guard.remote_launch_enabled) { throw 'remote training launch is ENABLED: refusing this instance' }
+    if ($EnableRemoteTraining) {
+        if ($guard.remote_launch_enabled -ne $true) { throw 'launch-guard does not report remote_launch_enabled: true' }
+    } elseif ($guard.remote_launch_enabled) { throw 'remote training launch is ENABLED: refusing this instance' }
     $sched = Wait-Http "$gateway/api/mlops/retraining/scheduler" 30
     if ($sched.enabled) { throw 'retraining scheduler is ENABLED: refusing this instance' }
     # The UI must be THIS worktree with the live flags (the old mock UI also answers 200).
@@ -183,7 +234,10 @@ try {
     }
     $null = Invoke-WebRequest -Uri "$ui/src/pages/ai-leader/training/policies/PoliciesView.tsx" -UseBasicParsing -TimeoutSec 30
     $proxied = Invoke-RestMethod -Uri "$ui/api/mlops/training/launch-guard" -TimeoutSec 30
-    if ($proxied.remote_launch_enabled) { throw 'the UI proxy reaches a gateway with remote launches enabled' }
+    if ([bool]$proxied.remote_launch_enabled -ne [bool]$EnableRemoteTraining) {
+        throw "the UI proxy reaches a gateway with remote_launch_enabled=$($proxied.remote_launch_enabled)"
+    }
+    if ($EnableRemoteTraining) { Write-RemoteLog 'launch-guard verified: remote_launch_enabled=true (direct and through the UI proxy); scheduler disabled' }
 
     Write-Host ''
     Write-Step 'HOVIS unified instance is running.'
@@ -194,12 +248,17 @@ try {
     Write-Step "  Supervisor / Operator      : $ui/superviseur  |  $ui/operateur"
     Write-Step "  Gateway API docs           : $gateway/docs"
     Write-Step "  Edge                       : $edge/health"
-    Write-Step "  Remote training: disabled  |  Retraining scheduler: disabled"
+    if ($EnableRemoteTraining) {
+        Write-Host '[hovis]   Remote training: AUTHORIZED (launches only from Training Factory)  |  Retraining scheduler: disabled' -ForegroundColor Yellow
+    } else {
+        Write-Step "  Remote training: disabled  |  Retraining scheduler: disabled"
+    }
     Write-Step "  Stop with: powershell -ExecutionPolicy Bypass -File scripts\start_hovis_unified.ps1 -Stop"
 }
 catch {
     Write-Bad "Start failed: $($_.Exception.Message)"
     Write-Bad 'Stopping the processes started by this run.'
+    if ($EnableRemoteTraining) { Write-RemoteLog 'start failed: authorization revoked (processes stopped)' }
     Stop-Recorded
     exit 1
 }
