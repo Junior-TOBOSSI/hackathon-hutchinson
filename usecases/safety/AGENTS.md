@@ -26,6 +26,8 @@ Faux analyseur (`analyzer.py:FakeSafetyAnalyzer`) : résultats aléatoires mais 
 - 2026-11-26 — Réentraînement depuis yolov8s COCO sur GPU (école), arrêt sur la validation SH17 — les poids SH17 officiels ratent 60 % des gants (rappel 0,40), même en baissant le seuil ; partir de COCO évite de réentraîner sur les mêmes images.
 - 2026-11-26 — Visages toujours pixellisés avant affichage ou sauvegarde — RGPD.
 - 2026-11-27 — **Modèle retenu : YOLO26s** (9 classes, `sh17_ours_yolo26s_640.pt`) — le plus précis des quatre modèles entraînés avec le même protocole (moyenne 0,704 ; gants 0,62, lunettes 0,68, chaussures 0,65, casque 0,68, validation SH17) ; YOLO26n pour un Raspberry Pi 5 sans accélérateur. Détails : `MODELS.md`.
+- 2026-11-27 — (branche `integration`, à valider par EPI) **Main gantée** : une détection « hands » recouverte à 50 % ou plus par une boîte « gloves » n'est plus une main nue (`covered()` dans `yolo_analyzer.py`) ; une seule main vraiment nue suffit toujours à déclarer les gants absents — en démo, le modèle voyait souvent une main gantée à la fois comme « gloves » et « hands », d'où « Gants absents » avec des gants.
+- 2026-11-27 — (branche `integration`, à valider par EPI) **Retrait d'une alerte** 1,5 s après la dernière image fautive au lieu de 5 s (`StationIssueTracker.hold_s`) — l'alerte restait trop longtemps une fois les gants mis ; le lissage sur 3 images évite toujours qu'une image seule déclenche une alerte.
 
 ## Questions ouvertes
 <!-- Questions sur le besoin métier ou les données, à poser à l'équipe ou à Hutchinson. -->

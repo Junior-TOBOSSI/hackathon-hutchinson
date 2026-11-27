@@ -149,3 +149,12 @@ def test_clear_forgets_problems_at_once():
     tracker.update(result(0.9, [person(gloves=A)]), T0)
     tracker.clear()
     assert tracker.update(result(0.1, []), T0 + timedelta(seconds=1)) == []
+
+
+def test_issue_cleared_soon_after_the_problem_is_gone():
+    tracker = StationIssueTracker("C3·P06")
+    t0 = datetime(2026, 11, 27, 8, 0, tzinfo=UTC)
+    assert tracker.update(result(0.9, [person(gloves=A)]), now=t0)
+    ok = result(0.0, [person()])
+    assert tracker.update(ok, now=t0 + timedelta(seconds=1))  # still held 1 s later
+    assert tracker.update(ok, now=t0 + timedelta(seconds=2)) == []  # gone after 1.5 s

@@ -45,6 +45,14 @@ def test_one_bare_hand_is_enough_even_with_one_glove():
     assert a.states["gloves"] == PPEState.ABSENT
 
 
+def test_gloved_hand_also_seen_as_hand_means_present():
+    # The model often detects a gloved hand twice: "gloves" and "hands" on the same spot.
+    a = states(
+        [Det("hands", 0.8, (0.32, 0.5, 0.36, 0.55)), Det("gloves", 0.5, (0.315, 0.49, 0.365, 0.56))]
+    )
+    assert a.states["gloves"] == PPEState.PRESENT
+
+
 def test_gloves_only_means_present():
     assert (
         states([Det("gloves", 0.6, (0.32, 0.5, 0.36, 0.55))]).states["gloves"] == PPEState.PRESENT

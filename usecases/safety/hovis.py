@@ -89,7 +89,7 @@ class StationIssueTracker:
         station_id: str,
         low: float = 0.4,
         required: tuple[str, ...] = DEFAULT_REQUIRED,
-        hold_s: float = 5.0,
+        hold_s: float = 1.5,  # an issue not seen for 1.5 s is over (was 5 s: too slow)
     ) -> None:
         self.station_id = station_id
         self.low = low

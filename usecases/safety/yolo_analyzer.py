@@ -109,6 +109,18 @@ def touches(a: tuple[float, ...], b: tuple[float, ...], margin: float) -> bool:
     return a[0] - dx < b[2] and b[0] < a[2] + dx and a[1] - dy < b[3] and b[1] < a[3] + dy
 
 
+def covered(hand: tuple[float, ...], gloves: list[Det], min_share: float = 0.5) -> bool:
+    """True if a glove box covers at least ``min_share`` of the hand box: a gloved hand is
+    often ALSO detected as "hands", it is not a bare hand."""
+    area = max(1e-9, (hand[2] - hand[0]) * (hand[3] - hand[1]))
+    for g in gloves:
+        w = min(hand[2], g.box[2]) - max(hand[0], g.box[0])
+        h = min(hand[3], g.box[3]) - max(hand[1], g.box[1])
+        if w > 0 and h > 0 and w * h / area >= min_share:
+            return True
+    return False
+
+
 def risk(conf: float) -> float:
     """Evidence confidence -> score: 0.4 (weak, a_verifier) to 1.0 (certain, anomalie)."""
     return min(1.0, 0.4 + 0.6 * conf)
@@ -129,6 +141,14 @@ def assess_person(person: Det, parts: list[Det], phones: list[Det], p: dict) -> 
     by_name: dict[str, list[Det]] = {}
     for d in parts:
         by_name.setdefault(d.name, []).append(d)
+    # A hand covered by a glove box is a gloved hand (the model often sees both): only the
+    # hands NOT covered by a glove are bare hands.
+    if "hands" in by_name:
+        bare = [h for h in by_name["hands"] if not covered(h.box, by_name.get("gloves", []))]
+        if bare:
+            by_name["hands"] = bare
+        else:
+            del by_name["hands"]
     best = {name: max(d.conf for d in dets) for name, dets in by_name.items()}
     out = PersonAssessment(box=person.box)
 
