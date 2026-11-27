@@ -25,6 +25,7 @@ Faux analyseur (`analyzer.py:FakeSafetyAnalyzer`) : résultats aléatoires mais 
 - 2026-11-26 — Classes du modèle : person, face, helmet, glasses, gloves, shoes, head, hands, foot — person pour le contrat, face pour masquer les visages, head/hands/foot comme preuve d'absence d'un EPI.
 - 2026-11-26 — Réentraînement depuis yolov8s COCO sur GPU (école), arrêt sur la validation SH17 — les poids SH17 officiels ratent 60 % des gants (rappel 0,40), même en baissant le seuil ; partir de COCO évite de réentraîner sur les mêmes images.
 - 2026-11-26 — Visages toujours pixellisés avant affichage ou sauvegarde — RGPD.
+- 2026-11-27 — **Modèle retenu : YOLO26s** (9 classes, `sh17_ours_yolo26s_640.pt`) — le plus précis des quatre modèles entraînés avec le même protocole (moyenne 0,704 ; gants 0,62, lunettes 0,68, chaussures 0,65, casque 0,68, validation SH17) ; YOLO26n pour un Raspberry Pi 5 sans accélérateur. Détails : `MODELS.md`.
 
 ## Questions ouvertes
 <!-- Questions sur le besoin métier ou les données, à poser à l'équipe ou à Hutchinson. -->

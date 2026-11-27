@@ -23,7 +23,9 @@ Le dépôt est public : **les poids ne sont pas dans Git**. Ils sont transmis à
 
 | Fichier, à placer dans `data/models/` | Rôle | SHA-256 |
 |---|---|---|
-| `safety/sh17_ours_yolov8s_640.pt` (22 Mo) | Modèle EPI recommandé : YOLOv8s, 9 classes | `4928624ec4a0e0db210df4d0422550f791e1aff2699822b55c12a55beae33b8e` |
+| `safety/sh17_ours_yolo26s_640.pt` | **Modèle EPI retenu : YOLO26s**, 9 classes | dans `SHA256SUMS` du paquet privé (`MODELS.md`) |
+| `safety/sh17_ours_yolo26n_640.pt` | Modèle léger pour Raspberry Pi 5 sans accélérateur : YOLO26n | dans `SHA256SUMS` du paquet privé |
+| `safety/sh17_ours_yolov8s_640.pt` (22 Mo) | Ancien modèle de référence : YOLOv8s | `4928624ec4a0e0db210df4d0422550f791e1aff2699822b55c12a55beae33b8e` |
 | `safety/sh17_ours_yolov8n_640.pt` (6 Mo) | Modèle EPI de repli, plus léger : YOLOv8n | `4699f7439d39423cad3f27b60b570182acc4aa8fae5d185588961cfd7458e84e` |
 | `yolov8n_coco.pt` (6 Mo) | Téléphones : modèle COCO générique, classe `cell phone` | `f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36` |
 
@@ -36,7 +38,7 @@ Dans `usecases/safety/config.yaml` :
 ```yaml
 analyzer_class: usecases.safety.yolo_analyzer:YoloSafetyAnalyzer
 params:
-  weights: data/models/safety/sh17_ours_yolov8s_640.pt
+  weights: data/models/safety/sh17_ours_yolo26s_640.pt
 ```
 
 Dépendance : `pip install -e ".[safety]"` (Ultralytics). Fonctionnement 100 % local : régler `YOLO_OFFLINE=1` et `yolo settings sync=False` (pas de télémétrie).
@@ -104,6 +106,8 @@ station_live["checks"].update(station_checks(station_live["issues"]))
 | Team leader : postes en **cartes** (une par poste : sécurité OK/NOK, rythme, pièces OK, pièces NOK ; fond et contour selon l'état), détail au clic (avancement, alertes en cours, écran du poste, historique) ; champ poste : taper **ou choisir dans une liste** | `pages/TeamLeader.tsx` |
 | Vocabulaire : **NOK** au lieu de KO dans tous les textes affichés (la valeur technique `verdict: 'KO'` ne change pas) | `pages/*.tsx`, `components/*`, `api/mock.ts` |
 | Historique d'un poste : tout sur le **shift en cours** (plus de « shift B », « 13 h → 21 h », « depuis 15 h », « moyenne 1,7 % » écrits en dur), 3 cases sans doublon (production, NOK, sécurité), une seule liste des événements ; champs facultatifs `shift` et `elapsedMin` dans `StationDetail` | `pages/PosteDetail.tsx`, `api/types.ts` |
+| Team leader : onglet **Sécurité** (événements du shift, postes concernés, alertes en cours, temps moyen de retour au vert, détail par EPI et par poste, jamais par personne) ; route `GET /cells/{id}/safety` (`CellSafety`) | `pages/TeamLeader.tsx`, `api/client.ts`, `api/types.ts`, `api/mock.ts` |
+| Animations courtes : bandeau d'alerte qui glisse, chiffres qui défilent, carte qui repasse au vert (« ✓ Revenu conforme »), carte rouge qui pulse ; coupées si l'utilisateur réduit les animations | `components/ui.tsx`, `pages/*.tsx`, `theme.css` |
 | Démo locale seulement : sélecteur de vue « Opérateur | Team leader » (sans se déconnecter), visible en mode démo ou avec `VITE_DEMO_VIEWS=true` | `App.tsx`, `vite-env.d.ts` |
 
 Côté serveur, la démo `notebooks/hovis_demo.py` fournit ces routes, et aussi celles de la vue manager : vue de la cellule (`/cells/{id}/overview`, poste C3·P06 réel, les 11 autres simulés et signalés comme tels), alertes (problèmes Safety du poste, signalements de l'opérateur, pièces requalifiées à confirmer), acquittement, décision, historique du poste (`/stations/{id}/detail`, épisodes Safety réels du shift). Une photo de pièce NOK peut être placée dans `argos-ui/public/img/piece-nok.jpg` pour la démo : **image industrielle, à ne jamais versionner**.
@@ -115,6 +119,7 @@ Côté serveur, la démo `notebooks/hovis_demo.py` fournit ces routes, et aussi 
 - Un EPI est `absent` seulement si la partie du corps protégée est visible sans lui (main nue, tête, visage, corps entier sans chaussures). Sinon `uncertain`.
 - Score : `0,4 + 0,6 × confiance de la preuve` ; chaussures déduites du corps entier : 0,5 (« à vérifier »).
 - Lissage : le score retenu est la médiane des 3 dernières images : une image isolée ne déclenche rien, un problème vu sur 2 images sur 3 déclenche l'alerte (un téléphone en main est souvent manqué sur une image).
+- **Opérateur seul** (`operator_only: true`) : seule la personne la plus grande de l'image (l'opérateur, au plus près de la caméra) est contrôlée ; une personne au fond, de passage, une affiche ou un reflet ne déclenchent pas d'alerte au poste. Mettre `false` pour un poste à plusieurs opérateurs.
 - Le gilet n'est pas vérifié (`vest = uncertain`).
 - Les événements Safety sont continus (pas une pièce par cycle).
 
@@ -128,9 +133,11 @@ Côté serveur, la démo `notebooks/hovis_demo.py` fournit ces routes, et aussi 
 
 | Modèle | mAP50 moyen | Gants | Lunettes | Chaussures | Casque |
 |---|---|---|---|---|---|
-| YOLOv8s (recommandé) | 0,68 | 0,53 | 0,65 | 0,58 | 0,61 |
-| YOLOv8n (repli) | 0,63 | 0,45 | 0,56 | 0,53 | 0,57 |
+| **YOLO26s (retenu)** | **0,70** | **0,62** | **0,68** | **0,65** | **0,68** |
+| YOLOv8s | 0,68 | 0,53 | 0,65 | 0,58 | 0,61 |
+| YOLO26n (léger, Raspberry Pi) | 0,65 | 0,50 | 0,55 | 0,55 | 0,63 |
+| YOLOv8n | 0,63 | 0,45 | 0,56 | 0,53 | 0,57 |
 
-Les chiffres définitifs (jeu de test de 810 images jamais utilisées) et la comparaison avec YOLO26 sont à venir.
+YOLO26s est le plus précis sur chacun des 4 EPI. Tableau complet et recette : `MODELS.md`. Les chiffres définitifs (jeu de test de 810 images jamais utilisées) sont à venir.
 
 Données : SH17 (licence CC BY-NC-SA 4.0, prototype uniquement). En production, réentraîner sur les images de l'usine.

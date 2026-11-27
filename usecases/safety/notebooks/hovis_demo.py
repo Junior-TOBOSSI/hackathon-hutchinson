@@ -39,7 +39,10 @@ from webcam_preview import draw, hide_faces  # noqa: E402
 
 STATION = "C3·P06"
 CAMERA = int(os.environ.get("CAMERA", "0"))
-WEIGHTS = os.environ.get("WEIGHTS", "data/models/safety/sh17_ours_yolov8s_640.pt")
+# Chosen model: YOLO26s; YOLOv8s while its file is not on this machine yet.
+_CHOSEN = "data/models/safety/sh17_ours_yolo26s_640.pt"
+_FALLBACK = "data/models/safety/sh17_ours_yolov8s_640.pt"
+WEIGHTS = os.environ.get("WEIGHTS", _CHOSEN if (REPO / _CHOSEN).is_file() else _FALLBACK)
 PERIOD = 1 / float(os.environ.get("FPS", "4"))  # analyses per second
 
 state = {"issues": [], "ppe": {}, "jpeg": None, "n": 0, "error": None}
@@ -101,6 +104,10 @@ def loop() -> None:
         with lock:
             record_episodes(issues, datetime.now().astimezone())
             ppe = station_ppe(analyzer.last_states, issues)
+            raw_names = [(d.name, round(d.conf, 2)) for d in analyzer.last_privacy]  # faces/heads/persons >= 0.10
+            dets_dbg = sorted(((d.name, round(d.conf, 2)) for d in analyzer.last_detections), key=lambda x: -x[1])
+            state.update(debug={"detections": dets_dbg, "low_conf_people": raw_names, "states": [
+                {k: v.value for k, v in st.items()} for st in analyzer.last_states]})
             state.update(issues=issues, ppe=ppe, jpeg=jpeg, n=n, error=None, blocked=analyzer.last_camera_blocked,
                          ms=round((time.perf_counter() - start) * 1000))
         time.sleep(max(0.0, PERIOD - (time.perf_counter() - start)))
@@ -410,6 +417,42 @@ def call_maintenance(alert_id: str) -> Response:
     return Response(status_code=204)
 
 
+@app.get("/api/cells/{cell_id}/safety")
+def cell_safety(cell_id: str) -> dict:
+    """Safety tab of the team leader, current shift: events by PPE and by station, time back to
+    green. C3·P06 is REAL (camera episodes); the 11 other stations are SIMULATED (reproducible)."""
+    local, shift, hours, prod = context()
+    with lock:
+        events = [dict(e) for e in EVENTS]
+    by_label: dict[str, list[float | None]] = {lab: [] for lab in EPI_LABELS}
+    for e in events:
+        if e["label"] in by_label:
+            by_label[e["label"]].append((e["end"] - e["start"]).total_seconds() if e["end"] else None)
+    by_station = []
+    for sid in CELL_STATIONS:
+        if sid == STATION:
+            by_station.append({"stationId": sid, "count": len(events),
+                               "openNow": sum(e["end"] is None for e in events)})  # fmt: skip
+            continue
+        i = int(sid[-2:])
+        n = (i * 7) % 4  # 0..3 simulated events
+        by_station.append({"stationId": sid, "count": n, "openNow": 0})
+        for k in range(n):  # simulated: mostly glasses and gloves, 20 s to 2 min
+            lab = EPI_LABELS[[1, 2, 1, 0, 4][(i + k) % 5]]
+            by_label[lab].append(20.0 + ((i * 31 + k * 17) % 100))
+    done = [d for ds in by_label.values() for d in ds if d is not None]
+    return {
+        "shift": shift,
+        "byPpe": [{"label": lab, "count": len(ds),
+                   "avgSec": round(sum(x for x in ds if x is not None) / max(1, sum(x is not None for x in ds)))
+                   if any(x is not None for x in ds) else None} for lab, ds in by_label.items()],
+        "byStation": by_station,
+        "openNow": sum(st["openNow"] for st in by_station),
+        "avgBackToGreenSec": round(sum(done) / len(done)) if done else None,
+        "simulatedStations": True,
+    }  # fmt: skip
+
+
 EPI_LABELS = ["Casque absent", "Lunettes absentes", "Gants absents", "Chaussures de sécurité non détectées",
               "Téléphone en main", "Téléphone sur le poste"]  # fmt: skip
 
@@ -465,4 +508,5 @@ def station_detail(station_id: str) -> dict:
 @app.get("/api/safety-demo/status")
 def status() -> dict:
     with lock:
-        return {"frames": state["n"], "ms_per_frame": state.get("ms"), "camera_blocked": state.get("blocked"), "issues": state["issues"], "error": state["error"]}
+        return {"frames": state["n"], "ms_per_frame": state.get("ms"), "camera_blocked": state.get("blocked"),
+                "issues": state["issues"], "error": state["error"], "debug": state.get("debug")}  # fmt: skip
