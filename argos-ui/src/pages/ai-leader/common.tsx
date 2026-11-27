@@ -12,7 +12,7 @@ export const SECTIONS: { id: Section; label: string; scoped: boolean }[] = [
   { id: 'training', label: 'Training Factory', scoped: false },
   { id: 'registry', label: 'Model Registry', scoped: true },
   { id: 'deployment', label: 'Deployment Center', scoped: false },
-  { id: 'monitoring', label: 'Monitoring', scoped: true },
+  { id: 'monitoring', label: 'Monitoring', scoped: false }, // DBX-07C: no preselected model
 ];
 
 /** Section et modèle courants, portés par l'URL (?section=…&model=…). */

@@ -1,0 +1,41 @@
+/* Monitoring (DBX-07C) — même direction artistique que Training Factory (training.css, ui.css). */
+.mon-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.mon-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.mon-span { grid-column: 1 / -1; }
+.mon-scope { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; font-size: 13px; color: var(--muted); padding: 0 4px; }
+.mon-scope b { color: var(--ink); margin-right: 6px; }
+.mon-alert-strip { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 18px; font-size: 14px; }
+.mon-lat { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.mon-lat li { display: grid; grid-template-columns: minmax(150px, 0.9fr) minmax(0, 1.6fr) 70px; gap: 10px; align-items: center; }
+.mon-lat-bars { display: flex; flex-direction: column; gap: 4px; }
+.mon-lat-values { font-size: 12px; text-align: right; line-height: 1.35; }
+.mon-card { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; min-width: 0; }
+.mon-card h3 { margin: 0; font-size: 17px; }
+.mon-card .sub { font-size: 13px; color: var(--muted); margin-top: -6px; }
+.mon-fig { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.mon-fig svg { width: 100%; height: auto; overflow: visible; }
+.mon-fig figcaption { font-size: 13px; }
+.mon-axis { stroke: var(--line-strong); stroke-width: 1; }
+.mon-tick { font-size: 11px; fill: var(--muted); }
+.mon-empty { padding: 18px 14px; border-radius: 14px; background: var(--surface-soft); border: 1px dashed var(--line-strong); color: var(--muted); font-size: 14px; font-weight: 600; }
+.mon-hbars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.mon-hbars li { display: grid; grid-template-columns: minmax(130px, 0.9fr) minmax(0, 1.4fr) 32px; gap: 10px; align-items: center; }
+.mon-hbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mon-hbar-track { height: 10px; border-radius: 5px; background: var(--track); overflow: hidden; }
+.mon-hbar-track span { display: block; height: 100%; border-radius: 5px; min-width: 2px; }
+.mon-hbars b { text-align: right; }
+.mon-banner { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 14px; border-radius: 14px; font-size: 14px; font-weight: 600; background: var(--amber-soft); color: var(--amber-text); }
+.mon-banner.navy { background: var(--primary-soft); color: var(--ink); }
+.mon-detail-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.mon-detail-head h2 { margin: 0; font-size: 21px; overflow-wrap: anywhere; }
+.mon-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
+.mon-kv dt { color: var(--muted); font-weight: 600; }
+.mon-kv dd { margin: 0; overflow-wrap: anywhere; }
+.mon-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; align-items: end; }
+.mon-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.mon-form input { height: 38px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 10px; font: inherit; color: var(--ink); }
+.mon-table td.num, .mon-table th.num { text-align: right; white-space: nowrap; }
+.tf-table tbody tr.static { cursor: default; }
+@media (max-width: 1500px) { .mon-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .mon-charts { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .mon-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
