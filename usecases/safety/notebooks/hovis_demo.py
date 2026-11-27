@@ -439,6 +439,7 @@ def station_detail(station_id: str) -> dict:
     elapsed_h = max(0.1, (local - shift_start).total_seconds() / 3600)
     return {
         "stationId": station_id, "product": f"Presse injection · {st['product']}",
+        "shift": shift, "elapsedMin": minutes(local),
         "efficiencyPct": round(100 * st["good"] / max(1, st["expectedNow"])), "good": st["good"],
         "expectedNow": st["expectedNow"], "delta": st["good"] - st["expectedNow"],
         "ratePerHour": round(st["good"] / elapsed_h), "ko": st["ko"],
