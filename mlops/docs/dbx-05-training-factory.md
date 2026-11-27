@@ -1,0 +1,121 @@
+# DBX-05 — Training Factory et intégration Quality
+
+Commits : `7220b2b` (05B, orchestration), `29c92e3` (05C, interface), `830ba3e` (correctifs). Base : `b3bbc5b`, obtenue par fast-forward depuis `243b232`.
+
+## 1. Pipelines déclaratifs
+
+Chaque pipeline est décrit dans `mlops/pipelines/<id>/pipeline.yaml` :
+- cas d'usage, classes, exigences sur le dataset (format, extensions, splits obligatoires, champ de groupe) ;
+- paramètres : de base, avancés ou imposés, avec type et bornes ;
+- calcul, job, points d'entrée, sorties, destination MLflow, protocole d'évaluation.
+
+Ajouter un pipeline (EPI, Comportement, Poste) revient à ajouter un dossier ; Training Factory ne change pas.
+
+| Pipeline | État | Raison |
+|---|---|---|
+| `quality-demo` | **Exécutable** | Job existant `argos-poc-quality-training`, serverless CPU. Aucun hyperparamètre exposé : les deux configurations sont fixées dans le code. La version du dataset se choisit **pour chaque exécution**, via les paramètres du notebook, sans modifier la définition du job. |
+| `quality-industrial` | **Non exécutable** | Le job `hovis-quality-industrial-training` n'est pas créé (création soumise à autorisation). Le code est présent. |
+
+## 2. Kit Quality
+
+Le kit est intégré **sans modification** dans `mlops/pipelines/quality_industrial/kit/`, depuis `394a86a`. `PROVENANCE.md` donne le SHA Git de chaque fichier, et un test vérifie l'égalité octet pour octet. Le kit est exclu de `ruff`.
+
+**Paramètres** : ceux réellement lus par `train.py`, avec les valeurs du groupe inchangées.
+- De base : `epochs` 30, `patience` 10, `batch` 32, `seed` 0.
+- Avancés : `imgsz` 128, `erasing` 0, `flipud` 0.5, `hsv_v` 0.6, `scale` 0.6, `rappel_vise` 0.90.
+- Imposés : `modele_base` = `yolo26n-cls.pt`, et **`fusionner_test` = false**.
+- Il n'y a pas de taux d'apprentissage.
+
+**Wrapper** `run_pipeline.py`, exécuté dans le job :
+1. Matérialisation de la version du dataset : chaque SHA-256 est vérifié, `validation` devient `val`, `repartition.csv` est régénéré avec les rafales, et aucune rafale ne peut se trouver dans deux splits.
+2. Écriture du YAML effectif.
+3. Appel de `train.py`, **sans** `--ecraser` **ni** `--fusionner-test`.
+4. Appel de `evaluer.py` sur le **test**.
+5. Appel de `export_onnx.py`, si `onnx` et `onnxruntime` sont installés.
+6. **Un seul** run MLflow (le suivi MLflow propre à Ultralytics est désactivé), contenant :
+   - les tags : pipeline, commit, dataset, empreinte du manifeste, empreintes des splits, job et exécution Databricks ;
+   - les paramètres ;
+   - les métriques par époque et les métriques de test ;
+   - les artefacts, **sans aucune image**.
+7. Enregistrement d'un **candidat** :
+   - idempotent : pas de doublon pour un même run ;
+   - sans alias, sans approbation, sans changement de la version servie.
+   - Relancer la même requête après un entraînement réussi ne réentraîne pas : seul l'enregistrement est repris.
+
+**Test local de bout en bout, réalisé** : il a utilisé les **vrais** scripts du groupe, sur `quality-synthetic-3c`, avec Ultralytics 8.4.219, PyTorch en CPU et un MLflow SQLite local.
+- L'entraînement (2 époques) puis l'évaluation sur le test ont produit un seul run MLflow, avec les métriques par époque et les métriques de test.
+- Les artefacts `evaluation/metriques.json`, `predictions.csv` et `rapport_evaluation.md` sont présents.
+- Le candidat v1 est enregistré, **sans alias**.
+- La seconde exécution de la même requête a renvoyé `resumed` : ni réentraînement, ni nouvelle version.
+- L'export ONNX a été sauté, car `onnx` n'est pas installé localement.
+
+## 3. Datasets
+
+- Le `DatasetResolver` passe par le catalogue indépendant (`scope_id`, `manifest`), sans raccourci par le modèle.
+- Le champ facultatif `group` à l'import est conservé dans les manifestes publiés (source pour 5S, rafale pour Quality). L'ajout est rétrocompatible.
+- `quality-synthetic-3c` est généré localement : 108 JPG de 126×86 px, 18 rafales, découpage par rafale (72 / 18 / 18). L'import est préparé mais pas effectué.
+- Un dataset sans split de validation (presse-5s) est **refusé** par les pipelines qui exigent ce split.
+
+## 4. Routes (`/api/mlops/training`)
+
+| Route | Rôle |
+|---|---|
+| `pipelines` | Pipelines déclarés et leur état d'exécutabilité |
+| `pipelines/{id}/datasets` | Datasets compatibles avec un pipeline |
+| `datasets/{d}/versions/{v}/preview` | Aperçu d'une version de dataset |
+| `validate` | Contrôles de compatibilité |
+| `launch` | Lancement d'un entraînement |
+| `summary` | Indicateurs |
+| `runs` | Catalogue des entraînements |
+| `runs/{id}` | Détail d'un entraînement |
+| `runs/{id}/cancel` | Annulation |
+| `runs/{id}/logs` | Logs Databricks |
+| `mlflow-runs/{r}/history` | Historique des métriques |
+| `mlflow-runs/{r}/evaluation` | Évaluation |
+| `mlflow-runs/{r}/predictions` | Prédictions |
+| `mlflow-runs/{r}/artifacts` | Liste des artefacts |
+| `mlflow-runs/{r}/artifact` | Lecture d'un artefact |
+
+**`launch` et `cancel`** renvoient **403** tant que `HOVIS_TRAINING_REMOTE` ne vaut pas `1`. Ils utilisent le jeton d'idempotence de Databricks : un double clic ou une réponse incertaine ne crée jamais un second job.
+
+## 5. Mesures sur les données réelles (via 5174)
+
+- **Catalogue** :
+  - 1,1 s à froid, puis servi depuis le cache ;
+  - `TR-413658636976172` est relié exactement à ses 2 runs MLflow et aux versions v1 et v2, par le tag `databricks.job_run_id` ;
+  - les 3 exécutions en échec de DBX-00 n'ont aucun run, ce qui est exact.
+- **Évaluation d'un run `quality-demo`** : 14 s au premier accès (listing MLflow), puis immédiate ; la matrice vient de `reports/confusion_matrix_test.json`.
+- **Liste complète des artefacts** : 24 s au premier accès, puis mise en cache 1 h.
+
+## 6. Limites
+
+- Le lancement distant est désactivé, et aucun job, expérience ou modèle Unity Catalog n'a été créé.
+- Les prédictions par image n'existent que pour `quality-industrial` (`predictions.csv`). `quality-demo` n'en produit pas.
+- `predictions.csv` ne contient pas les probabilités par classe : elles ne sont pas affichées.
+- Une image n'est reliée à son entrée du manifeste que si le couple (classe, nom) est unique dans le test.
+- Le lien « Ouvrir dans MLflow » dépend des tags du run.
+- `tri_nok.csv` manque : aucun dataset `quality-industrial` ne peut être construit.
+
+## 7. Plan des premiers lancements Databricks (à autoriser)
+
+Tout se fait en serverless CPU, sans GPU, sans warehouse et sans endpoint.
+
+1. **`quality-demo` sur `synthetic-v2`**
+   - Actions : passer `HOVIS_TRAINING_REMOTE=1`, puis lancer depuis l'assistant. Un seul job, existant ; environ 5 minutes de calcul.
+   - Vérifier : dataset = `synthetic-v2` dans les runs MLflow, versions candidates en v3 et v4, alias et version servie inchangés.
+   - **Point d'attention** : le code téléversé dans le Volume est encore celui de DBX-00, qui sélectionne lui-même le champion et le challenger. Avant ce lancement, il faut **décider** :
+     - soit mettre à jour le code distant (évolution Delta « option B », et suppression de l'attribution automatique des alias) ;
+     - soit accepter son comportement d'origine.
+
+     Je recommande la mise à jour, que je ferai avec `upload_code`, sans lancer de job.
+2. **Mise en place de `quality-industrial`**, sans entraînement :
+   - téléverser `mlops/` (wrapper et kit) dans `runs/hovis/code` ;
+   - créer le job `hovis-quality-industrial-training` : serverless CPU, environnement `ultralytics==8.4.219`, `torch` CPU, `onnx`, `onnxruntime`, `mlflow==3.18.0`, paramètre de job `request` ;
+   - créer l'expérience `/Shared/HOVIS/quality-industrial` et le modèle Unity Catalog `workspace.argos_poc.quality_industrial` ;
+   - déposer `yolo26n-cls.pt` avec son SHA-256.
+3. **Import de `quality-synthetic-3c`** : `python -m mlops.datasets_prep.quality_synthetic_3c import --i-have-explicit-authorization` (108 images, environ 1 Mo).
+4. **Premier entraînement `quality-industrial` sur `quality-synthetic-3c`** :
+   - un seul job, avec les paramètres par défaut du groupe (30 époques maximum) ;
+   - durée attendue de quelques minutes sur CPU (non mesurée sur Databricks) ;
+   - vérifier : courbes, matrice avec `A_VERIFIER`, galerie, artefacts, candidat sans alias.
+5. **Plus tard** : `quality-industrial` sur les données réelles, seulement après réception de `tri_nok.csv` et ton autorisation de transfert.
