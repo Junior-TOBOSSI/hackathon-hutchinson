@@ -57,7 +57,7 @@ Les sept blocs sont les suivants.
   - versions approuvées (avec le nombre de champions) ;
   - endpoints Serving prêts ;
   - modèles à investiguer (avec dérives et couverture insuffisante).
-- **Accès rapides :** Datasets, Nouvel entraînement (assistant existant, `new=1`), Training Factory, Model Registry, Deployment Center, Monitoring, Politiques. Ils réutilisent les parcours existants.
+- **Accès rapides :** d'abord présents sur la page, ils ont été retirés après revue : le menu latéral couvre les mêmes destinations (§9). L'assistant Nouvel entraînement reste accessible depuis Training Factory.
 
 ## 4. Mesures (sonde navigateur Edge headless, 3 passages, même jeu de données)
 | Mesure | Avant (ancien accueil, `1f7159e`) | Après |
@@ -114,3 +114,16 @@ Ni les datasets, ni les pipelines, ni Training Factory, ni les écrans industrie
 - **Images :** le compte porte sur la dernière version de chaque famille, pas sur les images uniques entre versions, ce qui demanderait de lire tous les manifestes.
 - **Historique des entraînements :** limité aux 25 derniers job runs par pipeline (page de l'API Databricks).
 - **Pastille `health` de l'en-tête commun :** elle fait toujours un appel Databricks par chargement (environ 250 ms, non bloquant). Elle est hors du périmètre de l'accueil.
+
+## 9. Revue visuelle : navigation de l'espace AI Leader
+Ces changements portent sur le cadre commun `AiLeaderWorkspace.tsx` et le nouveau fichier `workspace.css`. Ils s'appliquent donc à toutes les pages AI Leader ; les écrans industriels ne sont pas concernés.
+
+- **Bandeau allégé :**
+  - le sous-titre se réduit à « AI Leader » ;
+  - la date de lecture affiche l'heure seule (l'origine « cache serveur » est retirée), mais « dernier résultat connu » est conservé en cas de panne Databricks ;
+  - le texte de fraîcheur et le second bouton « Actualiser » sont retirés de l'en-tête de l'accueil.
+- **Menu latéral docké** à la place de la barre d'onglets horizontale :
+  - une barre fine affiche les « trois traits » à gauche, le nom de la page en cours et, à droite, le sélecteur de modèle, l'heure de lecture et « Actualiser » ;
+  - le volet est **ouvert par défaut** et ne se replie ou ne se déplie **que** par les trois traits, sans fermeture au choix d'une page, à Échap ou au clic extérieur. L'état est mémorisé dans `localStorage` (`hovis.aiLeaderMenu`) ;
+  - le volet est léger : fond blanc, fine bordure, 216 px ; la page active est sur fond bleu clair avec un liseré rouge. « Politiques » figure en sous-entrée de Training Factory.
+- **Vérification :** dans Edge headless (ouverture par défaut, navigation, Échap, clic dans le contenu, bascule, persistance). TypeScript, les tests frontend et le build passent.
