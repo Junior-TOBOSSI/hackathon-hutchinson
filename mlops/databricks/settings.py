@@ -88,6 +88,27 @@ DEFAULT_MODELS = [
         training_job="hovis-quality-industrial-binary-training",
         synthetic=False,
     ),
+    # SCI-03: the Workstation group's method, ONE registered model per section (references,
+    # zones and learned normality are section-specific: never interchangeable).
+    *[
+        ManagedModel(
+            id=f"workstation-{section.replace('_', '-')}",
+            display_name=f"Poste 5S — {title} (groupe Workstation)",
+            use_case="Gestion de poste",
+            argos_use_case="workstation",
+            scope=f"Section {section} · jeu pilote synthétique du groupe ({dataset})",
+            uc_name=f"workspace.argos_poc.workstation_{section}",
+            endpoint=None,
+            training_job="hovis-workstation-training",
+            synthetic=True,
+        )
+        for section, title, dataset in (
+            ("press_cell", "Press cell", "poste_5s_11"),
+            ("machine_cell", "Machine cell", "poste_bleu_5s_11"),
+            ("machine_cell_variant", "Machine cell variant", "poste_variante_5s_11"),
+            ("electrical_bench", "Electrical bench", "poste_electrique_5s_11"),
+        )
+    ],
 ]
 
 

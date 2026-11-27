@@ -24,6 +24,7 @@ from mlops.retraining.models import (
     RetrainPolicyConfig,
 )
 from mlops.retraining.store import RetrainingStore
+from mlops.training.specs import registers_into
 
 
 class LaunchRefused(Exception):
@@ -116,7 +117,7 @@ class RetrainingService:
             managed = self.p.managed(data.model_id)
         except Exception as exc:  # noqa: BLE001 - unknown model
             raise PolicyError(f"unknown model {data.model_id!r}") from exc
-        if spec.mlflow.get("registered_model") != managed.uc_name:
+        if not registers_into(spec, managed.uc_name):
             raise PolicyError(f"pipeline {spec.id} does not register into {managed.uc_name}")
         if data.use_case != managed.argos_use_case:
             raise PolicyError(f"model {data.model_id} belongs to use case {managed.argos_use_case}")

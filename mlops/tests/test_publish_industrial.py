@@ -94,7 +94,8 @@ def vol(monkeypatch):
 def test_local_checks_refuse_synthetic_flags_and_burst_leaks(tmp_path):
     assert pub.check_local(prepared(tmp_path / "a"))[1] == []
     assert any(
-        "synthetic=false" in e for e in pub.check_local(prepared(tmp_path / "b", synthetic=True))[1]
+        "image_provenance" in e
+        for e in pub.check_local(prepared(tmp_path / "b", synthetic=True))[1]
     )
     assert any("burst" in e for e in pub.check_local(prepared(tmp_path / "c", leak=True))[1])
     d = prepared(tmp_path / "d")
@@ -151,3 +152,55 @@ def test_execute_publishes_with_catalogue_guarantees(tmp_path, vol, monkeypatch)
         )
         == 0
     )
+
+
+def test_workstation_section_with_assets_keeps_its_synthetic_provenance(tmp_path, vol, monkeypatch):
+    """SCI-03: nested paths + assets (reference, labels.csv) published and verified like images;
+    the manifest written last keeps synthetic=true."""
+    base = "raw/workstation/poste_5s_11"
+    entries = {f"{base}/good/good_01.png": "good", f"{base}/anomaly/anomaly_01.png": "anomaly"}
+    items, assets = [], []
+    for rel, label in entries.items():
+        f = tmp_path.joinpath(*rel.split("/"))
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_bytes(rel.encode())
+        split = "train" if label == "good" else "test"
+        items.append({"file": rel, "label": label, "split": split, "sha256": pub._sha(f)})
+    for name in ("reference.png", "labels.csv"):
+        f = tmp_path / base / name
+        f.write_bytes(name.encode())
+        assets.append({"file": f"{base}/{name}", "sha256": pub._sha(f)})
+    m = {
+        "dataset_id": "poste-5s-11",
+        "dataset_version": "group-v1",
+        "station": "press_cell",
+        "use_case": "workstation",
+        "classes": ["good", "anomaly"],
+        "synthetic": True,
+        "image_provenance": "synthetic",
+        "counts": {"train": {"good": 1}, "test": {"anomaly": 1}},
+        "items": items,
+        "assets": assets,
+    }
+    (tmp_path / pub.STAGED).write_text(json.dumps(m), encoding="utf-8")
+    assert pub.check_local(tmp_path)[1] == []
+    assert pub.main(["--prepared", str(tmp_path), "--execute"]) == 3 and vol.files == {}
+    monkeypatch.setenv("HOVIS_INDUSTRIAL_TRANSFER", "1")
+    assert (
+        pub.main(["--prepared", str(tmp_path), "--execute", "--confirm", "poste-5s-11/group-v1"])
+        == 0
+    )
+    root = "/Volumes/x/_families/poste-5s-11/group-v1"
+    assert f"{root}/{base}/labels.csv" in vol.files and f"{root}/{base}/reference.png" in vol.files
+    assert vol.order[-1] == f"{root}/manifest.json"
+    published = json.loads(vol.files[f"{root}/manifest.json"])
+    assert published["synthetic"] is True
+    assert published["provenance"]["publication"] == "group explicit path (synthetic images)"
+    # contradictory provenance or a changed asset are refused before any transfer
+    m["image_provenance"] = "industrial"
+    (tmp_path / pub.STAGED).write_text(json.dumps(m), encoding="utf-8")
+    assert any("contradicts" in e for e in pub.check_local(tmp_path)[1])
+    m["image_provenance"] = "synthetic"
+    (tmp_path / pub.STAGED).write_text(json.dumps(m), encoding="utf-8")
+    (tmp_path / base / "labels.csv").write_bytes(b"changed")
+    assert any("SHA-256 mismatch" in e for e in pub.check_local(tmp_path)[1])

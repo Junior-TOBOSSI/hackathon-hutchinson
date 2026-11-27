@@ -315,3 +315,14 @@ def test_monitoring_snapshot_is_returned_as_such(connector):
     report = connector.monitoring("q", refresh=True)
     assert not report.available  # never presented as a live read
     assert report.last_snapshot.accuracies == {"accuracy_reference": 0.86}
+
+
+def test_declared_model_not_registered_yet_has_no_version(connector):
+    """SCI-03: a declared model (e.g. a Workstation section never trained) is not an error:
+    the Registry page shows it with 0 version instead of failing for every model."""
+    connector.mlflow.get_registered_model.side_effect = Exception(
+        "RESOURCE_DOES_NOT_EXIST: Registered model cat.sch.q does not exist"
+    )
+    status = connector.model_status(MODEL.id)
+    assert status.versions == [] and status.aliases == {}
+    connector.mlflow.search_model_versions.assert_not_called()

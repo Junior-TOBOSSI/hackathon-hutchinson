@@ -121,3 +121,24 @@ def test_mlops_workstation_kit_is_byte_identical_to_the_run_analyzer():
         assert strip((kit / "config.yaml").read_text(encoding="utf-8")) == strip(
             (run / "config.yaml").read_text(encoding="utf-8")
         )
+
+
+def test_workstation_sections_register_into_separate_models():
+    """SCI-03: a section's model is never compared with / promoted over another section's."""
+    from mlops.databricks.settings import DEFAULT_MODELS
+    from mlops.training.specs import registers_into
+
+    spec = {s.id: s for s in load_specs()}["workstation-industrial"]
+    names = spec.registered_models()
+    assert len(names) == len(set(names)) == len(SECTIONS) == 4
+    for section in SECTIONS:
+        name = spec.registered_model_for({"station": section})
+        assert name.endswith(section) and registers_into(spec, name)
+    with pytest.raises(ValueError):
+        spec.registered_model_for({"station": "unknown"})
+    managed = {m.uc_name: m for m in DEFAULT_MODELS if m.argos_use_case == "workstation"}
+    assert set(managed) == set(names)  # one managed model per section, each its own alias set
+    assert "workspace.argos_poc.workstation_industrial" not in managed  # no shared model
+    quality = {s.id: s for s in load_specs()}["quality-industrial-binary"]
+    assert quality.registered_models() == [quality.mlflow["registered_model"]]
+    assert not registers_into(quality, names[0])

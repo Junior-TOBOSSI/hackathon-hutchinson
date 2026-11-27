@@ -53,12 +53,38 @@ class PipelineSpec(BaseModel):
     job: dict[str, Any]
     entrypoints: dict[str, str]
     outputs: list[str]
-    mlflow: dict[str, str]
+    mlflow: dict[str, Any]
     evaluation: dict[str, Any]
     folder: str = ""
 
     def param(self, name: str) -> ParamSpec | None:
         return next((p for p in self.parameters if p.name == name), None)
+
+    # SCI-03: a pipeline may register into ONE model per value of a parameter (Workstation:
+    # one model per section). Versions of different sections are never in the same registered
+    # model, so they are never compared, approved or promoted as interchangeable.
+    def registered_models(self) -> list[str]:
+        per = self.mlflow.get("registered_models")
+        return list(per.values()) if per else [self.mlflow["registered_model"]]
+
+    def registered_model_for(self, parameters: dict[str, Any] | None) -> str:
+        per = self.mlflow.get("registered_models")
+        if not per:
+            return self.mlflow["registered_model"]
+        key = (parameters or {}).get(self.mlflow["registered_model_by"])
+        if key not in per:
+            raise ValueError(f"no registered model for {self.mlflow['registered_model_by']}={key}")
+        return per[key]
+
+    def registers_into(self, uc_name: str) -> bool:
+        return uc_name in self.registered_models()
+
+
+def registers_into(spec: Any, uc_name: str) -> bool:
+    """True if the pipeline registers into this UC model (one model or one per section)."""
+    mlflow = getattr(spec, "mlflow", {}) or {}
+    per = mlflow.get("registered_models")
+    return uc_name in per.values() if per else mlflow.get("registered_model") == uc_name
 
 
 class Requirement(BaseModel):

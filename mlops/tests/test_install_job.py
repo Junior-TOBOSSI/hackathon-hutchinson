@@ -45,3 +45,26 @@ def test_only_code_files_of_the_runner_are_uploaded():
     assert any(f.endswith("kit/usecases/workstation/model.py") for f in files)
     assert any(f.endswith("mlops/__init__.py") for f in files)
     assert not any(f.endswith((".pyc", ".pt", ".jpg", ".png", ".zip", ".sqlite3")) for f in files)
+
+
+def test_workstation_job_uploads_the_shared_modules_it_imports():
+    """SCI-03: the runner imports visionhub and the Quality runner; they are uploaded too."""
+    import pytest
+
+    from mlops.training.install_job import ROOT, code_files
+    from mlops.training.specs import load_specs
+
+    spec = next(s for s in load_specs() if s.id == "workstation-industrial")
+    rel = spec.job["script"].removeprefix(spec.job["code_root"] + "/")
+    names = {f.relative_to(ROOT).as_posix() for f in code_files(rel, spec.job["code_extra"])}
+    for needed in (
+        "visionhub/config.py",
+        "visionhub/contracts.py",
+        "mlops/pipelines/quality_industrial/run_pipeline.py",
+        "mlops/pipelines/workstation/kit/usecases/workstation/model.py",
+    ):
+        assert needed in names
+    assert not any(n.endswith((".pt", ".png", ".csv")) for n in names)
+    assert any(d.startswith("pydantic-settings") for d in spec.compute["environment"])
+    with pytest.raises(ValueError):
+        code_files(rel, ["../outside.py"])

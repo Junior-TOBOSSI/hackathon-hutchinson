@@ -26,8 +26,9 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def code_files(script_rel: str) -> list[Path]:
-    """The runner's folder (recursively) and the package __init__ files above it."""
+def code_files(script_rel: str, extra: list[str] | None = None) -> list[Path]:
+    """The runner's folder (recursively), the package __init__ files above it and the shared
+    modules declared by ``job.code_extra`` (repository-relative files, never outside it)."""
     folder = ROOT / Path(script_rel).parent
     files = [
         p
@@ -42,6 +43,12 @@ def code_files(script_rel: str) -> list[Path]:
         if init.is_file() and init not in files:
             files.append(init)
         parent = parent.parent
+    for rel in extra or []:
+        f = (ROOT / rel).resolve()
+        if not f.is_relative_to(ROOT) or not f.is_file() or f.suffix != ".py":
+            raise ValueError(f"code_extra must list Python files of the repository: {rel}")
+        if f not in files:
+            files.append(f)
     return sorted(files)
 
 
@@ -81,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     w = c.w
     code_root = spec.job["code_root"]
     script_rel = spec.job["script"].removeprefix(code_root + "/")
-    files = code_files(script_rel)
+    files = code_files(script_rel, spec.job.get("code_extra"))
     jobs = {j.settings.name: j for j in w.jobs.list(name=spec.job["name"])}
     template = next(iter(w.jobs.list(name=args.template_job)), None)
     if template is None:
