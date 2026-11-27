@@ -22,6 +22,7 @@ from typing import Annotated, Any, Literal, TypeVar
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel
 
+from mlops.api.monitoring_routes import create_monitoring_router
 from mlops.api.training_routes import create_training_router
 from mlops.connectors.mlflow_client import ExperimentInfo, MetricPoint, ModelVersionInfo, RunSummary
 from mlops.databricks.connector import (
@@ -578,6 +579,8 @@ def create_mlops_router(
 
     # DBX-05 Training Factory (dedicated module, same connector and cache).
     router.include_router(create_training_router(get_connector))
+    # DBX-07B Monitoring (dedicated module; local history only, GET never writes).
+    router.include_router(create_monitoring_router(get_connector, get_policy=_POLICIES.get))
 
     return router
 
